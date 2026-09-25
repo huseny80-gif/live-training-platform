@@ -18,7 +18,8 @@
     "db:reset": "prisma migrate reset",
     "test:auth": "npx tsx tests/auth.test.ts",
     "test:live": "npx tsx tests/live-session.test.ts",
-    "server": "npx tsx server.ts"
+    "server": "npx tsx server.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
