@@ -1,0 +1,551 @@
+// Live Training & Interactive Quiz Platform
+// Database Schema — Version 1.0
+// Designed for: extensibility (speed bonus, weighted questions, external API)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum InstructorRole {
+  INSTRUCTOR
+  ADMIN
+}
+
+enum Language {
+  AR
+  EN
+}
+
+enum ProgramStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum DocumentContentType {
+  TEXT_BASED    // pdfjs-dist can extract directly
+  IMAGE_BASED   // PowerPoint-exported or scanned — needs Vision LLM
+  MIXED         // some text, some images
+  UNKNOWN       // not yet analyzed
+}
+
+enum DocumentExtractionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  OCR_REQUIRED  // image-based, awaiting user confirmation to proceed with Vision LLM
+  FAILED
+}
+
+enum PageExtractionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  OCR_REQUIRED
+}
+
+enum DayStatus {
+  DRAFT
+  APPROVED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+  USED
+}
+
+enum QuestionGeneratedBy {
+  AI
+  MANUAL
+}
+
+enum OptionLabel {
+  A
+  B
+  C
+  D
+}
+
+enum SessionStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum SessionQuestionStatus {
+  DRAFT
+  READY
+  LIVE
+  CLOSED
+  RESULTS
+}
+
+enum ParticipantStatus {
+  JOINED
+  ONLINE
+  OFFLINE
+  RECONNECTED
+  REMOVED
+}
+
+enum ActorType {
+  INSTRUCTOR
+  PARTICIPANT
+  SYSTEM
+}
+
+// ─────────────────────────────────────────────
+// INSTRUCTORS
+// ─────────────────────────────────────────────
+
+model Instructor {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  name          String
+  role          InstructorRole @default(INSTRUCTOR)
+  isActive      Boolean        @default(true) @map("is_active")
+  lastLoginAt   DateTime?      @map("last_login_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  programs      TrainingProgram[]
+  sessions      LiveSession[]
+  auditLogs     AuditLog[]
+
+  @@index([email])
+  @@map("instructors")
+}
+
+// ─────────────────────────────────────────────
+// TRAINING PROGRAMS
+// ─────────────────────────────────────────────
+
+model TrainingProgram {
+  id           String        @id @default(uuid())
+  instructorId String        @map("instructor_id")
+  title        String
+  description  String?
+  language     Language      @default(AR)
+  status       ProgramStatus @default(DRAFT)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  instructor   Instructor          @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  documents    TrainingDocument[]
+  days         TrainingDay[]
+  sessions     LiveSession[]
+
+  @@index([instructorId])
+  @@index([status])
+  @@map("training_programs")
+}
+
+// ─────────────────────────────────────────────
+// TRAINING DOCUMENTS (PDF files)
+// ─────────────────────────────────────────────
+
+model TrainingDocument {
+  id                String                    @id @default(uuid())
+  programId         String                    @map("program_id")
+  fileName          String                    @map("file_name")
+  storagePath       String                    @map("storage_path")
+  fileSizeBytes     Int                       @map("file_size_bytes")
+  pageCount         Int?                      @map("page_count")
+  mimeType          String                    @default("application/pdf") @map("mime_type")
+  contentType       DocumentContentType       @default(UNKNOWN) @map("content_type")
+  extractionStatus  DocumentExtractionStatus  @default(PENDING) @map("extraction_status")
+  extractionNotes   String?                   @map("extraction_notes")
+  extractedAt       DateTime?                 @map("extracted_at")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+
+  program           TrainingProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  days              TrainingDay[]
+  pages             DocumentPage[]
+
+  @@index([programId])
+  @@index([extractionStatus])
+  @@map("training_documents")
+}
+
+// ─────────────────────────────────────────────
+// DOCUMENT PAGES (per-slide/per-page extraction)
+// Populated in PHASE 5 (PDF Processing)
+// Enables: Question → Page → Slide content traceability
+// ─────────────────────────────────────────────
+
+model DocumentPage {
+  id              String               @id @default(uuid())
+  documentId      String               @map("document_id")
+  pageNumber      Int                  @map("page_number")      // 1-based (1–147 for GIS PDF)
+  title           String?                                        // slide title if detectable
+  extractedText   String?              @map("extracted_text")   // raw extracted text
+  extractedJson   Json?                @map("extracted_json")   // structured: {title, bullets[], keywords[]}
+  imageStoragePath String?             @map("image_storage_path") // path to rendered slide image (for Vision LLM)
+  extractionMethod String?             @map("extraction_method") // NATIVE_TEXT | LLAMAPARSE | VISION_LLM | MOCK
+  extractionStatus PageExtractionStatus @default(PENDING) @map("extraction_status")
+  errorMessage    String?              @map("error_message")
+  extractedAt     DateTime?            @map("extracted_at")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  document        TrainingDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  questions       Question[]        @relation("QuestionSourcePage")
+
+  @@unique([documentId, pageNumber])
+  @@index([documentId])
+  @@index([extractionStatus])
+  @@map("document_pages")
+}
+
+// ─────────────────────────────────────────────
+// TRAINING DAYS (10 per program)
+// ─────────────────────────────────────────────
+
+model TrainingDay {
+  id             String    @id @default(uuid())
+  programId      String    @map("program_id")
+  documentId     String?   @map("document_id")
+  dayNumber      Int       @map("day_number")
+  title          String
+  objectives     String[]
+  contentSummary String?   @map("content_summary")
+  pageRangeStart Int?      @map("page_range_start")
+  pageRangeEnd   Int?      @map("page_range_end")
+  status         DayStatus @default(DRAFT)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  program        TrainingProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  document       TrainingDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  questions      Question[]
+  topics         TrainingTopic[]
+
+  @@unique([programId, dayNumber])
+  @@index([programId])
+  @@map("training_days")
+}
+
+// ─────────────────────────────────────────────
+// TRAINING TOPICS
+// ─────────────────────────────────────────────
+
+model TrainingTopic {
+  id         String   @id @default(uuid())
+  dayId      String   @map("day_id")
+  title      String
+  topicOrder Int      @map("topic_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  day        TrainingDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  @@index([dayId])
+  @@map("training_topics")
+}
+
+// ─────────────────────────────────────────────
+// QUESTIONS
+// ─────────────────────────────────────────────
+
+model Question {
+  id              String              @id @default(uuid())
+  dayId           String              @map("day_id")
+  programId       String              @map("program_id")
+  questionText    String              @map("question_text")
+  questionOrder   Int                 @map("question_order")
+  questionType    QuestionType        @default(MULTIPLE_CHOICE) @map("question_type")
+  difficulty      QuestionDifficulty  @default(MEDIUM)
+  correctOptionId String?             @map("correct_option_id")
+  explanation     String?
+  // Direct FK to DocumentPage for full traceability: Question → Day → Document → Page → Slide content
+  sourcePageId    String?             @map("source_page_id")
+  // Kept for denormalization / display without join (nullable when page not yet extracted)
+  sourcePageStart Int?                @map("source_page_start")
+  sourcePageEnd   Int?                @map("source_page_end")
+  topic           String?
+  language        Language            @default(AR)
+  status          QuestionStatus      @default(DRAFT)
+  weight          Decimal             @default(1.0)
+  generatedBy     QuestionGeneratedBy @default(AI) @map("generated_by")
+  aiModel         String?             @map("ai_model")
+  aiPromptVersion String?             @map("ai_prompt_version")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  day              TrainingDay       @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  sourcePage       DocumentPage?     @relation("QuestionSourcePage", fields: [sourcePageId], references: [id], onDelete: SetNull)
+  options          QuestionOption[]
+  sessionQuestions SessionQuestion[]
+
+  @@unique([dayId, questionOrder])
+  @@index([dayId])
+  @@index([programId])
+  @@index([status])
+  @@map("questions")
+}
+
+// ─────────────────────────────────────────────
+// QUESTION OPTIONS (A, B, C, D)
+// ─────────────────────────────────────────────
+
+model QuestionOption {
+  id           String      @id @default(uuid())
+  questionId   String      @map("question_id")
+  optionLabel  OptionLabel @map("option_label")
+  optionText   String      @map("option_text")
+  displayOrder Int         @map("display_order")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  question           Question            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  participantAnswers ParticipantAnswer[]
+
+  @@unique([questionId, optionLabel])
+  @@index([questionId])
+  @@map("question_options")
+}
+
+// ─────────────────────────────────────────────
+// LIVE SESSIONS
+// ─────────────────────────────────────────────
+
+model LiveSession {
+  id                String        @id @default(uuid())
+  programId         String        @map("program_id")
+  instructorId      String        @map("instructor_id")
+  sessionCode       String        @unique @map("session_code")
+  dayNumber         Int           @map("day_number")
+  title             String?
+  status            SessionStatus @default(DRAFT)
+  currentQuestionId String?       @map("current_question_id")
+  allowRetry        Boolean       @default(false) @map("allow_retry")
+  scoringConfig     Json          @default("{}") @map("scoring_config")
+  // joinDeadlineAt: after this time, new participants cannot join (null = no deadline)
+  // Application layer MUST check: status=ACTIVE AND (joinDeadlineAt IS NULL OR joinDeadlineAt > NOW())
+  joinDeadlineAt    DateTime?     @map("join_deadline_at")
+  startedAt         DateTime?     @map("started_at")
+  endedAt           DateTime?     @map("ended_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  program              TrainingProgram       @relation(fields: [programId], references: [id], onDelete: Restrict)
+  instructor           Instructor            @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  participants         SessionParticipant[]
+  sessionQuestions     SessionQuestion[]
+  answers              ParticipantAnswer[]
+  participantDayResults ParticipantDayResult[]
+  dailyResult          DailyResult?
+  sessionResult        SessionResult?
+
+  @@index([programId])
+  @@index([instructorId])
+  @@index([sessionCode])
+  @@index([status])
+  @@map("live_sessions")
+}
+
+// ─────────────────────────────────────────────
+// SESSION PARTICIPANTS
+// ─────────────────────────────────────────────
+
+model SessionParticipant {
+  id             String            @id @default(uuid())
+  sessionId      String            @map("session_id")
+  displayName    String            @map("display_name")
+  externalUserId String?           @map("external_user_id")
+  joinTokenHash  String            @map("join_token_hash")
+  status         ParticipantStatus @default(JOINED)
+  joinedAt       DateTime          @default(now()) @map("joined_at")
+  lastSeenAt     DateTime          @default(now()) @map("last_seen_at")
+  totalScore     Decimal           @default(0) @map("total_score")
+  answersCount   Int               @default(0) @map("answers_count")
+  correctCount   Int               @default(0) @map("correct_count")
+  rank           Int?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  session        LiveSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers        ParticipantAnswer[]
+  dayResults     ParticipantDayResult[]
+
+  @@index([sessionId])
+  @@index([sessionId, status])
+  @@index([externalUserId])
+  @@map("session_participants")
+}
+
+// ─────────────────────────────────────────────
+// SESSION QUESTIONS
+// ─────────────────────────────────────────────
+
+model SessionQuestion {
+  id               String                @id @default(uuid())
+  sessionId        String                @map("session_id")
+  questionId       String                @map("question_id")
+  questionOrder    Int                   @map("question_order")
+  status           SessionQuestionStatus @default(DRAFT)
+  timeLimitSeconds Int?                  @map("time_limit_seconds")
+  startedAt        DateTime?             @map("started_at")
+  closedAt         DateTime?             @map("closed_at")
+  resultsShownAt   DateTime?             @map("results_shown_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  session   LiveSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question  Question            @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answers   ParticipantAnswer[]
+
+  @@unique([sessionId, questionOrder])
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
+  @@index([status])
+  @@map("session_questions")
+}
+
+// ─────────────────────────────────────────────
+// PARTICIPANT ANSWERS
+// SECURITY: isCorrect computed SERVER-SIDE only — never from client
+// ─────────────────────────────────────────────
+
+model ParticipantAnswer {
+  id                String   @id @default(uuid())
+  sessionId         String   @map("session_id")
+  sessionQuestionId String   @map("session_question_id")
+  participantId     String   @map("participant_id")
+  selectedOptionId  String   @map("selected_option_id")
+  isCorrect         Boolean  @map("is_correct")
+  scoreAwarded      Decimal  @default(0) @map("score_awarded")
+  attemptNumber     Int      @default(1) @map("attempt_number")
+  isFinal           Boolean  @default(true) @map("is_final")
+  timeTakenSeconds  Int?     @map("time_taken_seconds")
+  answeredAt        DateTime @default(now()) @map("answered_at")
+
+  session         LiveSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionQuestion SessionQuestion    @relation(fields: [sessionQuestionId], references: [id], onDelete: Cascade)
+  participant     SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  selectedOption  QuestionOption     @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId])
+  @@index([sessionQuestionId])
+  @@index([participantId])
+  @@index([sessionQuestionId, isFinal])
+  @@map("participant_answers")
+}
+
+// ─────────────────────────────────────────────
+// PARTICIPANT DAY RESULTS
+// ─────────────────────────────────────────────
+
+model ParticipantDayResult {
+  id                String   @id @default(uuid())
+  sessionId         String   @map("session_id")
+  participantId     String   @map("participant_id")
+  dayNumber         Int      @map("day_number")
+  questionsTotal    Int      @default(5) @map("questions_total")
+  questionsAnswered Int      @default(0) @map("questions_answered")
+  correctCount      Int      @default(0) @map("correct_count")
+  wrongCount        Int      @default(0) @map("wrong_count")
+  totalScore        Decimal  @default(0) @map("total_score")
+  rank              Int?
+  computedAt        DateTime @default(now()) @map("computed_at")
+
+  session     LiveSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  participant SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, participantId, dayNumber])
+  @@index([sessionId, dayNumber])
+  @@map("participant_day_results")
+}
+
+// ─────────────────────────────────────────────
+// DAILY RESULTS (aggregated per session)
+// ─────────────────────────────────────────────
+
+model DailyResult {
+  id                String   @id @default(uuid())
+  sessionId         String   @unique @map("session_id")
+  dayNumber         Int      @map("day_number")
+  totalParticipants Int      @map("total_participants")
+  totalQuestions    Int      @default(5) @map("total_questions")
+  totalAnswers      Int      @map("total_answers")
+  totalCorrect      Int      @map("total_correct")
+  totalWrong        Int      @map("total_wrong")
+  correctRate       Decimal  @map("correct_rate")
+  averageScore      Decimal  @map("average_score")
+  highestScore      Decimal  @map("highest_score")
+  computedAt        DateTime @default(now()) @map("computed_at")
+
+  session           LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("daily_results")
+}
+
+// ─────────────────────────────────────────────
+// SESSION RESULTS (final aggregated)
+// ─────────────────────────────────────────────
+
+model SessionResult {
+  id                String   @id @default(uuid())
+  sessionId         String   @unique @map("session_id")
+  totalParticipants Int      @map("total_participants")
+  totalQuestions    Int      @map("total_questions")
+  totalAnswers      Int      @map("total_answers")
+  totalCorrect      Int      @map("total_correct")
+  correctRate       Decimal  @map("correct_rate")
+  averageScore      Decimal  @map("average_score")
+  highestScore      Decimal  @map("highest_score")
+  computedAt        DateTime @default(now()) @map("computed_at")
+
+  session           LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("session_results")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOGS — append-only event trail
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  entityType String    @map("entity_type")
+  entityId   String    @map("entity_id")
+  action     String
+  actorType  ActorType @map("actor_type")
+  actorId    String?   @map("actor_id")
+  metadata   Json      @default("{}") @map("metadata")
+  ipAddress  String?   @map("ip_address")
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  instructor Instructor? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
