@@ -55,14 +55,14 @@ async function run() {
   const aPrograms = await prisma.trainingProgram.findMany({
     where: { instructorId: instrA.id },
   });
-  assert(aPrograms.some((p) => p.id === progA.id), "A sees own program");
+  assert(aPrograms.some((p: typeof aPrograms[number]) => p.id === progA.id), "A sees own program");
 
   // PROG-03: Instructor B does NOT see A's program in their list
   console.log("\nPROG-03: B cannot see A's programs");
   const bPrograms = await prisma.trainingProgram.findMany({
     where: { instructorId: instrB.id },
   });
-  assert(!bPrograms.some((p) => p.id === progA.id), "B cannot see A's program");
+  assert(!bPrograms.some((p: typeof bPrograms[number]) => p.id === progA.id), "B cannot see A's program");
 
   // PROG-04: OWNERSHIP — B cannot update A's program (server-side check simulation)
   console.log("\nPROG-04: Cross-ownership update rejected");
