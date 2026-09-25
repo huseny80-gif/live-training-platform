@@ -46,13 +46,12 @@ export default function NewProgramPage() {
             <p className="text-sm text-red-600">{state.error}</p>
           )}
           <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex-1 py-2 rounded-lg border text-sm hover:bg-gray-50"
-            >
-              Cancel
-            </button>
+            <a
+  href="/dashboard"
+  className="flex-1 py-2 rounded-lg border text-sm hover:bg-gray-50 text-center"
+>
+  Cancel
+</a>
             <button
               type="submit"
               disabled={isPending}
