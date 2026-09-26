@@ -90,6 +90,35 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
           </div>
                 )}
 
+        {/* Uploaded Documents */}
+        {program.documents && program.documents.length > 0 && (
+          <div className="bg-white rounded-xl border p-4 space-y-2">
+            <h2 className="text-base font-semibold">Training Documents</h2>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {program.documents.map((doc: any) => (
+              <div key={doc.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
+                <div>
+                  <span className="font-medium">{doc.fileName}</span>
+                  {doc.pageCount != null && (
+                    <span className="ml-2 text-gray-400 text-xs">{doc.pageCount} pages</span>
+                  )}
+                </div>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full ${
+                    doc.extractionStatus === "COMPLETED"
+                      ? "bg-green-100 text-green-700"
+                      : doc.extractionStatus === "FAILED"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-yellow-100 text-yellow-700"
+                  }`}
+                >
+                  {doc.extractionStatus}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <DocumentUpload programId={id} />
 
         {/* Training Days */}

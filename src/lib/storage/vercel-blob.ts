@@ -20,8 +20,11 @@ export class VercelBlobAdapter implements StorageAdapter {
   async read(key: string): Promise<Buffer> {
     // Private blobs require an authenticated fetch — get() attaches the
     // BLOB_READ_WRITE_TOKEN as a bearer header; a plain fetch(url) would 403.
-    const result = await get(key, { access: "private" });
+    // useCache:false bypasses CDN caching so we never receive a 304 with a
+    // null stream for a blob we just uploaded.
+    const result = await get(key, { access: "private", useCache: false });
     if (!result) throw new Error("BLOB_READ_FAILED: not_found");
+    if (!result.stream) throw new Error("BLOB_READ_FAILED: empty_stream");
     const arrayBuffer = await new Response(result.stream).arrayBuffer();
     return Buffer.from(arrayBuffer);
   }

@@ -95,6 +95,18 @@ export async function getProgram(programId: string) {
         select: { id: true, sessionCode: true, status: true, startedAt: true },
         orderBy: { createdAt: "desc" },
       },
+      documents: {
+        select: {
+          id: true,
+          fileName: true,
+          fileSizeBytes: true,
+          pageCount: true,
+          contentType: true,
+          extractionStatus: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 }

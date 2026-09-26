@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { extractionService } from "@/lib/extraction/service";
@@ -197,7 +198,11 @@ export async function completeBlobUpload(
   fileName: string
 ) {
   const instructorId = await requireInstructor();
-  return registerBlobUpload({ instructorId, programId, blobUrl, fileName });
+  const doc = await registerBlobUpload({ instructorId, programId, blobUrl, fileName });
+  // Invalidate the program page so window.location.reload() fetches fresh data
+  // that includes the newly-created document.
+  revalidatePath(`/programs/${programId}`);
+  return doc;
 }
 
 /** Trigger extraction for a document */
