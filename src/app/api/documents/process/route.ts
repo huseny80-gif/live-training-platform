@@ -73,10 +73,21 @@ export async function POST(req: NextRequest) {
         await prisma.trainingDocument.update({
           where: { id: documentId },
           data: {
-            extractionNotes: generation.errorMessage ?? "Generation returned non-COMPLETED status",
+            extractionStatus: "FAILED",
+            extractionNotes: generation.errorMessage ?? "Content generation failed",
           },
         });
+        return;
       }
+
+      // Both extraction and generation succeeded
+      await prisma.trainingDocument.update({
+        where: { id: documentId },
+        data: {
+          extractionNotes: `${generation.daysGenerated} days · ${generation.questionsGenerated} questions`,
+          extractedAt: new Date(),
+        },
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown pipeline error";
       try {

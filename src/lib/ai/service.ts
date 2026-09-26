@@ -194,6 +194,16 @@ export class ContentGenerationService {
         }
       }
 
+      if (result.days.length === 0 || totalQuestions === 0) {
+        return {
+          programId, documentId,
+          status: "FAILED",
+          daysGenerated: result.days.length,
+          questionsGenerated: totalQuestions,
+          errorMessage: `AI returned insufficient content: ${result.days.length} days, ${totalQuestions} questions`,
+        };
+      }
+
       return {
         programId, documentId,
         status: "COMPLETED",
