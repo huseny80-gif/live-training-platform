@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { getProgram, deleteProgram } from "@/app/actions/programs";
 import Link from "next/link";
+import DocumentUpload from "./DocumentUpload";
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: "bg-yellow-100 text-yellow-800",
@@ -87,7 +88,9 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
           <div className="bg-white rounded-xl border p-4 text-sm text-gray-600">
             {program.description}
           </div>
-        )}
+                )}
+
+        <DocumentUpload programId={id} />
 
         {/* Training Days */}
         <div className="flex items-center justify-between">
@@ -107,29 +110,9 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         ) : (
           <div className="space-y-2">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {program.days.map((day: any) => (
-              <div
-                key={day.id}
-                className="bg-white rounded-xl border p-4 flex items-center justify-between"
-              >
-                <div>
-                  <span className="text-xs font-mono text-gray-400 mr-2">Day {day.dayNumber}</span>
-                  <span className="font-medium">{day.title}</span>
-                  <span
-                    className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
-                      day.status === "APPROVED"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
-                  >
-                    {day.status}
-                  </span>
-                </div>
-                <span className="text-sm text-gray-500">{day._count.questions} Q</span>
-              </div>
-            ))}
+            {program.days.map((day: any) => (<Link key={day.id} href={`/programs/${id}/days/${day.id}`} className="bg-white rounded-xl border p-4 flex items-center justify-between hover:bg-gray-50"><div><span className="text-xs font-mono text-gray-400 mr-2">Day {day.dayNumber}</span><span className="font-medium">{day.title}</span><span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${day.status === "APPROVED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{day.status}</span></div><span className="text-sm text-gray-500">{day._count.questions} Q</span></Link>))}
           </div>
-        )}
+                )}
 
         {/* Sessions */}
         {program.sessions.length > 0 && (

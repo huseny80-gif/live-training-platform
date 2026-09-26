@@ -131,3 +131,49 @@ export async function deleteDay(dayId: string): Promise<ActionResult> {
   revalidatePath(`/programs/${day.programId}`);
   return { ok: true, data: undefined };
 }
+
+export async function getDay(dayId: string) {
+  const instructorId = await requireInstructor();
+
+  const day = await prisma.trainingDay.findFirst({
+    where: {
+      id: dayId,
+      program: {
+        instructorId,
+      },
+    },
+    include: {
+      topics: {
+        orderBy: { topicOrder: "asc" },
+      },
+      document: {
+        select: {
+          id: true,
+          fileName: true,
+          pageCount: true,
+          extractionStatus: true,
+          pages: {
+            orderBy: { pageNumber: "asc" },
+            select: {
+              id: true,
+              pageNumber: true,
+              title: true,
+              extractionStatus: true,
+            },
+          },
+        },
+      },
+      _count: {
+        select: {
+          questions: true,
+        },
+      },
+    },
+  });
+
+  if (!day) {
+    throw new Error("NOT_FOUND");
+  }
+
+  return day;
+}
