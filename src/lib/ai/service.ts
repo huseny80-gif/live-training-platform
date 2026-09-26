@@ -119,6 +119,7 @@ export class ContentGenerationService {
       const pageIdByNumber = new Map(pages.map((p) => [p.pageNumber, p.id]));
 
       let totalQuestions = 0;
+      const questionsPerDayMap = new Map<number, number>();
 
       // Persist days → topics → questions → options
       for (const day of result.days) {
@@ -145,6 +146,7 @@ export class ContentGenerationService {
 
         // Questions for this day
         const dayQuestions = result.questions.filter((q) => q.dayNumber === day.dayNumber);
+        let dayQuestionCount = 0;
 
         for (const q of dayQuestions) {
           const sourcePageId = pageIdByNumber.get(q.sourcePageNumber) ?? null;
@@ -191,16 +193,28 @@ export class ContentGenerationService {
           });
 
           totalQuestions++;
+          dayQuestionCount++;
         }
+
+        questionsPerDayMap.set(day.dayNumber, dayQuestionCount);
       }
 
-      if (result.days.length === 0 || totalQuestions === 0) {
+      const EXPECTED_TOTAL = TOTAL_DAYS * QUESTIONS_PER_DAY;
+      const underQuotaDays = result.days
+        .filter((d) => (questionsPerDayMap.get(d.dayNumber) ?? 0) !== QUESTIONS_PER_DAY)
+        .map((d) => `day ${d.dayNumber}: got ${questionsPerDayMap.get(d.dayNumber) ?? 0}, want ${QUESTIONS_PER_DAY}`);
+
+      if (result.days.length !== TOTAL_DAYS || totalQuestions !== EXPECTED_TOTAL || underQuotaDays.length > 0) {
         return {
           programId, documentId,
           status: "FAILED",
           daysGenerated: result.days.length,
           questionsGenerated: totalQuestions,
-          errorMessage: `AI returned insufficient content: ${result.days.length} days, ${totalQuestions} questions`,
+          errorMessage: [
+            `Expected ${TOTAL_DAYS} days × ${QUESTIONS_PER_DAY} q/day = ${EXPECTED_TOTAL} total.`,
+            `Got ${result.days.length} days, ${totalQuestions} questions.`,
+            ...(underQuotaDays.length > 0 ? [`Per-day shortfalls: ${underQuotaDays.join("; ")}`] : []),
+          ].join(" "),
         };
       }
 

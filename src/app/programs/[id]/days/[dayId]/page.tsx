@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { getDay } from "@/app/actions/days";
+import { createLiveSession } from "@/app/actions/sessions";
 
 export default async function DayDetailsPage({
   params,
@@ -72,6 +73,29 @@ export default async function DayDetailsPage({
             </p>
           )}
         </section>
+
+        {day._count.questions > 0 && (
+          <section className="bg-blue-50 rounded-2xl border border-blue-200 p-6 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-blue-900">Ready to run a live quiz?</p>
+              <p className="text-sm text-blue-700 mt-1">{day._count.questions} questions available for Day {day.dayNumber}</p>
+            </div>
+            <form
+              action={async () => {
+                "use server";
+                const session = await createLiveSession(id, day.dayNumber);
+                redirect(`/programs/${id}/sessions/${session.id}`);
+              }}
+            >
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm"
+              >
+                Start Quiz Session
+              </button>
+            </form>
+          </section>
+        )}
 
         <Link
           href={`/programs/${id}`}

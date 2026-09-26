@@ -63,6 +63,13 @@ export async function POST(req: NextRequest) {
         return;
       }
 
+      // Extraction done but generation hasn't run yet. Reset to PROCESSING so
+      // the client keeps polling instead of refreshing before days/questions exist.
+      await prisma.trainingDocument.update({
+        where: { id: documentId },
+        data: { extractionStatus: "PROCESSING" },
+      });
+
       const generation = await contentGenerationService.generateForProgram(
         programId,
         documentId,
@@ -84,6 +91,7 @@ export async function POST(req: NextRequest) {
       await prisma.trainingDocument.update({
         where: { id: documentId },
         data: {
+          extractionStatus: "COMPLETED",
           extractionNotes: `${generation.daysGenerated} days · ${generation.questionsGenerated} questions`,
           extractedAt: new Date(),
         },

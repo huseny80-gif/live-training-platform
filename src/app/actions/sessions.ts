@@ -14,8 +14,11 @@ import {
   getLeaderboard,
   getSessionByCode,
   getSessionQuestions,
+  participantJoin,
 } from "@/lib/session/service";
 import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 async function requireInstructor(): Promise<string> {
   const session = await auth();
@@ -111,4 +114,24 @@ export async function getSessionDetails(sessionId: string) {
 export async function getSessionQuestionsAction(sessionId: string) {
   await requireInstructor();
   return getSessionQuestions(sessionId);
+}
+
+/** Participant join — sets guest_token cookie and redirects to /session/[code] */
+export async function joinSessionAction(formData: FormData) {
+  const code = (formData.get("code") as string | null)?.trim().toUpperCase() ?? "";
+  const name = (formData.get("name") as string | null)?.trim() ?? "";
+
+  if (!code || !name) throw new Error("MISSING_FIELDS");
+
+  const result = await participantJoin(code, name);
+
+  const cookieStore = await cookies();
+  cookieStore.set("guest_token", result.token, {
+    httpOnly: true,
+    path: "/",
+    maxAge: 12 * 60 * 60,
+    sameSite: "strict",
+  });
+
+  redirect(`/session/${code}`);
 }
