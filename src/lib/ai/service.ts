@@ -76,11 +76,14 @@ export class ContentGenerationService {
       };
     }
 
-    // Guard: refuse to generate from Mock-only pages
+    // Allow Mock content when LLAMA_CLOUD_API_KEY is absent (dev/staging without
+    // LlamaParse configured). When the key IS present, still require real content
+    // so we don't silently generate from placeholder text in production.
     const hasRealContent = pages.some(
       (p) => p.extractionMethod !== "MOCK" && (p.extractedText?.trim().length ?? 0) > 50
     );
-    if (!hasRealContent) {
+    const llamaConfigured = !!process.env.LLAMA_CLOUD_API_KEY;
+    if (llamaConfigured && !hasRealContent) {
       return {
         programId, documentId,
         status: "FAILED",

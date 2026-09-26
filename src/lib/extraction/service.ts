@@ -103,12 +103,10 @@ export class DocumentExtractionService {
         await this.persistPage(documentId, page);
       }
 
+      // Partial success is still usable — treat as COMPLETED so content
+      // generation can proceed with the pages that did extract.
       const finalStatus: DocumentProcessingStatus =
-        result.failureCount === 0
-          ? "COMPLETED"
-          : result.successCount === 0
-          ? "FAILED"
-          : "PROCESSING";
+        result.successCount > 0 ? "COMPLETED" : "FAILED";
 
       await this.updateDocumentStatus(documentId, finalStatus);
 

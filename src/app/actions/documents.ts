@@ -217,6 +217,26 @@ export async function retryPageExtraction(documentId: string, pageNumber: number
   return extractionService.retryPage(documentId, pageNumber, instructorId);
 }
 
+/** Mark a document as FAILED — called when the client-side pipeline throws */
+export async function markDocumentFailed(documentId: string) {
+  const instructorId = await requireInstructor();
+
+  const doc = await prisma.trainingDocument.findFirst({
+    where: { id: documentId, program: { instructorId } },
+    select: { id: true, extractionStatus: true },
+  });
+  if (!doc) throw new Error("NOT_FOUND");
+
+  // Only update if still in a transient state — don't downgrade COMPLETED to FAILED
+  if (doc.extractionStatus === "PENDING" || doc.extractionStatus === "PROCESSING") {
+    await prisma.trainingDocument.update({
+      where: { id: documentId },
+      data: { extractionStatus: "FAILED" },
+    });
+  }
+  return { success: true };
+}
+
 /** Delete a document and its stored file */
 export async function deleteDocument(documentId: string) {
   const instructorId = await requireInstructor();

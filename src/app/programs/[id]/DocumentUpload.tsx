@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { generateProgramContent } from "@/app/actions/generation";
-import { triggerExtraction, completeBlobUpload } from "@/app/actions/documents";
+import { triggerExtraction, completeBlobUpload, markDocumentFailed } from "@/app/actions/documents";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -95,8 +95,14 @@ export default function DocumentUpload({ programId }: { programId: string }) {
     }
 
     const data = parsed.ok ? (parsed.data as Record<string, unknown>) : {};
-    await runPipeline(data.documentId as string, data.fileName as string, data.pageCount as number);
-    setStatus("success");
+    const docId = data.documentId as string;
+    try {
+      await runPipeline(docId, data.fileName as string, data.pageCount as number);
+      setStatus("success");
+    } catch (pipelineErr) {
+      try { await markDocumentFailed(docId); } catch { /* best-effort */ }
+      throw pipelineErr;
+    }
   }
 
   async function blobUpload(file: File) {
@@ -131,8 +137,14 @@ export default function DocumentUpload({ programId }: { programId: string }) {
     // it's safe even if the webhook also runs.
     const doc = await completeBlobUpload(programId, blob.url, safeName);
 
-    await runPipeline(doc.id, doc.fileName, doc.pageCount ?? undefined);
-    setStatus("success");
+    try {
+      await runPipeline(doc.id, doc.fileName, doc.pageCount ?? undefined);
+      setStatus("success");
+    } catch (pipelineErr) {
+      // Mark the document FAILED so it doesn't stay stuck in PENDING/PROCESSING
+      try { await markDocumentFailed(doc.id); } catch { /* best-effort */ }
+      throw pipelineErr;
+    }
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
