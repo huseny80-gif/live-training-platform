@@ -6,7 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { storage } from "@/lib/storage/local";
+import { storage } from "@/lib/storage";
 import { inspectPdf } from "./pdf-inspector";
 import type { ExtractionAdapter, PdfInspectionResult, ExtractedPage } from "./types";
 import { LlamaParseAdapter } from "./adapters/llamaparse";

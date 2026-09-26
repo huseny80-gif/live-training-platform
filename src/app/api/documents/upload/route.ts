@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { storage } from "@/lib/storage/local";
+import { storage } from "@/lib/storage";
 import { inspectPdf } from "@/lib/extraction/pdf-inspector";
 import { randomUUID } from "crypto";
 
