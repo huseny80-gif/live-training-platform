@@ -18,16 +18,36 @@ import {
 
 const DEFAULT_SCORE_CORRECT = 10;
 
-function parseScoringConfig(raw: unknown): { scoreCorrect: number } {
+function parseScoringConfig(raw: unknown): { scoreCorrect: number; passingScore: number | null } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return { scoreCorrect: DEFAULT_SCORE_CORRECT };
+    return { scoreCorrect: DEFAULT_SCORE_CORRECT, passingScore: null };
   }
   const cfg = raw as Record<string, unknown>;
+
   const v = cfg["scoreCorrect"];
-  if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 10000) {
-    return { scoreCorrect: DEFAULT_SCORE_CORRECT };
-  }
-  return { scoreCorrect: v };
+  const scoreCorrect =
+    typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 10000
+      ? v
+      : DEFAULT_SCORE_CORRECT;
+
+  const ps = cfg["passingScore"];
+  // null = no automatic issuance; number 0–100 = percentage threshold
+  const passingScore =
+    typeof ps === "number" && Number.isFinite(ps) && ps >= 0 && ps <= 100
+      ? ps
+      : null;
+
+  return { scoreCorrect, passingScore };
+}
+
+const VERIFICATION_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 32 unambiguous chars
+
+function generateVerificationCode(): string {
+  const bytes = randomBytes(8);
+  return Array.from(bytes)
+    .map((b) => VERIFICATION_CODE_CHARS[b % VERIFICATION_CODE_CHARS.length])
+    .join("")
+    .slice(0, 8);
 }
 
 // ── Audit helper ──────────────────────────────────────────────────────────────
@@ -242,6 +262,7 @@ export async function endSession(sessionId: string, instructorId: string) {
     data: { status: "ENDED", endedAt: new Date() },
   });
   await computeSessionResult(sessionId);
+  await issueCertificates(sessionId);
   await writeAudit({
     entityType: "LiveSession",
     entityId: sessionId,
@@ -633,6 +654,144 @@ async function computeSessionResult(sessionId: string) {
       data: { rank: i + 1 },
     });
   }
+}
+
+// ── Certificate issuance ──────────────────────────────────────────────────────
+
+export async function issueCertificates(
+  sessionId: string,
+): Promise<{ issued: number; skipped: number }> {
+  const session = await prisma.liveSession.findUnique({
+    where: { id: sessionId },
+    include: { program: { select: { title: true } } },
+  });
+  if (!session) return { issued: 0, skipped: 0 };
+
+  const { passingScore } = parseScoringConfig(session.scoringConfig);
+  if (passingScore === null) return { issued: 0, skipped: 0 };
+
+  const participants = await prisma.sessionParticipant.findMany({
+    where: { sessionId },
+    select: { id: true, displayName: true, totalScore: true, correctCount: true, answersCount: true, rank: true },
+  });
+  if (participants.length === 0) return { issued: 0, skipped: 0 };
+
+  const questionsTotal = await prisma.sessionQuestion.count({ where: { sessionId } });
+
+  let issued = 0;
+  let skipped = 0;
+
+  for (const p of participants) {
+    const rate = questionsTotal > 0 ? (p.correctCount / questionsTotal) * 100 : 0;
+    if (rate < passingScore) { skipped++; continue; }
+
+    // Generate certificateNumber via DB sequence
+    const seqRows = await prisma.$queryRaw<[{ nextval: bigint }]>`
+      SELECT nextval('certificate_number_seq')
+    `;
+    const year = new Date().getFullYear();
+    // seqRows[0].nextval is bigint — convert via toString() for formatting
+    const seqNum = seqRows[0].nextval.toString();
+    const certNum = `CERT-${year}-${seqNum.padStart(6, "0")}`;
+
+    // Generate verificationCode with collision retry
+    let verificationCode = generateVerificationCode();
+    let attempts = 0;
+    while (attempts < 5) {
+      const conflict = await prisma.certificate.findUnique({ where: { verificationCode } });
+      if (!conflict) break;
+      verificationCode = generateVerificationCode();
+      attempts++;
+    }
+
+    await prisma.certificate.upsert({
+      where: { sessionId_participantId: { sessionId, participantId: p.id } },
+      create: {
+        sessionId,
+        participantId: p.id,
+        programId: session.programId,
+        certificateNumber: certNum,
+        verificationCode,
+        displayName: p.displayName,
+        programTitle: session.program.title,
+        dayNumber: session.dayNumber,
+        totalScore: p.totalScore,
+        correctCount: p.correctCount,
+        questionsTotal,
+        rank: p.rank ?? null,
+        status: "ISSUED",
+        issuedAt: new Date(),
+      },
+      update: {},
+    });
+    issued++;
+  }
+
+  return { issued, skipped };
+}
+
+export async function getCertificateForParticipant(token: string, sessionCode: string) {
+  const payload = verifyGuestToken(token);
+  if (!payload) throw new Error("INVALID_TOKEN");
+
+  const session = await prisma.liveSession.findUnique({ where: { sessionCode } });
+  if (!session) throw new Error("SESSION_NOT_FOUND");
+  if (session.id !== payload.sessionId) throw new Error("SESSION_MISMATCH");
+
+  const cert = await prisma.certificate.findUnique({
+    where: { sessionId_participantId: { sessionId: session.id, participantId: payload.participantId } },
+  });
+  if (!cert) throw new Error("CERTIFICATE_NOT_FOUND");
+  if (cert.status === "REVOKED") throw new Error("CERTIFICATE_REVOKED");
+
+  return {
+    certificateNumber: cert.certificateNumber,
+    verificationCode: cert.verificationCode,
+    displayName: cert.displayName,
+    programTitle: cert.programTitle,
+    dayNumber: cert.dayNumber,
+    totalScore: Number(cert.totalScore),
+    correctCount: cert.correctCount,
+    questionsTotal: cert.questionsTotal,
+    rank: cert.rank,
+    issuedAt: cert.issuedAt.toISOString(),
+  };
+}
+
+export async function listSessionCertificates(sessionId: string, instructorId: string) {
+  await requireOwnership(sessionId, instructorId);
+  return prisma.certificate.findMany({
+    where: { sessionId },
+    orderBy: [{ rank: "asc" }, { issuedAt: "asc" }],
+    select: {
+      id: true,
+      certificateNumber: true,
+      verificationCode: true,
+      displayName: true,
+      totalScore: true,
+      correctCount: true,
+      questionsTotal: true,
+      rank: true,
+      status: true,
+      issuedAt: true,
+      revokedAt: true,
+    },
+  });
+}
+
+export async function revokeCertificate(certId: string, instructorId: string) {
+  const cert = await prisma.certificate.findUnique({
+    where: { id: certId },
+    include: { session: { select: { instructorId: true } } },
+  });
+  if (!cert) throw new Error("CERTIFICATE_NOT_FOUND");
+  if (cert.session.instructorId !== instructorId) throw new Error("UNAUTHORIZED");
+  if (cert.status === "REVOKED") throw new Error("ALREADY_REVOKED");
+
+  return prisma.certificate.update({
+    where: { id: certId },
+    data: { status: "REVOKED", revokedAt: new Date() },
+  });
 }
 
 // ── Session reset ─────────────────────────────────────────────────────────────

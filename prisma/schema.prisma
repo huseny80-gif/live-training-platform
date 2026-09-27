@@ -117,6 +117,11 @@ enum ActorType {
   SYSTEM
 }
 
+enum CertificateStatus {
+  ISSUED
+  REVOKED
+}
+
 // ─────────────────────────────────────────────
 // INSTRUCTORS
 // ─────────────────────────────────────────────
@@ -154,10 +159,11 @@ model TrainingProgram {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
-  instructor Instructor         @relation(fields: [instructorId], references: [id], onDelete: Restrict)
-  documents  TrainingDocument[]
-  days       TrainingDay[]
-  sessions   LiveSession[]
+  instructor   Instructor         @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  documents    TrainingDocument[]
+  days         TrainingDay[]
+  sessions     LiveSession[]
+  certificates Certificate[]
 
   @@index([instructorId])
   @@index([status])
@@ -362,6 +368,7 @@ model LiveSession {
   participantDayResults ParticipantDayResult[]
   dailyResult           DailyResult?
   sessionResult         SessionResult?
+  certificates          Certificate[]
 
   @@index([programId])
   @@index([instructorId])
@@ -390,9 +397,10 @@ model SessionParticipant {
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  session    LiveSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  answers    ParticipantAnswer[]
-  dayResults ParticipantDayResult[]
+  session      LiveSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers      ParticipantAnswer[]
+  dayResults   ParticipantDayResult[]
+  certificates Certificate[]
 
   @@index([sessionId])
   @@index([sessionId, status])
@@ -526,6 +534,49 @@ model SessionResult {
   session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("session_results")
+}
+
+// ─────────────────────────────────────────────
+// CERTIFICATES
+// Issued server-side after session ends when passingScore threshold is met.
+// tokenHash removed — retrieval is authenticated via guest_token cookie.
+// ─────────────────────────────────────────────
+
+model Certificate {
+  id            String @id @default(uuid())
+  sessionId     String @map("session_id")
+  participantId String @map("participant_id")
+  programId     String @map("program_id")
+
+  // Human-readable unique identifier e.g. CERT-2026-000001
+  certificateNumber String @unique @map("certificate_number")
+  // Short uppercase alphanumeric code for future public verification
+  verificationCode  String @unique @map("verification_code")
+
+  // Snapshot fields — captured at issue time, self-contained
+  displayName    String  @map("display_name")
+  programTitle   String  @map("program_title")
+  dayNumber      Int     @map("day_number")
+  totalScore     Decimal @map("total_score")
+  correctCount   Int     @map("correct_count")
+  questionsTotal Int     @map("questions_total")
+  rank           Int?
+
+  status    CertificateStatus @default(ISSUED)
+  issuedAt  DateTime          @default(now()) @map("issued_at")
+  revokedAt DateTime?         @map("revoked_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  session     LiveSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  participant SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  program     TrainingProgram    @relation(fields: [programId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, participantId])
+  @@index([sessionId])
+  @@index([participantId])
+  @@index([verificationCode])
+  @@map("certificates")
 }
 
 // ─────────────────────────────────────────────
