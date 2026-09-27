@@ -14,6 +14,7 @@ import {
   getSessionQuestionsAction,
   gotoLiveQuestion,
 } from "@/app/actions/sessions";
+import ResetSessionButton from "./ResetSessionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -187,6 +188,10 @@ export default async function InstructorSessionPage({
                     إنهاء الاختبار
                   </button>
                 </form>
+              )}
+
+              {(session.status === "DRAFT" || session.status === "ENDED") && (
+                <ResetSessionButton sessionId={sessionId} programId={id} />
               )}
 
               <form action={async () => {

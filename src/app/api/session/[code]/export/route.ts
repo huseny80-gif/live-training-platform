@@ -5,14 +5,15 @@ import { buildSessionExcel } from "@/lib/excel/export";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
+  { params }: { params: Promise<{ code: string }> }
 ) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const { sessionId } = await params;
+  const { code: sessionId } = await params;
+  console.log({ exportParam: sessionId, userId: session.user.id });
 
   const liveSession = await prisma.liveSession.findFirst({
     where: { id: sessionId, instructorId: session.user.id },
