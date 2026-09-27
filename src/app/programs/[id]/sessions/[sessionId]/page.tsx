@@ -80,7 +80,11 @@ export default async function InstructorSessionPage({
   const prevQ = questions.find((q) => q.questionOrder === currentOrder - 1) ?? null;
   const nextQ = questions.find((q) => q.questionOrder === currentOrder + 1) ?? null;
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ??
+    process.env.NEXTAUTH_URL ??
+    "http://localhost:3000";
   const joinUrl = `${baseUrl}/join/${session.sessionCode}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}&bgcolor=ffffff&color=1d4ed8&margin=10`;
 
