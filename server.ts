@@ -6,6 +6,7 @@ import { parse } from "url";
 import next from "next";
 import { Server } from "socket.io";
 import { registerSessionHandlers } from "./src/lib/session/socket/handler";
+import { setIO } from "./src/lib/realtime/io-singleton";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
@@ -27,6 +28,7 @@ app.prepare().then(() => {
     path: "/api/socket",
   });
 
+  setIO(io);
   registerSessionHandlers(io);
 
   httpServer.listen(port, () => {

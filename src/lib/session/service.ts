@@ -5,6 +5,16 @@
 import { prisma } from "@/lib/prisma";
 import { issueGuestToken, verifyGuestToken, hashToken } from "./guest-token";
 import { randomBytes } from "crypto";
+import { getIO } from "@/lib/realtime/io-singleton";
+import {
+  emitSessionStarted,
+  emitSessionPaused,
+  emitSessionResumed,
+  emitSessionEnded,
+  emitQuestionStarted,
+  emitQuestionChanged,
+  emitQuestionLocked,
+} from "@/lib/realtime/socket-server";
 
 const SCORE_CORRECT = 10;
 
@@ -114,22 +124,31 @@ export async function startSession(sessionId: string, instructorId: string) {
   const session = await requireOwnership(sessionId, instructorId);
   if (session.status !== "DRAFT") throw new Error("INVALID_STATE");
 
-  return prisma.liveSession.update({
+  const updated = await prisma.liveSession.update({
     where: { id: sessionId },
     data: { status: "ACTIVE", startedAt: new Date() },
   });
+  const io = getIO();
+  if (io) emitSessionStarted(io, { sessionCode: updated.sessionCode, sessionId, timestamp: new Date().toISOString() });
+  return updated;
 }
 
 export async function pauseSession(sessionId: string, instructorId: string) {
   const session = await requireOwnership(sessionId, instructorId);
   if (session.status !== "ACTIVE") throw new Error("INVALID_STATE");
-  return prisma.liveSession.update({ where: { id: sessionId }, data: { status: "PAUSED" } });
+  const updated = await prisma.liveSession.update({ where: { id: sessionId }, data: { status: "PAUSED" } });
+  const io = getIO();
+  if (io) emitSessionPaused(io, { sessionCode: updated.sessionCode, sessionId, timestamp: new Date().toISOString() });
+  return updated;
 }
 
 export async function resumeSession(sessionId: string, instructorId: string) {
   const session = await requireOwnership(sessionId, instructorId);
   if (session.status !== "PAUSED") throw new Error("INVALID_STATE");
-  return prisma.liveSession.update({ where: { id: sessionId }, data: { status: "ACTIVE" } });
+  const updated = await prisma.liveSession.update({ where: { id: sessionId }, data: { status: "ACTIVE" } });
+  const io = getIO();
+  if (io) emitSessionResumed(io, { sessionCode: updated.sessionCode, sessionId, timestamp: new Date().toISOString() });
+  return updated;
 }
 
 export async function endSession(sessionId: string, instructorId: string) {
@@ -139,13 +158,15 @@ export async function endSession(sessionId: string, instructorId: string) {
     data: { status: "ENDED", endedAt: new Date() },
   });
   await computeSessionResult(sessionId);
+  const io = getIO();
+  if (io) emitSessionEnded(io, { sessionCode: session.sessionCode, sessionId, endedAt: new Date().toISOString(), leaderboard: [] });
   return session;
 }
 
 // ── Question lifecycle ────────────────────────────────────────────────────────
 
 export async function showQuestion(sessionId: string, sessionQuestionId: string, instructorId: string) {
-  await requireOwnership(sessionId, instructorId);
+  const session = await requireOwnership(sessionId, instructorId);
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { id: sessionQuestionId, sessionId },
@@ -162,11 +183,19 @@ export async function showQuestion(sessionId: string, sessionQuestionId: string,
     data: { currentQuestionId: sessionQuestionId },
   });
 
+  const io = getIO();
+  if (io) emitQuestionStarted(io, {
+    sessionCode: session.sessionCode,
+    sessionId,
+    questionId: sessionQuestionId,
+    questionIndex: sq.questionOrder,
+    timestamp: new Date().toISOString(),
+  });
   return updated;
 }
 
 export async function closeQuestion(sessionId: string, sessionQuestionId: string, instructorId: string) {
-  await requireOwnership(sessionId, instructorId);
+  const session = await requireOwnership(sessionId, instructorId);
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { id: sessionQuestionId, sessionId },
@@ -174,10 +203,19 @@ export async function closeQuestion(sessionId: string, sessionQuestionId: string
   if (!sq) throw new Error("QUESTION_NOT_IN_SESSION");
   if (sq.status !== "LIVE") throw new Error("QUESTION_NOT_LIVE");
 
-  return prisma.sessionQuestion.update({
+  const updated = await prisma.sessionQuestion.update({
     where: { id: sessionQuestionId },
     data: { status: "CLOSED", closedAt: new Date() },
   });
+  const io = getIO();
+  if (io) emitQuestionLocked(io, {
+    sessionCode: session.sessionCode,
+    sessionId,
+    questionId: sessionQuestionId,
+    questionIndex: sq.questionOrder,
+    timestamp: new Date().toISOString(),
+  });
+  return updated;
 }
 
 export async function showResults(sessionId: string, sessionQuestionId: string, instructorId: string) {
@@ -192,7 +230,7 @@ export async function showResults(sessionId: string, sessionQuestionId: string, 
 }
 
 export async function gotoQuestion(sessionId: string, questionOrder: number, instructorId: string) {
-  await requireOwnership(sessionId, instructorId);
+  const session = await requireOwnership(sessionId, instructorId);
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { sessionId, questionOrder },
@@ -206,6 +244,15 @@ export async function gotoQuestion(sessionId: string, questionOrder: number, ins
   await prisma.liveSession.update({
     where: { id: sessionId },
     data: { currentQuestionId: sq.id },
+  });
+
+  const io = getIO();
+  if (io) emitQuestionChanged(io, {
+    sessionCode: session.sessionCode,
+    sessionQuestionId: sq.id,
+    questionOrder: sq.questionOrder,
+    questionText: "",
+    timeLimitSeconds: null,
   });
   return updated;
 }
