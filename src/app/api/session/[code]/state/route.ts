@@ -22,7 +22,7 @@ export async function GET(
       title: true,
       dayNumber: true,
       currentQuestionId: true,
-      _count: { select: { participants: true } },
+      _count: { select: { participants: true, sessionQuestions: true } },
     },
   });
 
@@ -45,6 +45,8 @@ export async function GET(
     }
   }
 
+  const totalQuestions = session._count.sessionQuestions;
+
   // No current live question — return session status only
   if (!session.currentQuestionId || session.status !== "ACTIVE") {
     return NextResponse.json({
@@ -52,6 +54,8 @@ export async function GET(
       sessionTitle: session.title,
       dayNumber: session.dayNumber,
       participantCount: session._count.participants,
+      totalQuestions,
+      currentQuestionIndex: null,
       currentQuestion: null,
       hasAnswered: false,
     });
@@ -60,7 +64,7 @@ export async function GET(
   // Fetch current SessionQuestion
   const sq = await prisma.sessionQuestion.findUnique({
     where: { id: session.currentQuestionId },
-    select: { status: true },
+    select: { status: true, questionOrder: true },
   });
 
   if (!sq || sq.status === "DRAFT" || sq.status === "READY") {
@@ -69,6 +73,8 @@ export async function GET(
       sessionTitle: session.title,
       dayNumber: session.dayNumber,
       participantCount: session._count.participants,
+      totalQuestions,
+      currentQuestionIndex: sq?.questionOrder ?? null,
       currentQuestion: null,
       hasAnswered: false,
     });
@@ -108,6 +114,8 @@ export async function GET(
     sessionTitle: session.title,
     dayNumber: session.dayNumber,
     participantCount: session._count.participants,
+    totalQuestions,
+    currentQuestionIndex: sq.questionOrder,
     currentQuestion: questionPayload,
     hasAnswered,
     myAnswer,

@@ -191,6 +191,25 @@ export async function showResults(sessionId: string, sessionQuestionId: string, 
   return buildQuestionResult(sessionQuestionId);
 }
 
+export async function gotoQuestion(sessionId: string, questionOrder: number, instructorId: string) {
+  await requireOwnership(sessionId, instructorId);
+
+  const sq = await prisma.sessionQuestion.findFirst({
+    where: { sessionId, questionOrder },
+  });
+  if (!sq) throw new Error("QUESTION_NOT_FOUND");
+
+  const updated = await prisma.sessionQuestion.update({
+    where: { id: sq.id },
+    data: { status: "LIVE", startedAt: new Date() },
+  });
+  await prisma.liveSession.update({
+    where: { id: sessionId },
+    data: { currentQuestionId: sq.id },
+  });
+  return updated;
+}
+
 export async function nextQuestion(sessionId: string, instructorId: string) {
   await requireOwnership(sessionId, instructorId);
 
@@ -423,6 +442,40 @@ async function computeSessionResult(sessionId: string) {
       data: { rank: i + 1 },
     });
   }
+}
+
+// ── Session reset ─────────────────────────────────────────────────────────────
+
+export async function resetSession(sessionId: string, instructorId: string) {
+  await requireOwnership(sessionId, instructorId);
+
+  await prisma.$transaction([
+    // Delete participant answers
+    prisma.participantAnswer.deleteMany({ where: { sessionId } }),
+    // Delete participant day results
+    prisma.participantDayResult.deleteMany({ where: { sessionId } }),
+    // Delete daily result
+    prisma.dailyResult.deleteMany({ where: { sessionId } }),
+    // Delete session result
+    prisma.sessionResult.deleteMany({ where: { sessionId } }),
+    // Delete participants
+    prisma.sessionParticipant.deleteMany({ where: { sessionId } }),
+    // Reset session questions to DRAFT
+    prisma.sessionQuestion.updateMany({
+      where: { sessionId },
+      data: { status: "DRAFT", startedAt: null, closedAt: null, resultsShownAt: null },
+    }),
+    // Reset session itself to DRAFT
+    prisma.liveSession.update({
+      where: { id: sessionId },
+      data: {
+        status: "DRAFT",
+        currentQuestionId: null,
+        startedAt: null,
+        endedAt: null,
+      },
+    }),
+  ]);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -3,19 +3,38 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildSessionExcel } from "@/lib/excel/export";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
+  { params }: { params: Promise<{ code: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authSession = await auth();
+  const userId = authSession?.user?.id ?? null;
+  const { code: sessionId } = await params;
+
+  console.log({ exportParam: sessionId, userId, authed: !!userId });
+
+  if (!userId) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const { sessionId } = await params;
+  // Two-step: find by id first, then verify ownership
+  let found: { id: string; instructorId: string } | null = null;
+  try {
+    found = await prisma.liveSession.findUnique({ where: { id: sessionId }, select: { id: true, instructorId: true } });
+  } catch (e) {
+    console.error({ exportDbError: String(e), sessionId });
+    return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+  }
+  console.log({ sessionFound: !!found, dbInstructorId: found?.instructorId, requestUserId: userId, ownershipMatch: found?.instructorId === userId });
 
-  const liveSession = await prisma.liveSession.findFirst({
-    where: { id: sessionId, instructorId: session.user.id },
+  if (!found || found.instructorId !== userId) {
+    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  }
+
+  const liveSession = await prisma.liveSession.findUnique({
+    where: { id: sessionId },
     include: {
       sessionResult: true,
       participants: {
@@ -41,9 +60,16 @@ export async function GET(
   const totalQ = liveSession.sessionQuestions.length;
   const sr = liveSession.sessionResult;
 
+  // Fetch instructor name
+  const instructor = await prisma.instructor.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
+
   const participants = liveSession.participants.map((p) => ({
     rank: p.rank,
     displayName: p.displayName,
+    joinedAt: p.joinedAt,
     totalScore: Number(p.totalScore),
     correctCount: p.correctCount,
     wrongCount: p.answersCount - p.correctCount,
@@ -64,14 +90,21 @@ export async function GET(
         : 0,
   }));
 
+  const totalParticipants = sr?.totalParticipants ?? participants.length;
+
   const summary = {
     title: liveSession.title,
     sessionCode: liveSession.sessionCode,
-    totalParticipants: sr?.totalParticipants ?? participants.length,
+    instructorName: instructor?.name ?? "",
+    date: (liveSession.startedAt ?? liveSession.createdAt).toLocaleDateString("ar-SA"),
+    participationRate: totalQ > 0 && totalParticipants > 0
+      ? Math.round((participants.filter((p) => p.answersCount > 0).length / totalParticipants) * 100)
+      : 0,
+    totalParticipants,
     totalQuestions: sr?.totalQuestions ?? totalQ,
     averageScore: sr ? Number(sr.averageScore) : 0,
     highestScore: sr ? Number(sr.highestScore) : 0,
-    correctRate: sr ? Number(sr.correctRate) : 0,
+    correctRate: sr ? Math.round(Number(sr.correctRate) * 100) : 0,
   };
 
   const buffer = buildSessionExcel(summary, participants, questions);
@@ -81,7 +114,8 @@ export async function GET(
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="session-${sessionId}.xlsx"`,
+      "Content-Disposition":
+        'attachment; filename="Digital_Leadership_Test_Results.xlsx"; filename*=UTF-8\'\'%D9%86%D8%AA%D8%A7%D8%A6%D8%AC_%D8%A7%D9%84%D8%A7%D8%AE%D8%AA%D8%A8%D8%A7%D8%B1.xlsx',
     },
   });
 }

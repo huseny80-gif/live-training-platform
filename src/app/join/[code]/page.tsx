@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useParams } from "next/navigation";
 import { joinSessionAction } from "@/app/actions/sessions";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -14,7 +15,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 type State = { error: string } | null;
 
-export default function JoinPage() {
+export default function JoinWithCodePage() {
+  const { code } = useParams<{ code: string }>();
+
   const [state, action, isPending] = useActionState<State, FormData>(
     async (_prev: State, formData: FormData) => {
       try {
@@ -39,42 +42,42 @@ export default function JoinPage() {
         <div className="text-center space-y-1">
           <div className="text-4xl mb-2">🎓</div>
           <h1 className="text-2xl font-bold text-gray-900">القيادة الرقمية</h1>
-          <p className="text-sm text-gray-500">أدخل رمز الجلسة واسمك للانضمام</p>
+          <p className="text-sm text-gray-500">أدخل اسمك للانضمام إلى الاختبار</p>
         </div>
 
         <form action={action} className="space-y-4">
           <div>
-            <label htmlFor="join-code" className="block text-sm font-medium text-gray-700 mb-1">رمز الجلسة</label>
+            <label htmlFor="join-code-display" className="block text-sm font-medium text-gray-700 mb-1">رمز الجلسة</label>
             <input
-              id="join-code"
+              id="join-code-display"
               name="code"
               required
-              autoComplete="off"
-              placeholder="مثال: A3F2B1"
+              readOnly
+              value={code?.toUpperCase() ?? ""}
               dir="ltr"
-              className="w-full rounded-lg border px-3 py-2.5 text-center font-mono text-lg tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
-              maxLength={6}
-              aria-describedby={errorText ? "join-error" : undefined}
+              aria-readonly="true"
+              className="w-full rounded-lg border bg-gray-50 px-3 py-2.5 text-center font-mono text-lg tracking-widest uppercase cursor-default"
             />
           </div>
 
           <div>
-            <label htmlFor="join-name" className="block text-sm font-medium text-gray-700 mb-1">الاسم الثلاثي</label>
+            <label htmlFor="join-name-code" className="block text-sm font-medium text-gray-700 mb-1">الاسم الثلاثي</label>
             <input
-              id="join-name"
+              id="join-name-code"
               name="name"
               required
+              autoFocus
               autoComplete="name"
               placeholder="أدخل اسمك الثلاثي"
               className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               minLength={2}
               maxLength={50}
-              aria-describedby={errorText ? "join-error" : undefined}
+              aria-describedby={errorText ? "join-code-error" : undefined}
             />
           </div>
 
           {errorText && (
-            <p id="join-error" role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{errorText}</p>
+            <p id="join-code-error" role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{errorText}</p>
           )}
 
           <button

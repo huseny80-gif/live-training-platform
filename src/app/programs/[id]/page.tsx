@@ -44,6 +44,12 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="flex gap-2">
           <Link
+            href={`/programs/${id}/manage`}
+            className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100"
+          >
+            📋 إدارة المحتوى
+          </Link>
+          <Link
             href={`/programs/${id}/edit`}
             className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50"
           >
@@ -69,7 +75,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
 
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border p-4">
             <p className="text-sm text-gray-500">Days</p>
             <p className="text-3xl font-bold">{program._count.days}</p>

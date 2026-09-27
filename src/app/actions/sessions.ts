@@ -11,10 +11,12 @@ import {
   closeQuestion,
   showResults,
   nextQuestion,
+  gotoQuestion,
   getLeaderboard,
   getSessionByCode,
   getSessionQuestions,
   participantJoin,
+  resetSession,
 } from "@/lib/session/service";
 import { verifyGuestToken } from "@/lib/session/guest-token";
 import { prisma } from "@/lib/prisma";
@@ -74,6 +76,16 @@ export async function showQuestionResults(sessionId: string, sessionQuestionId: 
 export async function getNextQuestion(sessionId: string) {
   const instructorId = await requireInstructor();
   return nextQuestion(sessionId, instructorId);
+}
+
+export async function gotoLiveQuestion(sessionId: string, questionOrder: number) {
+  const instructorId = await requireInstructor();
+  return gotoQuestion(sessionId, questionOrder, instructorId);
+}
+
+export async function resetLiveSession(sessionId: string) {
+  const instructorId = await requireInstructor();
+  return resetSession(sessionId, instructorId);
 }
 
 export async function getSessionLeaderboard(sessionId: string) {

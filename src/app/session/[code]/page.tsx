@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
-
-// ── Types ─────────────────────────────────────────────────────────────────────────────────
+import { useParams, useRouter } from "next/navigation";
 
 interface QuestionOption {
   id: string;
@@ -27,6 +25,8 @@ interface SessionState {
   sessionTitle: string | null;
   dayNumber: number;
   participantCount: number;
+  totalQuestions: number;
+  currentQuestionIndex: number | null;
   currentQuestion: (LiveQuestion & { questionStatus: string }) | null;
   hasAnswered: boolean;
   myAnswer: string | null;
@@ -34,28 +34,37 @@ interface SessionState {
   scoreAwarded: number | null;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────────────────────
-
 export default function ParticipantSessionPage() {
   const { code } = useParams<{ code: string }>();
+  const router = useRouter();
   const [state, setState] = useState<SessionState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ isCorrect: boolean; scoreAwarded: number } | null>(null);
   const lastQuestionId = useRef<string | null>(null);
+  const redirectedRef = useRef(false);
 
   const fetchState = useCallback(async () => {
     try {
       const res = await fetch(`/api/session/${code}/state`, { cache: "no-store" });
       if (!res.ok) {
-        if (res.status === 404) { setError("Session not found."); return; }
+        if (res.status === 404) {
+          setError("SESSION_NOT_FOUND");
+          return;
+        }
         return;
       }
       const data: SessionState = await res.json();
       setState(data);
 
-      // Reset answer UI when a new question appears
+      // Auto-redirect to result page when session ends
+      if (data.sessionStatus === "ENDED" && !redirectedRef.current) {
+        redirectedRef.current = true;
+        setTimeout(() => router.push(`/session/${code}/result`), 1500);
+      }
+
       const newQId = data.currentQuestion?.sessionQuestionId ?? null;
       if (newQId !== lastQuestionId.current) {
         lastQuestionId.current = newQId;
@@ -63,11 +72,10 @@ export default function ParticipantSessionPage() {
         setSubmitResult(null);
       }
     } catch {
-      // network hiccup — ignore, next poll will retry
+      // network hiccup — ignore
     }
-  }, [code]);
+  }, [code, router]);
 
-  // Poll every 2 seconds
   useEffect(() => {
     fetchState();
     const id = setInterval(fetchState, 2000);
@@ -78,6 +86,7 @@ export default function ParticipantSessionPage() {
     if (!state?.currentQuestion || submitting) return;
     setSubmitting(true);
     setSelectedOption(optionId);
+    setSubmitError(null);
 
     try {
       const res = await fetch("/api/session/answer", {
@@ -93,63 +102,83 @@ export default function ParticipantSessionPage() {
         setSubmitResult({ isCorrect: data.isCorrect, scoreAwarded: data.scoreAwarded });
         await fetchState();
       } else {
-        setError(data.error ?? "Failed to submit answer.");
+        setSubmitError(data.error ?? "فشل إرسال الإجابة.");
       }
     } catch {
-      setError("Network error. Please try again.");
+      setSubmitError("خطأ في الشبكة. حاول مجدداً.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────────────────────────────
-
+  // ── Error state ──────────────────────────────────────────────────────────
   if (error) {
+    const isNotFound = error === "SESSION_NOT_FOUND";
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm">
-          <p className="text-red-600 font-medium">{error}</p>
-          <a href="/join" className="mt-4 inline-block text-sm text-blue-600 hover:underline">← Back to Join</a>
+      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
+          <div className="text-5xl">⚠️</div>
+          <h1 className="text-lg font-bold text-gray-800">
+            {isNotFound ? "الجلسة غير موجودة" : "حدث خطأ"}
+          </h1>
+          <p className="text-sm text-gray-500">
+            {isNotFound
+              ? "هذه الجلسة غير متاحة أو انتهت. تحقق من الرمز وحاول مجدداً."
+              : error}
+          </p>
+          <a
+            href="/join"
+            className="inline-block mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+          >
+            العودة للبداية
+          </a>
         </div>
       </main>
     );
   }
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (!state) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500 animate-pulse">Connecting…</p>
+      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500 animate-pulse">جاري الاتصال…</p>
       </main>
     );
   }
 
-  const { sessionStatus, sessionTitle, dayNumber, currentQuestion, hasAnswered, isCorrect, scoreAwarded } = state;
+  const { sessionStatus, sessionTitle, dayNumber, totalQuestions, currentQuestionIndex, currentQuestion, hasAnswered, isCorrect, scoreAwarded } = state;
 
-  // Session ended — show final result
+  // ── Session ended — redirect soon, show brief message ────────────────────
   if (sessionStatus === "ENDED") {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl">🏁</div>
-          <h1 className="text-xl font-bold">Session Ended</h1>
-          <p className="text-gray-500">{sessionTitle ?? `Day ${dayNumber}`}</p>
-          <p className="text-sm text-gray-400">Thank you for participating!</p>
+          <h1 className="text-xl font-bold text-gray-900">انتهى الاختبار</h1>
+          <p className="text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
+          <p className="text-sm text-blue-600 animate-pulse">جاري الانتقال لعرض نتيجتك…</p>
         </div>
       </main>
     );
   }
 
-  // Waiting for session to start / paused
+  // ── Waiting / Paused ─────────────────────────────────────────────────────
   if (sessionStatus === "DRAFT" || sessionStatus === "PAUSED" || !currentQuestion) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
+      <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border shadow-sm p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl animate-bounce">⏳</div>
-          <h1 className="text-xl font-bold">{sessionTitle ?? `Day ${dayNumber}`}</h1>
-          <p className="text-gray-500">
-            {sessionStatus === "PAUSED" ? "Session is paused. Stand by…" : "Waiting for the instructor to show a question…"}
+          <h1 className="text-xl font-bold text-gray-900">القيادة الرقمية</h1>
+          <p className="text-gray-600 font-medium">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
+          <p className="text-gray-500 text-sm">
+            {sessionStatus === "PAUSED"
+              ? "الاختبار موقوف مؤقتاً… انتظر."
+              : "في انتظار المدرب لعرض السؤال التالي…"}
           </p>
-          <p className="text-xs text-gray-400 font-mono">Code: {code}</p>
+          <p className="text-xs text-gray-400 font-mono bg-gray-50 px-3 py-1 rounded-full inline-block">رمز: {code}</p>
+          <a href="/join" className="block text-xs text-gray-400 hover:text-gray-600 underline mt-2">
+            العودة للبداية
+          </a>
         </div>
       </main>
     );
@@ -162,71 +191,108 @@ export default function ParticipantSessionPage() {
   const answerIsCorrect = submitResult?.isCorrect ?? isCorrect;
   const answeredScore = submitResult?.scoreAwarded ?? scoreAwarded;
 
+  const progressPercent = totalQuestions > 0 && currentQuestionIndex != null
+    ? Math.round((currentQuestionIndex / totalQuestions) * 100)
+    : 0;
+
   return (
-    <main className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
-      <div className="w-full max-w-lg space-y-4 mt-6">
-        {/* Question header */}
-        <div className="flex items-center justify-between text-sm text-gray-500">
-          <span>{sessionTitle ?? `Day ${dayNumber}`}</span>
-          <span className="font-mono">Q{q.questionOrder}</span>
+    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
+      <div className="w-full max-w-lg space-y-4 mt-4">
+
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-lg font-bold text-blue-800">القيادة الرقمية</h1>
+          <p className="text-xs text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
         </div>
+
+        {/* Progress bar */}
+        {totalQuestions > 0 && currentQuestionIndex != null && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>السؤال {currentQuestionIndex} من {totalQuestions}</span>
+              <span>{progressPercent}%</span>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`التقدم: ${progressPercent}%`}
+              className="h-2 bg-gray-200 rounded-full overflow-hidden"
+            >
+              <div
+                className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Question text */}
-        <div className="bg-white rounded-2xl border p-6">
-          <p className="text-lg font-semibold leading-relaxed">{q.questionText}</p>
+        <div className="bg-white rounded-2xl border p-6 shadow-sm">
+          <p className="text-lg font-semibold leading-relaxed text-gray-800">{q.questionText}</p>
         </div>
 
+        {/* Submit error banner */}
+        {submitError && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-red-700">{submitError}</span>
+            <button
+              type="button"
+              onClick={() => { setSubmitError(null); setSelectedOption(null); }}
+              className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+            >
+              إعادة المحاولة
+            </button>
+          </div>
+        )}
+
         {/* Options */}
-        <div className="space-y-3">
+        <div className="space-y-3" role="group" aria-label="خيارات الإجابة">
           {q.options.map((opt) => {
             const isSelected = (selectedOption ?? state.myAnswer) === opt.id;
-            const showCorrect = questionClosed && answered && answerIsCorrect !== null;
-
-            let cls = "w-full text-left rounded-xl border p-4 flex items-center gap-3 transition-colors ";
+            let cls = "w-full text-right rounded-xl border p-4 flex items-center gap-3 transition-colors ";
             if (canAnswer) {
-              cls += isSelected
-                ? "border-blue-500 bg-blue-50 "
-                : "hover:bg-gray-50 cursor-pointer ";
-            } else if (showCorrect) {
-              cls += isSelected ? "border-blue-400 bg-blue-50 " : "";
+              cls += isSelected ? "border-blue-500 bg-blue-50 " : "hover:bg-gray-50 cursor-pointer ";
             } else {
               cls += isSelected ? "border-blue-400 bg-blue-50 " : "";
             }
-
             return (
               <button
                 key={opt.id}
                 className={cls}
                 disabled={!canAnswer || submitting}
+                aria-pressed={isSelected}
                 onClick={() => canAnswer && submitAnswer(opt.id)}
               >
-                <span className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold flex-shrink-0">
+                {/* Label letter: dir="ltr" so A/B/C renders correctly inside RTL container */}
+                <span dir="ltr" className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold flex-shrink-0 bg-white">
                   {opt.optionLabel}
                 </span>
-                <span className="text-sm">{opt.optionText}</span>
+                <span className="text-sm text-gray-800 flex-1">{opt.optionText}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Feedback after answering */}
+        {/* Feedback */}
         {answered && (
           <div className={`rounded-xl p-4 text-center ${
             answerIsCorrect === true ? "bg-green-50 border border-green-200" :
             answerIsCorrect === false ? "bg-red-50 border border-red-200" :
             "bg-gray-50 border"
           }`}>
-            {answerIsCorrect === true && <p className="font-bold text-green-700">✓ Correct! +{answeredScore} points</p>}
-            {answerIsCorrect === false && <p className="font-bold text-red-700">✗ Incorrect</p>}
-            {answerIsCorrect === null && <p className="text-gray-600">Answer recorded. Waiting for results…</p>}
-            {questionClosed && <p className="text-xs text-gray-400 mt-1">Waiting for next question…</p>}
+            {answerIsCorrect === true && <p className="font-bold text-green-700">✓ إجابة صحيحة! +{answeredScore} نقطة</p>}
+            {answerIsCorrect === false && <p className="font-bold text-red-700">✗ إجابة خاطئة</p>}
+            {answerIsCorrect === null && <p className="text-gray-600">تم تسجيل إجابتك. في انتظار النتائج…</p>}
+            {questionClosed && <p className="text-xs text-gray-400 mt-1">في انتظار السؤال التالي…</p>}
           </div>
         )}
 
-        {/* Closed but not yet answered */}
+        {/* Closed but not answered */}
         {questionClosed && !answered && (
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
-            <p className="text-orange-700 text-sm">Time's up — this question has closed.</p>
+            <p className="text-orange-700 text-sm">انتهى وقت هذا السؤال.</p>
           </div>
         )}
       </div>
