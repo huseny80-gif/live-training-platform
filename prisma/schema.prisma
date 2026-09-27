@@ -407,6 +407,7 @@ model SessionParticipant {
   @@index([sessionId])
   @@index([sessionId, status])
   @@index([externalUserId])
+  @@index([sessionId, totalScore(sort: Desc), correctCount(sort: Desc), updatedAt(sort: Asc)], map: "session_participants_leaderboard_idx")
   @@map("session_participants")
 }
 
@@ -465,6 +466,7 @@ model ParticipantAnswer {
   @@index([sessionQuestionId])
   @@index([participantId])
   @@index([sessionQuestionId, isFinal])
+  @@index([sessionId, sessionQuestionId, isFinal, isCorrect], map: "participant_answers_analytics_idx")
   @@map("participant_answers")
 }
 
