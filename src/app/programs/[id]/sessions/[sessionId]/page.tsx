@@ -109,15 +109,16 @@ export default async function InstructorSessionPage({
         </div>
 
         {/* Live stats bar */}
-        <SessionLiveStats sessionId={sessionId} />
+        <SessionLiveStats sessionId={sessionId} sessionCode={session.sessionCode} />
 
         {/* Live participants list */}
-        <SessionParticipantsList sessionId={sessionId} />
+        <SessionParticipantsList sessionId={sessionId} sessionCode={session.sessionCode} />
 
         {/* Analytics dashboard */}
         <SessionAnalyticsDashboard
           sessionId={sessionId}
           isEnded={session.status === "ENDED"}
+          sessionCode={session.sessionCode}
         />
 
         {/* Live / final leaderboard */}
@@ -125,6 +126,7 @@ export default async function InstructorSessionPage({
           <SessionLeaderboard
             sessionId={sessionId}
             isEnded={session.status === "ENDED"}
+            sessionCode={session.sessionCode}
           />
         )}
 
