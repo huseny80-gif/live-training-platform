@@ -13,7 +13,10 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user;
       const isPublic =
         nextUrl.pathname.startsWith("/login") ||
-        nextUrl.pathname.startsWith("/api/auth");
+        nextUrl.pathname.startsWith("/api/auth") ||
+        nextUrl.pathname.startsWith("/join") ||
+        nextUrl.pathname.startsWith("/session") ||
+        nextUrl.pathname.startsWith("/api/session");
       if (!isLoggedIn && !isPublic) return false;
       if (isLoggedIn && nextUrl.pathname === "/login") {
         return Response.redirect(new URL("/dashboard", nextUrl));
