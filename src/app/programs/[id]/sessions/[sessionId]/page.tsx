@@ -109,7 +109,7 @@ export default async function InstructorSessionPage({
         </div>
 
         {/* Live stats bar */}
-        <SessionLiveStats sessionId={sessionId} />
+        <SessionLiveStats sessionId={sessionId} sessionCode={session.sessionCode} />
 
         {/* Live participants list */}
         <SessionParticipantsList sessionId={sessionId} sessionCode={session.sessionCode} />
