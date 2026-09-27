@@ -19,6 +19,7 @@ import CopyLinkButton from "./CopyLinkButton";
 import ShareLinkButton from "@/components/session/ShareLinkButton";
 import SessionLiveStats from "@/components/session/SessionLiveStats";
 import SessionParticipantsList from "@/components/session/SessionParticipantsList";
+import SessionAnalyticsDashboard from "@/components/session/SessionAnalyticsDashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -110,6 +111,12 @@ export default async function InstructorSessionPage({
 
         {/* Live participants list */}
         <SessionParticipantsList sessionId={sessionId} />
+
+        {/* Analytics dashboard */}
+        <SessionAnalyticsDashboard
+          sessionId={sessionId}
+          isEnded={session.status === "ENDED"}
+        />
 
         {/* Session info + QR */}
         <div className="bg-white rounded-2xl border p-5 grid md:grid-cols-2 gap-5">
