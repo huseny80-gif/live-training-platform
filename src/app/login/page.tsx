@@ -51,7 +51,7 @@ export default function LoginPage() {
             />
           </div>
           {state && !state.success && (
-            <p className="text-sm text-red-600 text-center">{state.error}</p>
+            <p role="alert" className="text-sm text-red-600 text-center bg-red-50 rounded-lg px-3 py-2">{state.error}</p>
           )}
           <button
             type="submit"

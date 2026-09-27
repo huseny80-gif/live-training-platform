@@ -24,13 +24,32 @@ function Row({ label, value }: { label: string; value: string | number }) {
 
 export default function SessionFinalReport({ sessionId }: { sessionId: string }) {
   const [data, setData] = useState<ReportData | null>(null);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const fetchReport = () => {
+    setError(false);
     fetch(`/api/session/${sessionId}/analytics`, { cache: "no-store" })
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => d && setData(d))
-      .catch(() => null);
-  }, [sessionId]);
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d) => setData(d))
+      .catch(() => setError(true));
+  };
+
+  useEffect(() => { fetchReport(); }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
+        <p className="text-sm text-red-700">تعذّر تحميل التقرير النهائي.</p>
+        <button
+          type="button"
+          onClick={fetchReport}
+          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
 
   if (!data || data.totalAnswers === 0) return null;
 

@@ -52,7 +52,20 @@ export default function SessionLiveStats({ sessionId }: { sessionId: string }) {
     return () => clearInterval(id);
   }, [fetchStats]);
 
-  if (error) return null;
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-center justify-between gap-4">
+        <p className="text-sm text-red-700">تعذّر تحميل إحصائيات الجلسة.</p>
+        <button
+          type="button"
+          onClick={fetchStats}
+          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
   if (!stats) {
     return (
       <div className="bg-white rounded-2xl border p-4 animate-pulse">

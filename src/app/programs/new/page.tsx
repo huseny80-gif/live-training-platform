@@ -22,18 +22,20 @@ export default function NewProgramPage() {
       <div className="max-w-xl mx-auto bg-white rounded-2xl border p-8">
         <h1 className="text-xl font-bold mb-6">New Training Program</h1>
         <form action={dispatch} className="space-y-4">
-          <Field label="Title *" name="title" required />
+          <Field label="Title *" name="title" id="new-title" required />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label htmlFor="new-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
+              id="new-description"
               name="description"
               rows={3}
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+            <label htmlFor="new-language" className="block text-sm font-medium text-gray-700 mb-1">Language</label>
             <select
+              id="new-language"
               name="language"
               defaultValue="AR"
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -43,7 +45,7 @@ export default function NewProgramPage() {
             </select>
           </div>
           {state && !state.ok && (
-            <p className="text-sm text-red-600">{state.error}</p>
+            <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{state.error}</p>
           )}
           <div className="flex gap-3 pt-2">
             <a
@@ -66,11 +68,12 @@ export default function NewProgramPage() {
   );
 }
 
-function Field({ label, name, required }: { label: string; name: string; required?: boolean }) {
+function Field({ label, name, id, required }: { label: string; name: string; id: string; required?: boolean }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <input
+        id={id}
         name={name}
         required={required}
         className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"

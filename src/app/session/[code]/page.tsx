@@ -39,6 +39,7 @@ export default function ParticipantSessionPage() {
   const router = useRouter();
   const [state, setState] = useState<SessionState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ isCorrect: boolean; scoreAwarded: number } | null>(null);
@@ -85,6 +86,7 @@ export default function ParticipantSessionPage() {
     if (!state?.currentQuestion || submitting) return;
     setSubmitting(true);
     setSelectedOption(optionId);
+    setSubmitError(null);
 
     try {
       const res = await fetch("/api/session/answer", {
@@ -100,10 +102,10 @@ export default function ParticipantSessionPage() {
         setSubmitResult({ isCorrect: data.isCorrect, scoreAwarded: data.scoreAwarded });
         await fetchState();
       } else {
-        setError(data.error ?? "فشل إرسال الإجابة.");
+        setSubmitError(data.error ?? "فشل إرسال الإجابة.");
       }
     } catch {
-      setError("خطأ في الشبكة. حاول مجدداً.");
+      setSubmitError("خطأ في الشبكة. حاول مجدداً.");
     } finally {
       setSubmitting(false);
     }
@@ -210,7 +212,14 @@ export default function ParticipantSessionPage() {
               <span>السؤال {currentQuestionIndex} من {totalQuestions}</span>
               <span>{progressPercent}%</span>
             </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              role="progressbar"
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`التقدم: ${progressPercent}%`}
+              className="h-2 bg-gray-200 rounded-full overflow-hidden"
+            >
               <div
                 className="h-full bg-blue-500 rounded-full transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
@@ -224,8 +233,22 @@ export default function ParticipantSessionPage() {
           <p className="text-lg font-semibold leading-relaxed text-gray-800">{q.questionText}</p>
         </div>
 
+        {/* Submit error banner */}
+        {submitError && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+            <span className="text-sm text-red-700">{submitError}</span>
+            <button
+              type="button"
+              onClick={() => { setSubmitError(null); setSelectedOption(null); }}
+              className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+            >
+              إعادة المحاولة
+            </button>
+          </div>
+        )}
+
         {/* Options */}
-        <div className="space-y-3">
+        <div className="space-y-3" role="group" aria-label="خيارات الإجابة">
           {q.options.map((opt) => {
             const isSelected = (selectedOption ?? state.myAnswer) === opt.id;
             let cls = "w-full text-right rounded-xl border p-4 flex items-center gap-3 transition-colors ";
@@ -239,9 +262,11 @@ export default function ParticipantSessionPage() {
                 key={opt.id}
                 className={cls}
                 disabled={!canAnswer || submitting}
+                aria-pressed={isSelected}
                 onClick={() => canAnswer && submitAnswer(opt.id)}
               >
-                <span className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold flex-shrink-0 bg-white">
+                {/* Label letter: dir="ltr" so A/B/C renders correctly inside RTL container */}
+                <span dir="ltr" className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold flex-shrink-0 bg-white">
                   {opt.optionLabel}
                 </span>
                 <span className="text-sm text-gray-800 flex-1">{opt.optionText}</span>

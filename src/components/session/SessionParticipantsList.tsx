@@ -43,7 +43,28 @@ export default function SessionParticipantsList({ sessionId }: { sessionId: stri
     return () => clearInterval(id);
   }, [fetchParticipants]);
 
-  if (error || participants.length === 0) return null;
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
+        <p className="text-sm text-red-700">تعذّر تحميل قائمة المشاركين.</p>
+        <button
+          type="button"
+          onClick={fetchParticipants}
+          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
+
+  if (participants.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border p-5 text-center text-sm text-gray-400">
+        لم ينضم أي مشارك بعد.
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border p-5">

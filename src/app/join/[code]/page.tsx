@@ -47,19 +47,23 @@ export default function JoinWithCodePage() {
 
         <form action={action} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">رمز الجلسة</label>
+            <label htmlFor="join-code-display" className="block text-sm font-medium text-gray-700 mb-1">رمز الجلسة</label>
             <input
+              id="join-code-display"
               name="code"
               required
               readOnly
               value={code?.toUpperCase() ?? ""}
-              className="w-full rounded-lg border bg-gray-50 px-3 py-2.5 text-center font-mono text-lg tracking-widest uppercase focus:outline-none"
+              dir="ltr"
+              aria-readonly="true"
+              className="w-full rounded-lg border bg-gray-50 px-3 py-2.5 text-center font-mono text-lg tracking-widest uppercase cursor-default"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">الاسم الثلاثي</label>
+            <label htmlFor="join-name-code" className="block text-sm font-medium text-gray-700 mb-1">الاسم الثلاثي</label>
             <input
+              id="join-name-code"
               name="name"
               required
               autoFocus
@@ -68,16 +72,18 @@ export default function JoinWithCodePage() {
               className="w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               minLength={2}
               maxLength={50}
+              aria-describedby={errorText ? "join-code-error" : undefined}
             />
           </div>
 
           {errorText && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{errorText}</p>
+            <p id="join-code-error" role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{errorText}</p>
           )}
 
           <button
             type="submit"
             disabled={isPending}
+            aria-disabled={isPending}
             className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {isPending ? "جاري الانضمام…" : "انضمام للاختبار"}
