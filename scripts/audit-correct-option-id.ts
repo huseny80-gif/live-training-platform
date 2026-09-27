@@ -14,8 +14,10 @@
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const prisma = new PrismaClient({ adapter });
 
 // ─── Audit 1: Orphan correctOptionId ─────────────────────────────────────────
 // Questions where correctOptionId is set but points to a non-existent option.
