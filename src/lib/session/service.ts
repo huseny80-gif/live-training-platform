@@ -191,6 +191,25 @@ export async function showResults(sessionId: string, sessionQuestionId: string, 
   return buildQuestionResult(sessionQuestionId);
 }
 
+export async function gotoQuestion(sessionId: string, questionOrder: number, instructorId: string) {
+  await requireOwnership(sessionId, instructorId);
+
+  const sq = await prisma.sessionQuestion.findFirst({
+    where: { sessionId, questionOrder },
+  });
+  if (!sq) throw new Error("QUESTION_NOT_FOUND");
+
+  const updated = await prisma.sessionQuestion.update({
+    where: { id: sq.id },
+    data: { status: "LIVE", startedAt: new Date() },
+  });
+  await prisma.liveSession.update({
+    where: { id: sessionId },
+    data: { currentQuestionId: sq.id },
+  });
+  return updated;
+}
+
 export async function nextQuestion(sessionId: string, instructorId: string) {
   await requireOwnership(sessionId, instructorId);
 

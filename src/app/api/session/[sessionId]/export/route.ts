@@ -41,9 +41,16 @@ export async function GET(
   const totalQ = liveSession.sessionQuestions.length;
   const sr = liveSession.sessionResult;
 
+  // Fetch instructor name
+  const instructor = await prisma.instructor.findUnique({
+    where: { id: session.user.id },
+    select: { name: true },
+  });
+
   const participants = liveSession.participants.map((p) => ({
     rank: p.rank,
     displayName: p.displayName,
+    joinedAt: p.joinedAt,
     totalScore: Number(p.totalScore),
     correctCount: p.correctCount,
     wrongCount: p.answersCount - p.correctCount,
@@ -64,14 +71,21 @@ export async function GET(
         : 0,
   }));
 
+  const totalParticipants = sr?.totalParticipants ?? participants.length;
+
   const summary = {
     title: liveSession.title,
     sessionCode: liveSession.sessionCode,
-    totalParticipants: sr?.totalParticipants ?? participants.length,
+    instructorName: instructor?.name ?? "",
+    date: (liveSession.startedAt ?? liveSession.createdAt).toLocaleDateString("ar-SA"),
+    participationRate: totalQ > 0 && totalParticipants > 0
+      ? Math.round((participants.filter((p) => p.answersCount > 0).length / totalParticipants) * 100)
+      : 0,
+    totalParticipants,
     totalQuestions: sr?.totalQuestions ?? totalQ,
     averageScore: sr ? Number(sr.averageScore) : 0,
     highestScore: sr ? Number(sr.highestScore) : 0,
-    correctRate: sr ? Number(sr.correctRate) : 0,
+    correctRate: sr ? Math.round(Number(sr.correctRate) * 100) : 0,
   };
 
   const buffer = buildSessionExcel(summary, participants, questions);
@@ -81,7 +95,8 @@ export async function GET(
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="session-${sessionId}.xlsx"`,
+      "Content-Disposition":
+        'attachment; filename="Digital_Leadership_Test_Results.xlsx"; filename*=UTF-8\'\'%D9%86%D8%AA%D8%A7%D8%A6%D8%AC_%D8%A7%D9%84%D8%A7%D8%AE%D8%AA%D8%A8%D8%A7%D8%B1.xlsx',
     },
   });
 }
