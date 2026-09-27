@@ -118,6 +118,7 @@ export default async function InstructorSessionPage({
         <SessionAnalyticsDashboard
           sessionId={sessionId}
           isEnded={session.status === "ENDED"}
+          sessionCode={session.sessionCode}
         />
 
         {/* Live / final leaderboard */}
@@ -125,6 +126,7 @@ export default async function InstructorSessionPage({
           <SessionLeaderboard
             sessionId={sessionId}
             isEnded={session.status === "ENDED"}
+            sessionCode={session.sessionCode}
           />
         )}
 

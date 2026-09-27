@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { io } from "socket.io-client";
+import { REALTIME_EVENTS } from "@/lib/realtime/socket-events";
 
 interface RankEntry {
   rank: number;
@@ -16,9 +18,11 @@ const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 export default function SessionLeaderboard({
   sessionId,
   isEnded,
+  sessionCode,
 }: {
   sessionId: string;
   isEnded: boolean;
+  sessionCode?: string;
 }) {
   const [ranking, setRanking] = useState<RankEntry[]>([]);
   const [error, setError] = useState(false);
@@ -37,6 +41,7 @@ export default function SessionLeaderboard({
     }
   }, [sessionId]);
 
+  // Polling fallback — always active while session is live
   useEffect(() => {
     fetchLeaderboard();
     if (!isEnded) {
@@ -44,6 +49,28 @@ export default function SessionLeaderboard({
       return () => clearInterval(id);
     }
   }, [fetchLeaderboard, isEnded]);
+
+  // Socket.IO realtime listener — re-fetches on relevant events
+  useEffect(() => {
+    if (!sessionCode || isEnded) return;
+
+    const socket = io({ path: "/api/socket", transports: ["websocket"] });
+
+    socket.emit("participant:join_room", { room: `session:${sessionCode}` });
+
+    const refresh = () => { fetchLeaderboard(); };
+
+    socket.on(REALTIME_EVENTS.LEADERBOARD_UPDATED, refresh);
+    socket.on(REALTIME_EVENTS.ANSWER_SUBMITTED, refresh);
+    socket.on(REALTIME_EVENTS.SESSION_ENDED, refresh);
+
+    return () => {
+      socket.off(REALTIME_EVENTS.LEADERBOARD_UPDATED, refresh);
+      socket.off(REALTIME_EVENTS.ANSWER_SUBMITTED, refresh);
+      socket.off(REALTIME_EVENTS.SESSION_ENDED, refresh);
+      socket.disconnect();
+    };
+  }, [sessionCode, isEnded, fetchLeaderboard]);
 
   if (error) {
     return (
