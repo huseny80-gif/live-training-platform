@@ -18,6 +18,37 @@ import {
 
 const SCORE_CORRECT = 10;
 
+// ── Audit helper ──────────────────────────────────────────────────────────────
+
+async function writeAudit(opts: {
+  entityType: string;
+  entityId: string;
+  action: string;
+  actorType: "INSTRUCTOR" | "PARTICIPANT" | "SYSTEM";
+  actorId?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entityType: opts.entityType,
+        entityId: opts.entityId,
+        action: opts.action,
+        actorType: opts.actorType,
+        actorId: opts.actorId ?? null,
+        // Prisma InputJsonValue requires explicit cast from Record<string, unknown>
+        metadata: (opts.metadata ?? {}) as Parameters<typeof prisma.auditLog.create>[0]["data"]["metadata"],
+      },
+    });
+  } catch (err) {
+    // Audit failure must never crash the main flow.
+    // Log safe fields only — no secrets, no tokens, no personal data.
+    process.stderr.write(
+      `[AuditLog] write failed: action=${opts.action} entity=${opts.entityType}:${opts.entityId} err=${err instanceof Error ? err.message : String(err)}\n`,
+    );
+  }
+}
+
 // ── Session creation ──────────────────────────────────────────────────────────
 
 export async function createSession(
@@ -64,6 +95,15 @@ export async function createSession(
       },
     });
   }
+
+  await writeAudit({
+    entityType: "LiveSession",
+    entityId: session.id,
+    action: "SESSION_CREATED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+    metadata: { sessionCode, dayNumber, programId },
+  });
 
   return session;
 }
@@ -128,6 +168,14 @@ export async function startSession(sessionId: string, instructorId: string) {
     where: { id: sessionId },
     data: { status: "ACTIVE", startedAt: new Date() },
   });
+  await writeAudit({
+    entityType: "LiveSession",
+    entityId: sessionId,
+    action: "SESSION_STARTED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+    metadata: { sessionCode: updated.sessionCode },
+  });
   const io = getIO();
   if (io) emitSessionStarted(io, { sessionCode: updated.sessionCode, sessionId, timestamp: new Date().toISOString() });
   return updated;
@@ -137,6 +185,13 @@ export async function pauseSession(sessionId: string, instructorId: string) {
   const session = await requireOwnership(sessionId, instructorId);
   if (session.status !== "ACTIVE") throw new Error("INVALID_STATE");
   const updated = await prisma.liveSession.update({ where: { id: sessionId }, data: { status: "PAUSED" } });
+  await writeAudit({
+    entityType: "LiveSession",
+    entityId: sessionId,
+    action: "SESSION_PAUSED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+  });
   const io = getIO();
   if (io) emitSessionPaused(io, { sessionCode: updated.sessionCode, sessionId, timestamp: new Date().toISOString() });
   return updated;
@@ -146,6 +201,13 @@ export async function resumeSession(sessionId: string, instructorId: string) {
   const session = await requireOwnership(sessionId, instructorId);
   if (session.status !== "PAUSED") throw new Error("INVALID_STATE");
   const updated = await prisma.liveSession.update({ where: { id: sessionId }, data: { status: "ACTIVE" } });
+  await writeAudit({
+    entityType: "LiveSession",
+    entityId: sessionId,
+    action: "SESSION_RESUMED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+  });
   const io = getIO();
   if (io) emitSessionResumed(io, { sessionCode: updated.sessionCode, sessionId, timestamp: new Date().toISOString() });
   return updated;
@@ -158,6 +220,14 @@ export async function endSession(sessionId: string, instructorId: string) {
     data: { status: "ENDED", endedAt: new Date() },
   });
   await computeSessionResult(sessionId);
+  await writeAudit({
+    entityType: "LiveSession",
+    entityId: sessionId,
+    action: "SESSION_ENDED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+    metadata: { endedAt: session.endedAt?.toISOString() },
+  });
   const io = getIO();
   if (io) emitSessionEnded(io, { sessionCode: session.sessionCode, sessionId, endedAt: new Date().toISOString(), leaderboard: [] });
   return session;
@@ -183,6 +253,14 @@ export async function showQuestion(sessionId: string, sessionQuestionId: string,
     data: { currentQuestionId: sessionQuestionId },
   });
 
+  await writeAudit({
+    entityType: "SessionQuestion",
+    entityId: sessionQuestionId,
+    action: "QUESTION_STARTED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+    metadata: { sessionId, questionOrder: sq.questionOrder },
+  });
   const io = getIO();
   if (io) emitQuestionStarted(io, {
     sessionCode: session.sessionCode,
@@ -206,6 +284,14 @@ export async function closeQuestion(sessionId: string, sessionQuestionId: string
   const updated = await prisma.sessionQuestion.update({
     where: { id: sessionQuestionId },
     data: { status: "CLOSED", closedAt: new Date() },
+  });
+  await writeAudit({
+    entityType: "SessionQuestion",
+    entityId: sessionQuestionId,
+    action: "QUESTION_LOCKED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+    metadata: { sessionId, questionOrder: sq.questionOrder },
   });
   const io = getIO();
   if (io) emitQuestionLocked(io, {
