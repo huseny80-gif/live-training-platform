@@ -16,7 +16,19 @@ import {
   emitQuestionLocked,
 } from "@/lib/realtime/socket-server";
 
-const SCORE_CORRECT = 10;
+const DEFAULT_SCORE_CORRECT = 10;
+
+function parseScoringConfig(raw: unknown): { scoreCorrect: number } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { scoreCorrect: DEFAULT_SCORE_CORRECT };
+  }
+  const cfg = raw as Record<string, unknown>;
+  const v = cfg["scoreCorrect"];
+  if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 10000) {
+    return { scoreCorrect: DEFAULT_SCORE_CORRECT };
+  }
+  return { scoreCorrect: v };
+}
 
 // ── Audit helper ──────────────────────────────────────────────────────────────
 
@@ -415,6 +427,7 @@ export async function submitAnswer(
         question: {
           include: { options: true },
         },
+        session: { select: { scoringConfig: true } },
       },
     });
     if (!sq) throw new Error("QUESTION_NOT_FOUND");
@@ -436,9 +449,10 @@ export async function submitAnswer(
     });
     if (existing) return { duplicate: true, answer: existing };
 
-    // Score server-side
+    // Score server-side — scoreCorrect read from session's scoringConfig, default 10
+    const { scoreCorrect } = parseScoringConfig(sq.session.scoringConfig);
     const isCorrect = sq.question.correctOptionId === selectedOptionId;
-    const scoreAwarded = isCorrect ? SCORE_CORRECT : 0;
+    const scoreAwarded = isCorrect ? scoreCorrect : 0;
 
     // Insert answer (partial unique index enforces uniqueness at DB level)
     const answer = await tx.participantAnswer.create({
