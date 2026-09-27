@@ -83,9 +83,14 @@ export default function SessionResultsPage({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `session-${sessionId}.xlsx`;
+      a.download = "Digital_Leadership_Test_Results.xlsx";
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      // Fallback: open in new tab
+      window.open(`/api/session/${sessionId}/export`, "_blank");
     } finally {
       setExporting(false);
     }
@@ -93,16 +98,16 @@ export default function SessionResultsPage({
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500 text-sm animate-pulse">Loading analytics…</div>
+      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500 text-sm animate-pulse">جاري تحميل النتائج…</div>
       </main>
     );
   }
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-red-500 text-sm">Failed to load session data.</div>
+      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-red-500 text-sm">فشل تحميل بيانات الجلسة.</div>
       </main>
     );
   }
@@ -138,7 +143,7 @@ export default function SessionResultsPage({
       : 0;
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
+    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -147,17 +152,17 @@ export default function SessionResultsPage({
               href={`/programs/${id}/sessions/${sessionId}`}
               className="text-sm text-gray-500 hover:text-gray-800"
             >
-              ← Session
+              → الجلسة
             </Link>
             <span className="text-gray-300">/</span>
-            <h1 className="font-bold text-gray-900">Analytics Dashboard</h1>
+            <h1 className="font-bold text-gray-900">تحليلات الاختبار</h1>
           </div>
           <button
             onClick={handleExport}
             disabled={exporting}
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors"
           >
-            {exporting ? "Exporting…" : "⬇ Export Excel"}
+            {exporting ? "جاري التصدير…" : "⬇ تصدير النتائج Excel"}
           </button>
         </div>
 
@@ -166,30 +171,30 @@ export default function SessionResultsPage({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               {
-                label: "Participants",
+                label: "المشاركون",
                 value: statistics.totalParticipants,
                 sub: "",
                 color: "bg-blue-50 border-blue-100",
                 text: "text-blue-700",
               },
               {
-                label: "Participation",
+                label: "نسبة المشاركة",
                 value: `${participationPct}%`,
-                sub: "answered ≥ 1",
+                sub: "أجاب على سؤال واحد على الأقل",
                 color: "bg-emerald-50 border-emerald-100",
                 text: "text-emerald-700",
               },
               {
-                label: "Avg Score",
+                label: "متوسط الدرجات",
                 value: statistics.averageScore.toFixed(1),
-                sub: "pts",
+                sub: "نقطة",
                 color: "bg-amber-50 border-amber-100",
                 text: "text-amber-700",
               },
               {
-                label: "Highest Score",
+                label: "أعلى درجة",
                 value: statistics.highestScore,
-                sub: "pts",
+                sub: "نقطة",
                 color: "bg-purple-50 border-purple-100",
                 text: "text-purple-700",
               },
@@ -215,7 +220,7 @@ export default function SessionResultsPage({
           {/* Score Distribution */}
           <div className="bg-white rounded-2xl border p-5">
             <h2 className="font-semibold text-gray-800 mb-4 text-sm">
-              Score Distribution
+              توزيع الدرجات
             </h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={scoreDistribution} barSize={32}>
@@ -235,7 +240,7 @@ export default function SessionResultsPage({
           {/* Question Accuracy */}
           <div className="bg-white rounded-2xl border p-5">
             <h2 className="font-semibold text-gray-800 mb-4 text-sm">
-              Question Accuracy
+              دقة الأسئلة
             </h2>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart
@@ -271,7 +276,7 @@ export default function SessionResultsPage({
         {/* Leaderboard */}
         <div className="bg-white rounded-2xl border p-5">
           <h2 className="font-semibold text-gray-800 mb-4">
-            Leaderboard ({participants.length})
+            🏆 المتصدرون ({participants.length})
           </h2>
           <div className="space-y-2">
             {participants.map((p, idx) => (
@@ -286,7 +291,7 @@ export default function SessionResultsPage({
                   {p.displayName}
                 </span>
                 <span className="text-xs text-gray-400 mr-2">
-                  {p.correctCount}/{p.answersCount} correct
+                  {p.correctCount}/{p.answersCount} صحيح
                 </span>
                 <span className="text-xs text-gray-400 mr-2">
                   {p.percentage}%
@@ -302,17 +307,17 @@ export default function SessionResultsPage({
         {/* Question Analysis Table */}
         <div className="bg-white rounded-2xl border p-5">
           <h2 className="font-semibold text-gray-800 mb-4">
-            Question Analysis
+            تحليل الأسئلة
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-gray-500 border-b">
-                  <th className="pb-2 pr-3 w-10">Q#</th>
-                  <th className="pb-2 pr-3">Question</th>
-                  <th className="pb-2 pr-3 text-right w-24">Answers</th>
-                  <th className="pb-2 pr-3 text-right w-20">Correct</th>
-                  <th className="pb-2 text-right w-20">Accuracy</th>
+                <tr className="text-right text-xs text-gray-500 border-b">
+                  <th className="pb-2 pr-3 w-10">رقم</th>
+                  <th className="pb-2 pr-3">السؤال</th>
+                  <th className="pb-2 pr-3 text-right w-24">الإجابات</th>
+                  <th className="pb-2 pr-3 text-right w-20">الصحيح</th>
+                  <th className="pb-2 text-right w-20">الدقة</th>
                 </tr>
               </thead>
               <tbody>

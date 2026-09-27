@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 interface QuestionOption {
   id: string;
@@ -36,22 +36,33 @@ interface SessionState {
 
 export default function ParticipantSessionPage() {
   const { code } = useParams<{ code: string }>();
+  const router = useRouter();
   const [state, setState] = useState<SessionState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ isCorrect: boolean; scoreAwarded: number } | null>(null);
   const lastQuestionId = useRef<string | null>(null);
+  const redirectedRef = useRef(false);
 
   const fetchState = useCallback(async () => {
     try {
       const res = await fetch(`/api/session/${code}/state`, { cache: "no-store" });
       if (!res.ok) {
-        if (res.status === 404) { setError("لم يتم العثور على الجلسة."); return; }
+        if (res.status === 404) {
+          setError("SESSION_NOT_FOUND");
+          return;
+        }
         return;
       }
       const data: SessionState = await res.json();
       setState(data);
+
+      // Auto-redirect to result page when session ends
+      if (data.sessionStatus === "ENDED" && !redirectedRef.current) {
+        redirectedRef.current = true;
+        setTimeout(() => router.push(`/session/${code}/result`), 1500);
+      }
 
       const newQId = data.currentQuestion?.sessionQuestionId ?? null;
       if (newQId !== lastQuestionId.current) {
@@ -62,7 +73,7 @@ export default function ParticipantSessionPage() {
     } catch {
       // network hiccup — ignore
     }
-  }, [code]);
+  }, [code, router]);
 
   useEffect(() => {
     fetchState();
@@ -98,17 +109,33 @@ export default function ParticipantSessionPage() {
     }
   }
 
+  // ── Error state ──────────────────────────────────────────────────────────
   if (error) {
+    const isNotFound = error === "SESSION_NOT_FOUND";
     return (
       <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm">
-          <p className="text-red-600 font-medium">{error}</p>
-          <a href="/join" className="mt-4 inline-block text-sm text-blue-600 hover:underline">→ العودة للانضمام</a>
+        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
+          <div className="text-5xl">⚠️</div>
+          <h1 className="text-lg font-bold text-gray-800">
+            {isNotFound ? "الجلسة غير موجودة" : "حدث خطأ"}
+          </h1>
+          <p className="text-sm text-gray-500">
+            {isNotFound
+              ? "هذه الجلسة غير متاحة أو انتهت. تحقق من الرمز وحاول مجدداً."
+              : error}
+          </p>
+          <a
+            href="/join"
+            className="inline-block mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+          >
+            العودة للبداية
+          </a>
         </div>
       </main>
     );
   }
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (!state) {
     return (
       <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -119,6 +146,7 @@ export default function ParticipantSessionPage() {
 
   const { sessionStatus, sessionTitle, dayNumber, totalQuestions, currentQuestionIndex, currentQuestion, hasAnswered, isCorrect, scoreAwarded } = state;
 
+  // ── Session ended — redirect soon, show brief message ────────────────────
   if (sessionStatus === "ENDED") {
     return (
       <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -126,12 +154,13 @@ export default function ParticipantSessionPage() {
           <div className="text-5xl">🏁</div>
           <h1 className="text-xl font-bold text-gray-900">انتهى الاختبار</h1>
           <p className="text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
-          <p className="text-sm text-gray-400">شكراً على مشاركتك!</p>
+          <p className="text-sm text-blue-600 animate-pulse">جاري الانتقال لعرض نتيجتك…</p>
         </div>
       </main>
     );
   }
 
+  // ── Waiting / Paused ─────────────────────────────────────────────────────
   if (sessionStatus === "DRAFT" || sessionStatus === "PAUSED" || !currentQuestion) {
     return (
       <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
@@ -145,6 +174,9 @@ export default function ParticipantSessionPage() {
               : "في انتظار المدرب لعرض السؤال التالي…"}
           </p>
           <p className="text-xs text-gray-400 font-mono bg-gray-50 px-3 py-1 rounded-full inline-block">رمز: {code}</p>
+          <a href="/join" className="block text-xs text-gray-400 hover:text-gray-600 underline mt-2">
+            العودة للبداية
+          </a>
         </div>
       </main>
     );
@@ -196,16 +228,12 @@ export default function ParticipantSessionPage() {
         <div className="space-y-3">
           {q.options.map((opt) => {
             const isSelected = (selectedOption ?? state.myAnswer) === opt.id;
-
             let cls = "w-full text-right rounded-xl border p-4 flex items-center gap-3 transition-colors ";
             if (canAnswer) {
-              cls += isSelected
-                ? "border-blue-500 bg-blue-50 "
-                : "hover:bg-gray-50 cursor-pointer ";
+              cls += isSelected ? "border-blue-500 bg-blue-50 " : "hover:bg-gray-50 cursor-pointer ";
             } else {
               cls += isSelected ? "border-blue-400 bg-blue-50 " : "";
             }
-
             return (
               <button
                 key={opt.id}
