@@ -9,9 +9,28 @@ const { auth } = NextAuth(authConfig);
 export async function proxy(request: Request) {
   const pathname = new URL(request.url).pathname;
 
-  // handleUpload reads the JSON body; auth(request) consumes the stream first.
-  if (pathname === "/api/documents/upload-url") {
-    return undefined;
+  // Inject x-request-id on all /api/* requests (pass-through or generate UUID).
+  if (pathname.startsWith("/api/")) {
+    const requestId =
+      (request.headers.get("x-request-id") as string | null) ??
+      globalThis.crypto.randomUUID();
+
+    // handleUpload reads the JSON body; auth(request) consumes the stream first.
+    // Return early without calling auth so the body stream stays intact.
+    if (pathname === "/api/documents/upload-url") {
+      return undefined;
+    }
+
+    const headers = new Headers(request.headers);
+    headers.set("x-request-id", requestId);
+    const tagged = new Request(request, { headers });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const authRes = await ((auth as unknown) as (req: Request) => Promise<Response | undefined>)(tagged);
+    if (authRes) {
+      authRes.headers.set("x-request-id", requestId);
+    }
+    return authRes;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
