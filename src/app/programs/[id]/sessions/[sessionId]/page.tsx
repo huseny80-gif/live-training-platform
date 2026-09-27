@@ -16,6 +16,7 @@ import {
 } from "@/app/actions/sessions";
 import ResetSessionButton from "./ResetSessionButton";
 import CopyLinkButton from "./CopyLinkButton";
+import ShareLinkButton from "@/components/session/ShareLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +121,7 @@ export default async function InstructorSessionPage({
               <p className="text-4xl font-mono font-bold tracking-widest text-blue-700">{session.sessionCode}</p>
               <p className="text-xs text-gray-400 mt-1 break-all">{joinUrl}</p>
               <CopyLinkButton url={joinUrl} />
+              <ShareLinkButton url={joinUrl} />
             </div>
 
             {/* Controls */}
