@@ -3,20 +3,32 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildSessionExcel } from "@/lib/excel/export";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authSession = await auth();
+  const userId = authSession?.user?.id ?? null;
+  const { code: sessionId } = await params;
+
+  console.log({ exportParam: sessionId, userId, authed: !!userId });
+
+  if (!userId) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
-  const { code: sessionId } = await params;
-  console.log({ exportParam: sessionId, userId: session.user.id });
+  // Two-step: find by id first, then verify ownership
+  const found = await prisma.liveSession.findUnique({ where: { id: sessionId }, select: { id: true, instructorId: true } });
+  console.log({ sessionFound: !!found, dbInstructorId: found?.instructorId, requestUserId: userId, ownershipMatch: found?.instructorId === userId });
 
-  const liveSession = await prisma.liveSession.findFirst({
-    where: { id: sessionId, instructorId: session.user.id },
+  if (!found || found.instructorId !== userId) {
+    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  }
+
+  const liveSession = await prisma.liveSession.findUnique({
+    where: { id: sessionId },
     include: {
       sessionResult: true,
       participants: {
@@ -44,7 +56,7 @@ export async function GET(
 
   // Fetch instructor name
   const instructor = await prisma.instructor.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: { name: true },
   });
 
