@@ -45,7 +45,22 @@ export default function SessionLeaderboard({
     }
   }, [fetchLeaderboard, isEnded]);
 
-  if (error || ranking.length === 0) return null;
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
+        <p className="text-sm text-red-700">تعذّر تحميل الترتيب.</p>
+        <button
+          type="button"
+          onClick={fetchLeaderboard}
+          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
+
+  if (ranking.length === 0) return null;
 
   return (
     <div className="bg-white rounded-2xl border p-5">

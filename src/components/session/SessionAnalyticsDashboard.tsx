@@ -70,7 +70,22 @@ export default function SessionAnalyticsDashboard({
     }
   }, [fetchAnalytics, isEnded]);
 
-  if (error || !data) return null;
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
+        <p className="text-sm text-red-700">تعذّر تحميل التحليلات.</p>
+        <button
+          type="button"
+          onClick={fetchAnalytics}
+          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) return null;
   if (data.totalAnswers === 0 && data.participantCount === 0) return null;
 
   return (

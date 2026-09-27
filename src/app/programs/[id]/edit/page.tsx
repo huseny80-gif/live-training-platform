@@ -26,18 +26,20 @@ export default function EditProgramPage() {
       <div className="max-w-xl mx-auto bg-white rounded-2xl border p-8">
         <h1 className="text-xl font-bold mb-6">Edit Program</h1>
         <form action={dispatch} className="space-y-4">
-          <Field label="Title" name="title" />
+          <Field label="Title" name="title" id="edit-title" />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label htmlFor="edit-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
+              id="edit-description"
               name="description"
               rows={3}
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+            <label htmlFor="edit-language" className="block text-sm font-medium text-gray-700 mb-1">Language</label>
             <select
+              id="edit-language"
               name="language"
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -47,8 +49,9 @@ export default function EditProgramPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label htmlFor="edit-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
+              id="edit-status"
               name="status"
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -59,7 +62,7 @@ export default function EditProgramPage() {
             </select>
           </div>
           {state && !state.ok && (
-            <p className="text-sm text-red-600">{state.error}</p>
+            <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{state.error}</p>
           )}
           <div className="flex gap-3 pt-2">
             <button
@@ -83,11 +86,12 @@ export default function EditProgramPage() {
   );
 }
 
-function Field({ label, name }: { label: string; name: string }) {
+function Field({ label, name, id }: { label: string; name: string; id: string }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <input
+        id={id}
         name={name}
         className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
