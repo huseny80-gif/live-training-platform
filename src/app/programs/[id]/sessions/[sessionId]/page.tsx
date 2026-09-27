@@ -20,6 +20,8 @@ import ShareLinkButton from "@/components/session/ShareLinkButton";
 import SessionLiveStats from "@/components/session/SessionLiveStats";
 import SessionParticipantsList from "@/components/session/SessionParticipantsList";
 import SessionAnalyticsDashboard from "@/components/session/SessionAnalyticsDashboard";
+import SessionLeaderboard from "@/components/session/SessionLeaderboard";
+import SessionFinalReport from "@/components/session/SessionFinalReport";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +119,19 @@ export default async function InstructorSessionPage({
           sessionId={sessionId}
           isEnded={session.status === "ENDED"}
         />
+
+        {/* Live / final leaderboard */}
+        {(session.status === "ACTIVE" || session.status === "ENDED") && (
+          <SessionLeaderboard
+            sessionId={sessionId}
+            isEnded={session.status === "ENDED"}
+          />
+        )}
+
+        {/* Final report — shown only after session ends */}
+        {session.status === "ENDED" && (
+          <SessionFinalReport sessionId={sessionId} />
+        )}
 
         {/* Session info + QR */}
         <div className="bg-white rounded-2xl border p-5 grid md:grid-cols-2 gap-5">
