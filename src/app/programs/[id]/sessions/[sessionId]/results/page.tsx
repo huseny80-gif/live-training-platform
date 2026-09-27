@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   BarChart,
@@ -47,12 +48,8 @@ interface Statistics {
 const MEDAL = ["🥇", "🥈", "🥉"];
 const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
-export default function SessionResultsPage({
-  params,
-}: {
-  params: { id: string; sessionId: string };
-}) {
-  const { id, sessionId } = params;
+export default function SessionResultsPage() {
+  const { id, sessionId } = useParams<{ id: string; sessionId: string }>();
   const [data, setData] = useState<{
     participants: Participant[];
     questions: Question[];

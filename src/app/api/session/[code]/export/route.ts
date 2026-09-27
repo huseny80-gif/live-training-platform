@@ -20,7 +20,13 @@ export async function GET(
   }
 
   // Two-step: find by id first, then verify ownership
-  const found = await prisma.liveSession.findUnique({ where: { id: sessionId }, select: { id: true, instructorId: true } });
+  let found: { id: string; instructorId: string } | null = null;
+  try {
+    found = await prisma.liveSession.findUnique({ where: { id: sessionId }, select: { id: true, instructorId: true } });
+  } catch (e) {
+    console.error({ exportDbError: String(e), sessionId });
+    return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+  }
   console.log({ sessionFound: !!found, dbInstructorId: found?.instructorId, requestUserId: userId, ownershipMatch: found?.instructorId === userId });
 
   if (!found || found.instructorId !== userId) {
