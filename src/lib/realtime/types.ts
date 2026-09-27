@@ -61,11 +61,55 @@ export interface SessionEndedPayload {
   leaderboard: LeaderboardEntry[];
 }
 
+// ── Session control event payloads (Phase 19.4) ───────────────────────────────
+
+export interface SessionStartedPayload {
+  sessionCode: string;
+  sessionId: string;
+  timestamp: string;      // ISO timestamp
+}
+
+export interface SessionPausedPayload {
+  sessionCode: string;
+  sessionId: string;
+  timestamp: string;
+}
+
+export interface SessionResumedPayload {
+  sessionCode: string;
+  sessionId: string;
+  timestamp: string;
+}
+
+// ── Question control event payloads (Phase 19.4) ──────────────────────────────
+
+export interface QuestionStartedPayload {
+  sessionCode: string;
+  sessionId: string;
+  questionId: string;
+  questionIndex: number;
+  timestamp: string;
+}
+
+export interface QuestionLockedPayload {
+  sessionCode: string;
+  sessionId: string;
+  questionId: string;
+  questionIndex: number;
+  timestamp: string;
+}
+
 // ── Discriminated union for all realtime events ───────────────────────────────
 
 export type RealtimeEvent =
-  | { type: "PARTICIPANT_JOINED";   payload: ParticipantJoinedPayload }
-  | { type: "ANSWER_SUBMITTED";     payload: AnswerSubmittedPayload }
-  | { type: "QUESTION_CHANGED";     payload: QuestionChangedPayload }
-  | { type: "LEADERBOARD_UPDATED";  payload: LeaderboardUpdatedPayload }
-  | { type: "SESSION_ENDED";        payload: SessionEndedPayload };
+  | { type: "PARTICIPANT_JOINED";    payload: ParticipantJoinedPayload }
+  | { type: "ANSWER_SUBMITTED";      payload: AnswerSubmittedPayload }
+  | { type: "QUESTION_CHANGED";      payload: QuestionChangedPayload }
+  | { type: "LEADERBOARD_UPDATED";   payload: LeaderboardUpdatedPayload }
+  | { type: "SESSION_ENDED";         payload: SessionEndedPayload }
+  | { type: "SESSION_STARTED";       payload: SessionStartedPayload }
+  | { type: "SESSION_PAUSED";        payload: SessionPausedPayload }
+  | { type: "SESSION_RESUMED";       payload: SessionResumedPayload }
+  | { type: "QUESTION_STARTED";  payload: QuestionStartedPayload }
+  | { type: "QUESTION_CHANGED";  payload: QuestionChangedPayload }
+  | { type: "QUESTION_LOCKED";   payload: QuestionLockedPayload };

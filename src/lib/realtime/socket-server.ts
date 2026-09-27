@@ -18,6 +18,11 @@ import {
   type QuestionChangedPayload,
   type LeaderboardUpdatedPayload,
   type SessionEndedPayload,
+  type SessionStartedPayload,
+  type SessionPausedPayload,
+  type SessionResumedPayload,
+  type QuestionStartedPayload,
+  type QuestionLockedPayload,
 } from "./types";
 
 export function emitParticipantJoined(
@@ -66,6 +71,60 @@ export function emitSessionEnded(
 ): void {
   io.to(sessionRoom(payload.sessionCode)).emit(
     REALTIME_EVENTS.SESSION_ENDED,
+    payload,
+  );
+}
+
+// ── Session control emitters (Phase 19.4) ────────────────────────────────────
+
+export function emitSessionStarted(
+  io: Server,
+  payload: SessionStartedPayload,
+): void {
+  io.to(sessionRoom(payload.sessionCode)).emit(
+    REALTIME_EVENTS.SESSION_STARTED,
+    payload,
+  );
+}
+
+export function emitSessionPaused(
+  io: Server,
+  payload: SessionPausedPayload,
+): void {
+  io.to(sessionRoom(payload.sessionCode)).emit(
+    REALTIME_EVENTS.SESSION_PAUSED,
+    payload,
+  );
+}
+
+export function emitSessionResumed(
+  io: Server,
+  payload: SessionResumedPayload,
+): void {
+  io.to(sessionRoom(payload.sessionCode)).emit(
+    REALTIME_EVENTS.SESSION_RESUMED,
+    payload,
+  );
+}
+
+// ── Question control emitters (Phase 19.4) ───────────────────────────────────
+
+export function emitQuestionStarted(
+  io: Server,
+  payload: QuestionStartedPayload,
+): void {
+  io.to(sessionRoom(payload.sessionCode)).emit(
+    REALTIME_EVENTS.QUESTION_STARTED,
+    payload,
+  );
+}
+
+export function emitQuestionLocked(
+  io: Server,
+  payload: QuestionLockedPayload,
+): void {
+  io.to(sessionRoom(payload.sessionCode)).emit(
+    REALTIME_EVENTS.QUESTION_LOCKED,
     payload,
   );
 }
