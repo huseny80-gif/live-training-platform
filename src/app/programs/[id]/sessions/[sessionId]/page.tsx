@@ -221,6 +221,22 @@ export default async function InstructorSessionPage({
           </div>
         </div>
 
+        {/* Analytics link when session ended */}
+        {session.status === "ENDED" && (
+          <div className="bg-white rounded-2xl border p-5 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-gray-800">Session Ended</p>
+              <p className="text-sm text-gray-500">View detailed analytics, charts, and export to Excel.</p>
+            </div>
+            <Link
+              href={`/programs/${id}/sessions/${sessionId}/results`}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap"
+            >
+              📊 View Analytics
+            </Link>
+          </div>
+        )}
+
         {/* Leaderboard (only when session ended) */}
         {leaderboard && leaderboard.length > 0 && (
           <div className="bg-white rounded-2xl border p-6">
