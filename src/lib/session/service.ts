@@ -229,7 +229,12 @@ export async function endSession(sessionId: string, instructorId: string) {
     metadata: { endedAt: session.endedAt?.toISOString() },
   });
   const io = getIO();
-  if (io) emitSessionEnded(io, { sessionCode: session.sessionCode, sessionId, endedAt: new Date().toISOString(), leaderboard: [] });
+  if (io) {
+    // Leaderboard is populated by computeSessionResult(); fetch it now so
+    // participants receive final rankings via the SESSION_ENDED event.
+    const leaderboard = await getLeaderboard(sessionId);
+    emitSessionEnded(io, { sessionCode: session.sessionCode, sessionId, endedAt: new Date().toISOString(), leaderboard });
+  }
   return session;
 }
 
@@ -320,6 +325,7 @@ export async function gotoQuestion(sessionId: string, questionOrder: number, ins
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { sessionId, questionOrder },
+    include: { question: { select: { questionText: true } } },
   });
   if (!sq) throw new Error("QUESTION_NOT_FOUND");
 
@@ -337,8 +343,8 @@ export async function gotoQuestion(sessionId: string, questionOrder: number, ins
     sessionCode: session.sessionCode,
     sessionQuestionId: sq.id,
     questionOrder: sq.questionOrder,
-    questionText: "",
-    timeLimitSeconds: null,
+    questionText: sq.question.questionText,
+    timeLimitSeconds: sq.timeLimitSeconds ?? null,
   });
   return updated;
 }
