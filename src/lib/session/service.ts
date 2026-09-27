@@ -144,6 +144,7 @@ export async function participantJoin(sessionCode: string, displayName: string) 
       displayName: name,
       joinTokenHash: tokenHash,
       status: "JOINED",
+      lastSeenAt: new Date(),
     },
   });
 
@@ -153,6 +154,15 @@ export async function participantJoin(sessionCode: string, displayName: string) 
   await prisma.sessionParticipant.update({
     where: { id: participant.id },
     data: { joinTokenHash: finalHash },
+  });
+
+  await writeAudit({
+    entityType: "SessionParticipant",
+    entityId: participant.id,
+    action: "PARTICIPANT_JOIN",
+    actorType: "PARTICIPANT",
+    actorId: participant.id,
+    metadata: { sessionId: session.id, sessionCode, displayName: name },
   });
 
   return { token, participantId: participant.id, sessionId: session.id };
@@ -317,6 +327,15 @@ export async function showResults(sessionId: string, sessionQuestionId: string, 
     data: { status: "RESULTS", resultsShownAt: new Date() },
   });
 
+  await writeAudit({
+    entityType: "SessionQuestion",
+    entityId: sessionQuestionId,
+    action: "SHOW_RESULTS",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+    metadata: { sessionId },
+  });
+
   return buildQuestionResult(sessionQuestionId);
 }
 
@@ -388,7 +407,7 @@ export async function submitAnswer(
   const { participantId, sessionId } = tokenPayload;
 
   // Atomic transaction: prevents concurrent duplicate submissions
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Verify SessionQuestion is LIVE
     const sq = await tx.sessionQuestion.findFirst({
       where: { id: sessionQuestionId, sessionId },
@@ -448,6 +467,25 @@ export async function submitAnswer(
 
     return { duplicate: false, answer };
   });
+
+  // Write audit outside the transaction — never blocks the main flow
+  if (!result.duplicate) {
+    await writeAudit({
+      entityType: "ParticipantAnswer",
+      entityId: result.answer.id,
+      action: "SUBMIT_ANSWER",
+      actorType: "PARTICIPANT",
+      actorId: participantId,
+      metadata: {
+        sessionId,
+        sessionQuestionId,
+        isCorrect: result.answer.isCorrect,
+        scoreAwarded: Number(result.answer.scoreAwarded),
+      },
+    });
+  }
+
+  return result;
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────

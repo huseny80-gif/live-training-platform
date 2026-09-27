@@ -291,6 +291,15 @@ export function registerSessionHandlers(io: Server) {
         }
 
         await socket.join(`session:${sessionCode}`);
+
+        // Stamp lastSeenAt if this socket already has a participant identity
+        const participantId = socket.data.participantId as string | undefined;
+        if (participantId) {
+          const { prisma } = await import("@/lib/prisma");
+          await prisma.sessionParticipant
+            .update({ where: { id: participantId }, data: { lastSeenAt: new Date() } })
+            .catch(() => {}); // Non-critical
+        }
       } catch {
         // Non-critical — ignore silently
       }
@@ -299,6 +308,23 @@ export function registerSessionHandlers(io: Server) {
     // ── Participant join ───────────────────────────────────────────────────────
     socket.on(EVENTS.PARTICIPANT_JOIN, async (payload: ParticipantJoinPayload) => {
       await handleParticipantJoin(io, socket, payload, { participantJoin, getSessionByCode });
+    });
+
+    // ── Disconnect ─────────────────────────────────────────────────────────────
+    // Marks participant OFFLINE and stamps lastSeenAt.
+    // Instructor sockets have no participantId — they're silently skipped.
+    socket.on("disconnect", async () => {
+      const participantId = socket.data.participantId as string | undefined;
+      if (!participantId) return;
+      try {
+        const { prisma } = await import("@/lib/prisma");
+        await prisma.sessionParticipant.update({
+          where: { id: participantId },
+          data: { status: "OFFLINE", lastSeenAt: new Date() },
+        });
+      } catch {
+        // Non-critical — participant record may not exist (e.g. join failed mid-flight)
+      }
     });
 
     // ── Submit answer ──────────────────────────────────────────────────────────
