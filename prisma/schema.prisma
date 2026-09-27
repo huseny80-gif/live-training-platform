@@ -280,6 +280,19 @@ model Question {
   questionType    QuestionType        @default(MULTIPLE_CHOICE) @map("question_type")
   difficulty      QuestionDifficulty  @default(MEDIUM)
   correctOptionId String?             @map("correct_option_id")
+model Question {
+  id              String   @id @default(uuid())
+  correctOptionId String?  @map("correct_option_id")
+
+  correctOption QuestionOption?
+    @relation(
+      fields: [correctOptionId],
+      references: [id],
+      onDelete: Restrict
+    )
+
+  options QuestionOption[]
+}
   explanation     String?
   // Direct FK to DocumentPage for full traceability: Question → Day → Document → Page → Slide content
   sourcePageId    String?             @map("source_page_id")
@@ -322,6 +335,7 @@ model QuestionOption {
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
   question           Question            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+correctForQuestions Question[]
   participantAnswers ParticipantAnswer[]
 
   @@unique([questionId, optionLabel])
