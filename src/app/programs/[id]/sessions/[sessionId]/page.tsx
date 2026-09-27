@@ -17,6 +17,7 @@ import {
 import ResetSessionButton from "./ResetSessionButton";
 import CopyLinkButton from "./CopyLinkButton";
 import ShareLinkButton from "@/components/session/ShareLinkButton";
+import SessionLiveStats from "@/components/session/SessionLiveStats";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,9 @@ export default async function InstructorSessionPage({
           <span className="text-gray-300">/</span>
           <h1 className="font-bold truncate text-gray-800">{session.title}</h1>
         </div>
+
+        {/* Live stats bar */}
+        <SessionLiveStats sessionId={sessionId} />
 
         {/* Session info + QR */}
         <div className="bg-white rounded-2xl border p-5 grid md:grid-cols-2 gap-5">
