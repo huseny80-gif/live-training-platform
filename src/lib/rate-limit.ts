@@ -1,81 +1,137 @@
-// ── Shared types ─────────────────────────────────────────────────────────────
+// ── Distributed rate limiting via Upstash Redis ──────────────────────────────
+// Replaces the previous in-memory Map store which was NOT multi-instance safe.
+// On Redis unavailability: fail-open (allow request) + log RATE_LIMIT_BACKEND_UNAVAILABLE.
 
-interface Attempt {
-  count: number;
-  resetAt: number;
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// ── Test injection hooks ──────────────────────────────────────────────────────
+// Allow tests to supply a mock Ratelimit instance without a real Redis connection.
+// Never called in production paths.
+let _testLoginLimiter: Ratelimit | null = null;
+let _testAnswerLimiter: Ratelimit | null = null;
+
+export function _setLoginLimiterForTest(l: Ratelimit | null) { _testLoginLimiter = l; }
+export function _setAnswerLimiterForTest(l: Ratelimit | null) { _testAnswerLimiter = l; }
+
+// ── Lazy-initialised production limiters ──────────────────────────────────────
+let _redis: Redis | null = null;
+let _loginLimiter: Ratelimit | null = null;
+let _answerLimiter: Ratelimit | null = null;
+
+function getRedis(): Redis | null {
+  if (_redis) return _redis;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  _redis = new Redis({ url, token });
+  return _redis;
 }
 
-// ── Login rate limiter ────────────────────────────────────────────────────────
-// LIMITATION: in-memory store — resets on server restart and is NOT shared
-// across multiple process instances (multi-instance / serverless deployments).
-// Suitable for single-process / self-hosted deployments only.
-// For multi-instance production, replace with a shared store (e.g. Redis).
+function getLoginLimiter(): Ratelimit | null {
+  if (_testLoginLimiter) return _testLoginLimiter;
+  if (_loginLimiter) return _loginLimiter;
+  const redis = getRedis();
+  if (!redis) return null;
+  _loginLimiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, "15 m"),
+    prefix: "rl:login",
+  });
+  return _loginLimiter;
+}
 
-const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
-const MAX_ATTEMPTS = 5;
+function getAnswerLimiter(): Ratelimit | null {
+  if (_testAnswerLimiter) return _testAnswerLimiter;
+  if (_answerLimiter) return _answerLimiter;
+  const redis = getRedis();
+  if (!redis) return null;
+  _answerLimiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(10, "1 m"),
+    prefix: "rl:answer",
+  });
+  return _answerLimiter;
+}
 
-const store = new Map<string, Attempt>();
+// Fire-and-forget security log — avoids circular import by writing directly to DB
+async function logBackendUnavailable(limiterName: string) {
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    await prisma.auditLog.create({
+      data: {
+        entityType: "RateLimiter",
+        entityId: limiterName,
+        action: "RATE_LIMIT_BACKEND_UNAVAILABLE",
+        actorType: "SYSTEM",
+        metadata: { limiter: limiterName, timestamp: new Date().toISOString() },
+      },
+    });
+  } catch {
+    process.stderr.write(
+      `[rate-limit] RATE_LIMIT_BACKEND_UNAVAILABLE for ${limiterName} — audit write also failed\n`
+    );
+  }
+}
 
-export function checkRateLimit(key: string): { allowed: boolean; retryAfterMs: number } {
-  const now = Date.now();
-  const entry = store.get(key);
+// ── Login rate limiter ─────────────────────────────────────────────────────────
+// Policy: 5 attempts / 15 minutes per IP:email key
 
-  if (!entry || now > entry.resetAt) {
-    store.set(key, { count: 1, resetAt: now + WINDOW_MS });
+export async function checkRateLimit(
+  key: string
+): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const limiter = getLoginLimiter();
+  if (!limiter) {
+    void logBackendUnavailable("login").catch(() =>
+      process.stderr.write("[rate-limit] logBackendUnavailable failed silently\n")
+    );
     return { allowed: true, retryAfterMs: 0 };
   }
 
-  if (entry.count >= MAX_ATTEMPTS) {
-    return { allowed: false, retryAfterMs: entry.resetAt - now };
+  try {
+    const result = await limiter.limit(key);
+    if (result.success) return { allowed: true, retryAfterMs: 0 };
+    return { allowed: false, retryAfterMs: Math.max(0, result.reset - Date.now()) };
+  } catch {
+    void logBackendUnavailable("login").catch(() =>
+      process.stderr.write("[rate-limit] logBackendUnavailable failed silently\n")
+    );
+    return { allowed: true, retryAfterMs: 0 };
   }
-
-  entry.count += 1;
-  return { allowed: true, retryAfterMs: 0 };
 }
 
-export function resetRateLimit(key: string): void {
-  store.delete(key);
+export async function resetRateLimit(key: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.del(`rl:login:${key}`);
+  } catch {
+    // best-effort reset; non-fatal
+  }
 }
 
 // ── Answer submission rate limiter ────────────────────────────────────────────
-// LIMITATION: in-memory store — resets on server restart and is NOT shared
-// across multiple process instances (multi-instance / serverless deployments).
-// Suitable for single-process / self-hosted deployments only.
-// For multi-instance production, replace with a shared store (e.g. Redis).
-//
-// Key format: `${sessionQuestionId}:${hashToken(guestToken)}`
-// This scopes the limit per-question per-participant, preventing one participant
-// from submitting the same answer more than ANSWER_MAX_ATTEMPTS times per window.
+// Policy: 10 attempts / 1 minute per participantId key
 
-const ANSWER_WINDOW_MS = 60 * 1000; // 1 minute
-const ANSWER_MAX_ATTEMPTS = 10;
-
-const answerStore = new Map<string, Attempt>();
-
-export function checkAnswerRateLimit(key: string): { allowed: boolean; retryAfterMs: number } {
-  const now = Date.now();
-  const entry = answerStore.get(key);
-
-  if (!entry || now > entry.resetAt) {
-    answerStore.set(key, { count: 1, resetAt: now + ANSWER_WINDOW_MS });
+export async function checkAnswerRateLimit(
+  key: string
+): Promise<{ allowed: boolean; retryAfterMs: number }> {
+  const limiter = getAnswerLimiter();
+  if (!limiter) {
+    void logBackendUnavailable("answer").catch(() =>
+      process.stderr.write("[rate-limit] logBackendUnavailable failed silently\n")
+    );
     return { allowed: true, retryAfterMs: 0 };
   }
 
-  if (entry.count >= ANSWER_MAX_ATTEMPTS) {
-    return { allowed: false, retryAfterMs: entry.resetAt - now };
+  try {
+    const result = await limiter.limit(key);
+    if (result.success) return { allowed: true, retryAfterMs: 0 };
+    return { allowed: false, retryAfterMs: Math.max(0, result.reset - Date.now()) };
+  } catch {
+    void logBackendUnavailable("answer").catch(() =>
+      process.stderr.write("[rate-limit] logBackendUnavailable failed silently\n")
+    );
+    return { allowed: true, retryAfterMs: 0 };
   }
-
-  entry.count += 1;
-  return { allowed: true, retryAfterMs: 0 };
 }
-
-// Prune expired entries every 30 minutes to prevent unbounded memory growth
-setInterval(() => {
-  const now = Date.now();
-  store.forEach((entry, key) => {
-    if (now > entry.resetAt) store.delete(key);
-  });
-  answerStore.forEach((entry, key) => {
-    if (now > entry.resetAt) answerStore.delete(key);
-  });
-}, 30 * 60 * 1000);

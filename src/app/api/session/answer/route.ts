@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   // Rate limit: keyed by sessionQuestionId + token hash — scoped to participant+question.
   // Prevents rapid-fire abuse without blocking legitimate single submissions or retries.
   const rlKey = `${sessionQuestionId}:${hashToken(token)}`;
-  const rl = checkAnswerRateLimit(rlKey);
+  const rl = await checkAnswerRateLimit(rlKey);
   if (!rl.allowed) {
     const retryAfterSec = Math.ceil(rl.retryAfterMs / 1000);
     return NextResponse.json(

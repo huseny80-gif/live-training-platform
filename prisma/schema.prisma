@@ -127,21 +127,23 @@ enum CertificateStatus {
 // ─────────────────────────────────────────────
 
 model Instructor {
-  id           String         @id @default(uuid())
-  email        String         @unique
-  passwordHash String         @map("password_hash")
-  name         String
-  role         InstructorRole @default(INSTRUCTOR)
-  isActive     Boolean        @default(true) @map("is_active")
-  lastLoginAt  DateTime?      @map("last_login_at")
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  id                String         @id @default(uuid())
+  email             String         @unique
+  passwordHash      String         @map("password_hash")
+  name              String
+  role              InstructorRole @default(INSTRUCTOR)
+  isActive          Boolean        @default(true) @map("is_active")
+  mustResetPassword Boolean        @default(false) @map("must_reset_password")
+  lastLoginAt       DateTime?      @map("last_login_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
   programs  TrainingProgram[]
   sessions  LiveSession[]
   auditLogs AuditLog[]
 
   @@index([email])
+  @@index([isActive])
   @@map("instructors")
 }
 

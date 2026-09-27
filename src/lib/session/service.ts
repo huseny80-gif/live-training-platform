@@ -704,7 +704,7 @@ export async function issueCertificates(
       attempts++;
     }
 
-    await prisma.certificate.upsert({
+    const cert = await prisma.certificate.upsert({
       where: { sessionId_participantId: { sessionId, participantId: p.id } },
       create: {
         sessionId,
@@ -724,6 +724,21 @@ export async function issueCertificates(
       },
       update: {},
     });
+    // Audit after commit — fire-and-forget, must not roll back certificate issuance
+    void writeAudit({
+      entityType: "Certificate",
+      entityId: cert.id,
+      action: "CERTIFICATE_ISSUED",
+      actorType: "SYSTEM",
+      metadata: {
+        certificateId: cert.id,
+        certificateNumber: cert.certificateNumber,
+        sessionId,
+        participantId: p.id,
+      },
+    }).catch((e: unknown) =>
+      process.stderr.write(`[service] CERTIFICATE_ISSUED audit failed: ${e instanceof Error ? e.message : e}\n`)
+    );
     issued++;
   }
 
@@ -788,10 +803,26 @@ export async function revokeCertificate(certId: string, instructorId: string) {
   if (cert.session.instructorId !== instructorId) throw new Error("UNAUTHORIZED");
   if (cert.status === "REVOKED") throw new Error("ALREADY_REVOKED");
 
-  return prisma.certificate.update({
+  const revoked = await prisma.certificate.update({
     where: { id: certId },
     data: { status: "REVOKED", revokedAt: new Date() },
   });
+  // Audit after commit — fire-and-forget
+  void writeAudit({
+    entityType: "Certificate",
+    entityId: certId,
+    action: "CERTIFICATE_REVOKED",
+    actorType: "INSTRUCTOR",
+    actorId: instructorId,
+    metadata: {
+      certificateId: certId,
+      revokedBy: instructorId,
+      timestamp: new Date().toISOString(),
+    },
+  }).catch((e: unknown) =>
+    process.stderr.write(`[service] CERTIFICATE_REVOKED audit failed: ${e instanceof Error ? e.message : e}\n`)
+  );
+  return revoked;
 }
 
 // ── Session reset ─────────────────────────────────────────────────────────────
@@ -836,6 +867,14 @@ async function requireOwnership(sessionId: string, instructorId: string) {
   });
   if (!session) throw new Error("SESSION_NOT_FOUND_OR_UNAUTHORIZED");
   return session;
+}
+
+export async function requireAdmin(instructorId: string): Promise<void> {
+  const instructor = await prisma.instructor.findUnique({
+    where: { id: instructorId },
+    select: { role: true },
+  });
+  if (!instructor || instructor.role !== "ADMIN") throw new Error("UNAUTHORIZED");
 }
 
 export async function getSessionByCode(code: string) {
