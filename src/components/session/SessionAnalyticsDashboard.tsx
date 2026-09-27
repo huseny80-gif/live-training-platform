@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { io } from "socket.io-client";
+import { REALTIME_EVENTS } from "@/lib/realtime/socket-events";
 
 interface QuestionStat {
   questionId: string;
@@ -42,9 +44,11 @@ function StatCard({
 export default function SessionAnalyticsDashboard({
   sessionId,
   isEnded,
+  sessionCode,
 }: {
   sessionId: string;
   isEnded: boolean;
+  sessionCode?: string;
 }) {
   const [data, setData] = useState<Analytics | null>(null);
   const [error, setError] = useState(false);
@@ -62,6 +66,7 @@ export default function SessionAnalyticsDashboard({
     }
   }, [sessionId]);
 
+  // Polling fallback — always active while session is live
   useEffect(() => {
     fetchAnalytics();
     if (!isEnded) {
@@ -69,6 +74,28 @@ export default function SessionAnalyticsDashboard({
       return () => clearInterval(id);
     }
   }, [fetchAnalytics, isEnded]);
+
+  // Socket.IO realtime listener — re-fetches on relevant events
+  useEffect(() => {
+    if (!sessionCode || isEnded) return;
+
+    const socket = io({ path: "/api/socket", transports: ["websocket"] });
+
+    socket.emit("participant:join_room", { room: `session:${sessionCode}` });
+
+    const refresh = () => { fetchAnalytics(); };
+
+    socket.on(REALTIME_EVENTS.ANSWER_SUBMITTED, refresh);
+    socket.on(REALTIME_EVENTS.QUESTION_CHANGED, refresh);
+    socket.on(REALTIME_EVENTS.SESSION_ENDED, refresh);
+
+    return () => {
+      socket.off(REALTIME_EVENTS.ANSWER_SUBMITTED, refresh);
+      socket.off(REALTIME_EVENTS.QUESTION_CHANGED, refresh);
+      socket.off(REALTIME_EVENTS.SESSION_ENDED, refresh);
+      socket.disconnect();
+    };
+  }, [sessionCode, isEnded, fetchAnalytics]);
 
   if (error) {
     return (
