@@ -16,6 +16,7 @@ import {
   getSessionQuestions,
   participantJoin,
 } from "@/lib/session/service";
+import { verifyGuestToken } from "@/lib/session/guest-token";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -114,6 +115,128 @@ export async function getSessionDetails(sessionId: string) {
 export async function getSessionQuestionsAction(sessionId: string) {
   await requireInstructor();
   return getSessionQuestions(sessionId);
+}
+
+export async function getSessionResults(sessionId: string) {
+  const instructorId = await requireInstructor();
+
+  const session = await prisma.liveSession.findFirst({
+    where: { id: sessionId, instructorId },
+    include: {
+      sessionResult: true,
+      participants: {
+        orderBy: [{ totalScore: "desc" }, { correctCount: "desc" }],
+      },
+      sessionQuestions: {
+        orderBy: { questionOrder: "asc" },
+        include: {
+          question: { select: { questionText: true, questionOrder: true } },
+          answers: {
+            where: { isFinal: true },
+            select: { isCorrect: true, participantId: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!session) throw new Error("SESSION_NOT_FOUND");
+
+  const totalQ = session.sessionQuestions.length;
+
+  const participants = session.participants.map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    joinedAt: p.joinedAt,
+    totalScore: Number(p.totalScore),
+    answersCount: p.answersCount,
+    correctCount: p.correctCount,
+    wrongCount: p.answersCount - p.correctCount,
+    rank: p.rank,
+    percentage: totalQ > 0 ? Math.round((p.correctCount / totalQ) * 100) : 0,
+  }));
+
+  const questions = session.sessionQuestions.map((sq) => ({
+    sessionQuestionId: sq.id,
+    questionOrder: sq.questionOrder,
+    questionText: sq.question.questionText,
+    totalAnswers: sq.answers.length,
+    correctAnswers: sq.answers.filter((a) => a.isCorrect).length,
+    accuracy:
+      sq.answers.length > 0
+        ? Math.round(
+            (sq.answers.filter((a) => a.isCorrect).length / sq.answers.length) * 100
+          )
+        : 0,
+  }));
+
+  const sr = session.sessionResult;
+  return {
+    participants,
+    questions,
+    statistics: sr
+      ? {
+          totalParticipants: sr.totalParticipants,
+          totalQuestions: sr.totalQuestions,
+          totalAnswers: sr.totalAnswers,
+          totalCorrect: sr.totalCorrect,
+          correctRate: Number(sr.correctRate),
+          averageScore: Number(sr.averageScore),
+          highestScore: Number(sr.highestScore),
+        }
+      : null,
+  };
+}
+
+/** Participant result — authenticated via guest_token cookie */
+export async function getParticipantResult(sessionCode: string, token: string) {
+  const code = sessionCode.trim().toUpperCase();
+
+  let participantId: string;
+  try {
+    const payload = verifyGuestToken(token);
+    participantId = payload.participantId;
+  } catch {
+    throw new Error("INVALID_TOKEN");
+  }
+
+  const liveSession = await prisma.liveSession.findUnique({
+    where: { sessionCode: code },
+    include: { sessionResult: true },
+  });
+  if (!liveSession) throw new Error("SESSION_NOT_FOUND");
+
+  const participant = await prisma.sessionParticipant.findFirst({
+    where: { id: participantId, sessionId: liveSession.id },
+  });
+  if (!participant) throw new Error("PARTICIPANT_NOT_FOUND");
+
+  const totalQuestions = await prisma.sessionQuestion.count({
+    where: { sessionId: liveSession.id },
+  });
+
+  return {
+    participant: {
+      id: participant.id,
+      displayName: participant.displayName,
+      totalScore: Number(participant.totalScore),
+      correctCount: participant.correctCount,
+      wrongCount: participant.answersCount - participant.correctCount,
+      answersCount: participant.answersCount,
+      rank: participant.rank,
+    },
+    session: {
+      title: liveSession.title,
+      dayNumber: liveSession.dayNumber,
+      sessionCode: liveSession.sessionCode,
+      totalParticipants: liveSession.sessionResult?.totalParticipants ?? 0,
+    },
+    totalQuestions,
+    percentage:
+      totalQuestions > 0
+        ? Math.round((participant.correctCount / totalQuestions) * 100)
+        : 0,
+  };
 }
 
 /** Participant join — sets guest_token cookie and redirects to /session/[code] */
