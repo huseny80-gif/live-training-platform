@@ -8,7 +8,7 @@ import { completeBlobUpload } from "@/app/actions/documents";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 const POLL_INTERVAL_MS = 4000;
-const POLL_MAX_ATTEMPTS = 90; // 90 × 4s = 6 minutes
+const POLL_MAX_ATTEMPTS = 120; // Allow stale serverless jobs to be recovered after 6 minutes
 
 // Safe JSON parser — never throws on HTML error pages or empty bodies
 async function safeJson(res: Response): Promise<{ ok: true; data: unknown } | { ok: false; text: string }> {

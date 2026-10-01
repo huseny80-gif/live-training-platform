@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recoverStaleDocument } from "@/lib/extraction/recovery";
 import { extractionService } from "@/lib/extraction/service";
 import { contentGenerationService } from "@/lib/ai/service";
 
@@ -33,6 +34,8 @@ export async function POST(req: NextRequest) {
   if (!doc) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
+
+  await recoverStaleDocument(documentId, instructorId);
 
   // Claim atomically: a failed document can retry, concurrent requests cannot run twice.
   const claimed = await prisma.trainingDocument.updateMany({

@@ -11,7 +11,7 @@ export function documentErrorLabel(reason: string | null | undefined): string {
   if (/BLOB_READ|ENOENT|not found.*blob/i.test(message)) return "تعذّر الوصول إلى الملف المحفوظ. تحقق من إعدادات التخزين أو ارفع المستند مجدداً.";
   if (/401|403|authentication|invalid.*api.*key/i.test(message)) return "رفضت خدمة المعالجة طلب الاتصال. على مسؤول المنصة التحقق من صلاحية إعدادات الخدمة.";
   if (/429|quota|credit|billing|rate.limit/i.test(message)) return "بلغت خدمة المعالجة حد الاستخدام أو الرصيد المتاح. تحقق من الاشتراك ثم أعد المحاولة لاحقاً.";
-  if (/timeout|timed out|TIMEOUT/i.test(message)) return "انتهت مهلة المعالجة. حاول لاحقاً أو قسّم المستند إلى أجزاء أصغر.";
+  if (/timeout|timed out|TIMEOUT|aborted/i.test(message)) return "انتهت مهلة المعالجة. حاول لاحقاً أو قسّم المستند إلى أجزاء أصغر.";
   if (/NO_EXTRACTED_PAGES|EXTRACTION_INCOMPLETE/.test(message)) return "لم يكتمل استخراج نص المستند. أعد المحاولة أو ارفع نسخة أوضح.";
   return "تعذّرت معالجة المستند. يمكنك إعادة المحاولة، وإذا تكرر الخطأ تواصل مع مسؤول المنصة.";
 }

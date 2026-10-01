@@ -32,7 +32,7 @@ export default function DocumentProcessing({ documentId, programId, status, note
           if (data.extractionStatus !== "PROCESSING") { router.refresh(); return; }
         }
       } catch { /* A temporary network failure does not start another job. */ }
-      if (!cancelled && ++attempts < 90) timer = setTimeout(poll, 4000);
+      if (!cancelled && ++attempts < 120) timer = setTimeout(poll, 4000);
       else if (!cancelled) setPollExpired(true);
     }
     timer = setTimeout(poll, 4000);

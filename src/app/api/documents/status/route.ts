@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recoverStaleDocument } from "@/lib/extraction/recovery";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -13,6 +14,8 @@ export async function GET(req: NextRequest) {
   if (!documentId) {
     return NextResponse.json({ error: "MISSING_DOCUMENT_ID" }, { status: 400 });
   }
+
+  await recoverStaleDocument(documentId, instructorId);
 
   const doc = await prisma.trainingDocument.findFirst({
     where: { id: documentId, program: { instructorId } },

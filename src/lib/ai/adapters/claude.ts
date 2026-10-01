@@ -16,8 +16,8 @@ export class ClaudeAIAdapter implements AIAdapter {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY env var not set");
 
-    const client = new Anthropic({ apiKey });
-    const start = Date.now();
+    const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 0 });
+    const deadline = AbortSignal.timeout(210_000);
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
@@ -34,7 +34,7 @@ export class ClaudeAIAdapter implements AIAdapter {
       model: MODEL_ID,
       max_tokens: 8192,
       messages: [{ role: "user", content: dayPlanPrompt }],
-    });
+    }, { signal: deadline });
 
     totalInputTokens += dayPlanResponse.usage.input_tokens;
     totalOutputTokens += dayPlanResponse.usage.output_tokens;
@@ -50,33 +50,37 @@ export class ClaudeAIAdapter implements AIAdapter {
 
     const allQuestions: GeneratedQuestion[] = [];
 
-    for (const day of days) {
-      const existingTexts = allQuestions.map((q) => q.questionText);
+    // Two days at a time keep the 10-day course within the serverless budget.
+    for (let offset = 0; offset < days.length; offset += 2) {
+      const batch = await Promise.all(days.slice(offset, offset + 2).map(async day => {
+        const existingTexts = allQuestions.map((q) => q.questionText);
 
-      const qPrompt = buildQuestionsPrompt(
-        day,
-        req.pages,
-        req.language,
-        req.questionsPerDay,
-        existingTexts
-      );
+        const qPrompt = buildQuestionsPrompt(
+          day,
+          req.pages,
+          req.language,
+          req.questionsPerDay,
+          existingTexts
+        );
 
-      const qResponse = await client.messages.create({
-        model: MODEL_ID,
-        max_tokens: 4096,
-        messages: [{ role: "user", content: qPrompt }],
-      });
+        const qResponse = await client.messages.create({
+          model: MODEL_ID,
+          max_tokens: 4096,
+          messages: [{ role: "user", content: qPrompt }],
+        }, { signal: deadline });
 
-      totalInputTokens += qResponse.usage.input_tokens;
-      totalOutputTokens += qResponse.usage.output_tokens;
+        totalInputTokens += qResponse.usage.input_tokens;
+        totalOutputTokens += qResponse.usage.output_tokens;
 
-      const qText = qResponse.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
-        .join("");
+        const qText = qResponse.content
+          .filter((b) => b.type === "text")
+          .map((b) => (b as { type: "text"; text: string }).text)
+          .join("");
 
-      const dayQuestions = parseQuestions(qText, day.dayNumber, req.questionsPerDay);
-      allQuestions.push(...dayQuestions);
+        const dayQuestions = parseQuestions(qText, day.dayNumber, req.questionsPerDay);
+        return dayQuestions;
+      }));
+      allQuestions.push(...batch.flat());
     }
 
     if (req.language === "AR") {

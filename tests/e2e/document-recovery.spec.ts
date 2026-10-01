@@ -27,7 +27,7 @@ test.beforeAll(async () => {
   await storage.save(key, textPdf(147), "application/pdf");
   const document = await prisma.trainingDocument.create({ data: {
     programId, fileName: "GIS_Training_course.pdf", storagePath: key, fileSizeBytes: textPdf(147).length,
-    mimeType: "application/pdf", pageCount: 147, extractionStatus: "FAILED", extractionNotes: "NO_ADAPTER_AVAILABLE",
+    mimeType: "application/pdf", pageCount: 147, extractionStatus: "PROCESSING", extractionNotes: null, updatedAt: new Date(Date.now() - 7 * 60 * 1000),
   } });
   documentId = document.id;
   for (let n = 1; n <= 10; n++) await prisma.trainingDay.create({ data: { programId, dayNumber: n, title: `اليوم ${n}`, objectives: [] } });
@@ -65,7 +65,7 @@ test("failed PDF retries through the real production route and shows actionable 
   expect(untouched.extractionStatus).toBe("FAILED");
   await page.goto(`/programs/${programId}`);
   await expect(page.getByText("GIS_Training_course.pdf")).toBeVisible();
-  await expect(page.locator("p[role=alert]")).toContainText("أعد المعالجة لاستخراج النص");
+  await expect(page.locator("p[role=alert]")).toContainText("انتهت مهلة المعالجة", { timeout: 20000 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   const initialDays = await prisma.trainingDay.findMany({ where: { programId }, orderBy: { dayNumber: "asc" } });
   const responsePromise = page.waitForResponse(r => r.url().endsWith("/api/documents/process") && r.request().method() === "POST");
