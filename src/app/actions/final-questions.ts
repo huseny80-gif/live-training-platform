@@ -263,27 +263,44 @@ async function requestFinalExam(
   prompt: string,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const explicit = process.env.AI_PROVIDER?.trim().toLowerCase();
+  const attempts: Array<() => Promise<{ ok: true; text: string } | { ok: false; error: string }>> = [];
 
-  if (explicit === "openai") return requestFinalExamOpenAI(prompt);
-  if (explicit === "anthropic" || explicit === "claude") {
-    return requestFinalExamAnthropic(prompt);
+  const addOpenAI = () => {
+    if (process.env.OPENAI_API_KEY) attempts.push(() => requestFinalExamOpenAI(prompt));
+  };
+  const addAnthropic = () => {
+    if (process.env.ANTHROPIC_API_KEY) attempts.push(() => requestFinalExamAnthropic(prompt));
+  };
+
+  if (explicit === "openai") {
+    addOpenAI();
+    addAnthropic();
+  } else if (explicit === "anthropic" || explicit === "claude") {
+    addAnthropic();
+    addOpenAI();
+  } else {
+    addOpenAI();
+    addAnthropic();
   }
 
-  if (process.env.OPENAI_API_KEY) {
-    const openai = await requestFinalExamOpenAI(prompt);
-    if (openai.ok) return openai;
-
-    if (!process.env.ANTHROPIC_API_KEY) return openai;
+  if (attempts.length === 0) {
+    return {
+      ok: false,
+      error:
+        "لا يوجد مزود ذكاء اصطناعي مفعّل للأسئلة النهائية. اضبط OPENAI_API_KEY أو ANTHROPIC_API_KEY في Vercel.",
+    };
   }
 
-  if (process.env.ANTHROPIC_API_KEY) {
-    return requestFinalExamAnthropic(prompt);
+  const errors: string[] = [];
+  for (const attempt of attempts) {
+    const result = await attempt();
+    if (result.ok) return result;
+    errors.push(result.error);
   }
 
   return {
     ok: false,
-    error:
-      "لا يوجد مزود ذكاء اصطناعي مفعّل للأسئلة النهائية. اضبط OPENAI_API_KEY أو ANTHROPIC_API_KEY في Vercel.",
+    error: `تعذر إنشاء الأسئلة النهائية عبر جميع المزودين المفعّلين: ${errors.join(" | ")}`,
   };
 }
 
