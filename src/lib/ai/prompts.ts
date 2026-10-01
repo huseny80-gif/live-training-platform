@@ -1,7 +1,7 @@
 // Versioned prompt templates — bump PROMPT_VERSION when changing prompts
 // so aiPromptVersion on Question tracks which prompt produced each question.
 
-export const PROMPT_VERSION = "v1.0";
+export const PROMPT_VERSION = "v1.1-source-grounded";
 
 export function buildDayPlanPrompt(
   pages: Array<{ pageNumber: number; title?: string | null; extractedText: string }>,
@@ -41,6 +41,8 @@ ${pageList}
 }
 
 قواعد صارمة:
+- استخدم حصراً محتوى الصفحات المرفقة أعلاه؛ ممنوع إدخال معلومات من المعرفة العامة أو افتراض حقائق غير موجودة في الملف
+- إذا كان المحتوى غير كافٍ لتقسيم موثوق فلا تخترع محتوى لإكمال الخطة
 - أعد JSON فقط، لا شرح ولا تعليق
 - يجب أن تغطي الأيام جميع الصفحات المتاحة بالتساوي تقريباً
 - كل يوم يجب أن يحتوي على 2-4 أهداف
@@ -71,7 +73,7 @@ export function buildQuestionsPrompt(
 اللغة: ${language === "AR" ? "العربية" : "الإنجليزية"}
 ${avoidBlock}
 محتوى الصفحات:
-${pageContent || "محتوى غير متوفر — استخدم موضوع اليوم كمرجع"}
+${pageContent || "لا يوجد محتوى مصدر صالح — لا تنشئ أسئلة"}
 
 المطلوب: أنشئ ${questionsPerDay} أسئلة. أعد JSON صارم فقط:
 
@@ -96,6 +98,9 @@ ${pageContent || "محتوى غير متوفر — استخدم موضوع ال�
 }
 
 قواعد صارمة:
+- استخدم حصراً الحقائق الموجودة في محتوى الصفحات أعلاه؛ ممنوع استخدام المعرفة العامة أو اختراع معلومة
+- يجب أن تكون الإجابة الصحيحة والتفسير قابلين للتحقق مباشرة من sourcePageNumber المحددة
+- إذا لم يكن المحتوى كافياً لإنشاء ${questionsPerDay} أسئلة موثقة فلا تملأ النقص بأسئلة مختلقة
 - أعد JSON فقط، لا شرح ولا تعليق
 - كل سؤال يجب أن يحتوي على 4 خيارات (A, B, C, D)
 - إجابة صحيحة واحدة فقط لكل سؤال
