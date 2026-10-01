@@ -1,0 +1,54 @@
+name: Release validation
+
+on:
+  push:
+    branches:
+      - release/live-training-stable-20261001
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://release_validation:release_validation@localhost:5432/release_validation
+      AUTH_SECRET: release-validation-secret-release-validation-secret
+      SESSION_SECRET: release-validation-session-secret-release-validation
+      NEXTAUTH_URL: http://localhost:3000
+      AUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_PARTICIPANT_URL: https://live-training-platform.vercel.app
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Synchronize dependency lock
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Clean install from generated lock
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: QR and Arabic-language safety tests
+        run: npm run test:safety
+
+      - name: Production build
+        run: npm run build
+
+      - name: Upload synchronized lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-lock
+          path: package-lock.json
+          if-no-files-found: error
