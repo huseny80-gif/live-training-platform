@@ -165,8 +165,8 @@ export default function ManageClient({ program }: { program: Program }) {
   function handleRegenerateArabic() {
     const message =
       program.language === "AR"
-        ? "إعادة توليد الأيام والأسئلة بالعربية من آخر ملف تم تحليله بنجاح؟\n\nلن يُستبدل المحتوى الحالي إلا بعد نجاح توليد بنك كامل والتحقق منه."
-        : "تحويل البرنامج إلى العربية وإعادة توليد الأيام والأسئلة من آخر ملف تم تحليله بنجاح؟\n\nيجب حذف الجلسات القديمة أولًا.";
+        ? "إعادة استخراج الملف التدريبي الحقيقي عند الحاجة، ثم إعادة توليد الأيام والأسئلة بالعربية؟\n\nلن يُستبدل المحتوى الحالي إلا بعد نجاح الاستخراج والتوليد والتحقق الكامل."
+        : "استخراج الملف التدريبي الحقيقي وتحويل البرنامج إلى العربية ثم إعادة توليد الأيام والأسئلة؟\n\nلن يتم استخدام أي محتوى Mock.";
     if (!confirm(message)) return;
 
     startTransition(async () => {
@@ -216,7 +216,11 @@ export default function ManageClient({ program }: { program: Program }) {
                 disabled={isPending}
                 className="px-3 py-1.5 bg-teal-700 text-white rounded-lg text-sm hover:bg-teal-800 disabled:opacity-50"
               >
-                {program.language === "AR" ? "إعادة توليد المحتوى بالعربية" : "تحويل وإعادة التوليد بالعربية"}
+                {isPending
+                  ? "جاري استخراج الملف والتوليد…"
+                  : program.language === "AR"
+                  ? "إعادة توليد المحتوى بالعربية"
+                  : "تحويل وإعادة التوليد بالعربية"}
               </button>
               {program.language === "AR" ? (
                 <button

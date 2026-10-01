@@ -3,6 +3,8 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isArabicQuestionContent, isPredominantlyArabic } from "@/lib/language";
+import { extractionService } from "@/lib/extraction/service";
+import { extractionErrorToArabic } from "@/lib/extraction/errors";
 
 export type FinalQuestion = {
   type: "MCQ" | "TF";
@@ -204,7 +206,6 @@ export async function generateFinalQuestions(
     where: { id: programId, instructorId: session.user.id },
     include: {
       documents: {
-        where: { extractionStatus: "COMPLETED" },
         orderBy: { createdAt: "desc" },
         take: 1,
       },
@@ -214,17 +215,44 @@ export async function generateFinalQuestions(
   if (!program) return { ok: false, error: "PROGRAM_NOT_FOUND" };
 
   const doc = program.documents[0];
-  if (!doc) return { ok: false, error: "لا يوجد ملف مكتمل التحليل. ارفع المادة أو أكمل تحليلها أولاً." };
+  if (!doc) return { ok: false, error: "لا يوجد ملف تدريبي مرفوع. ارفع المادة أولاً." };
+
+  const extraction = await extractionService.ensureRealExtraction(
+    doc.id,
+    session.user.id
+  );
+
+  if (extraction && extraction.status !== "COMPLETED") {
+    return {
+      ok: false,
+      error:
+        extractionErrorToArabic(extraction.errorMessage),
+    };
+  }
 
   const pages = await prisma.documentPage.findMany({
     where: { documentId: doc.id, extractionStatus: "COMPLETED" },
     orderBy: { pageNumber: "asc" },
-    select: { pageNumber: true, extractedText: true, title: true },
+    select: {
+      pageNumber: true,
+      extractedText: true,
+      title: true,
+      extractionMethod: true,
+    },
   });
 
-  const usable = pages.filter((page) => (page.extractedText?.trim().length ?? 0) > 20);
+  const usable = pages.filter(
+    (page) =>
+      page.extractionMethod !== null &&
+      page.extractionMethod !== "MOCK" &&
+      (page.extractedText?.trim().length ?? 0) > 20
+  );
+
   if (!usable.length) {
-    return { ok: false, error: "يجب إكمال استخراج محتوى الملف قبل إنشاء الأسئلة النهائية." };
+    return {
+      ok: false,
+      error: "لا توجد صفحات حقيقية مستخرجة من الملف. أعد تحليل المادة ثم حاول إنشاء الأسئلة النهائية.",
+    };
   }
 
   const source = usable

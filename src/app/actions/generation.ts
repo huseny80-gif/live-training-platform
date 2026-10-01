@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { contentGenerationService } from "@/lib/ai/service";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { extractionService } from "@/lib/extraction/service";
+import { extractionErrorToArabic } from "@/lib/extraction/errors";
 
 async function requireInstructor(): Promise<string> {
   const session = await auth();
@@ -87,10 +89,9 @@ export async function regenerateProgramInArabic(programId: string) {
       id: true,
       sessions: { select: { id: true, sessionCode: true, status: true } },
       documents: {
-        where: { extractionStatus: "COMPLETED" },
         orderBy: { createdAt: "desc" },
         take: 1,
-        select: { id: true },
+        select: { id: true, extractionStatus: true },
       },
     },
   });
@@ -117,7 +118,27 @@ export async function regenerateProgramInArabic(programId: string) {
       status: "FAILED" as const,
       daysGenerated: 0,
       questionsGenerated: 0,
-      errorMessage: "لا يوجد ملف مكتمل التحليل لإعادة توليد المحتوى منه.",
+      errorMessage: "لا يوجد ملف تدريبي مرفوع لإعادة توليد المحتوى منه.",
+    };
+  }
+
+  // Recover automatically from historical MOCK extraction. The original
+  // private PDF remains in storage, so re-extract it with a real provider
+  // before asking the generation model to build Arabic content.
+  const extraction = await extractionService.ensureRealExtraction(
+    document.id,
+    instructorId
+  );
+
+  if (extraction && extraction.status !== "COMPLETED") {
+    return {
+      programId,
+      documentId: document.id,
+      status: "FAILED" as const,
+      daysGenerated: 0,
+      questionsGenerated: 0,
+      errorMessage:
+        extractionErrorToArabic(extraction.errorMessage),
     };
   }
 

@@ -3,9 +3,8 @@
  * GEN-01 through GEN-15
  *
  * NOTE on real AI generation (GEN-14):
- * Requires ANTHROPIC_API_KEY in .env and COMPLETED DocumentPages from
- * LlamaParse (ACP-06). GEN-14 is SKIPPED unless ANTHROPIC_API_KEY is set.
- * All structural/logic tests run without API calls.
+ * Production extraction now uses real PDF providers (OpenAI PDF by default,
+ * LlamaParse optionally). Structural/logic tests run without external API calls.
  */
 
 import "dotenv/config";
@@ -205,7 +204,7 @@ async function runTests() {
     const service = new ContentGenerationService();
     const result = await service.generateForProgram(programId, documentId, instructorId);
     assert.strictEqual(result.status, "FAILED");
-    assert.ok(result.errorMessage?.includes("MOCK_ONLY_CONTENT"), `Expected MOCK_ONLY_CONTENT error, got: ${result.errorMessage}`);
+    assert.ok(result.errorMessage?.includes("REAL_SOURCE_REQUIRED"), `Expected REAL_SOURCE_REQUIRED error, got: ${result.errorMessage}`);
 
     // Clean up pages
     await prisma.documentPage.deleteMany({ where: { documentId } });
@@ -324,16 +323,16 @@ async function runTests() {
   });
 
   // GEN-14: Real AI generation (skipped if no API key or no real pages)
-  await test("GEN-14: SKIPPED — real AI generation requires ANTHROPIC_API_KEY + LlamaParse pages (ACP-06)", async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+  await test("GEN-14: SKIPPED — live AI generation requires provider credentials + real extracted pages", async () => {
+    const apiKey = process.env.OPENAI_API_KEY ?? process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      console.log("    → ANTHROPIC_API_KEY not set — skipping live generation test");
+      console.log("    → No AI provider key set — skipping live generation test");
       return; // pass (skip)
     }
     // Even with API key, if no real (non-MOCK) pages exist → service returns FAILED
     const service = new ContentGenerationService();
     const result = await service.generateForProgram(programId, documentId, instructorId);
-    // Should fail with NO_EXTRACTED_PAGES or MOCK_ONLY_CONTENT since no real pages
+    // Should fail with NO_EXTRACTED_PAGES or REAL_SOURCE_REQUIRED since no real pages
     assert.ok(
       result.status === "FAILED",
       `Expected FAILED (no real pages yet), got ${result.status}: ${result.errorMessage}`

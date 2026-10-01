@@ -82,27 +82,31 @@ export class ContentGenerationService {
       };
     }
 
-    // Fail closed on placeholder/mock-only content in every environment.
-    // AI generation must always be grounded in real extracted training material;
-    // missing provider credentials must never mask a source-content problem.
-    const hasRealContent = pages.some(
-      (p) => p.extractionMethod !== "MOCK" && (p.extractedText?.trim().length ?? 0) > 50
+    // Build a source set from real extraction methods only. MOCK content
+    // must never leak into production generation even when stale rows remain.
+    const realPages = pages.filter(
+      (page) =>
+        page.extractionMethod !== null &&
+        page.extractionMethod !== "MOCK" &&
+        (page.extractedText?.trim().length ?? 0) > 50
     );
-    if (!hasRealContent) {
+
+    if (realPages.length === 0) {
       return {
         programId, documentId,
         status: "FAILED",
         daysGenerated: 0, questionsGenerated: 0,
-        errorMessage: "MOCK_ONLY_CONTENT — real extracted source content is required before generating questions",
+        errorMessage:
+          "REAL_SOURCE_REQUIRED — لم يتم العثور على محتوى حقيقي مستخرج من الملف. أعد تحليل الملف ثم حاول التوليد.",
       };
     }
 
-    // Build source page refs
-    const sourcePages: SourcePageRef[] = pages.map((p) => ({
-      pageId: p.id,
-      pageNumber: p.pageNumber,
-      extractedText: p.extractedText ?? "",
-      title: p.title,
+    // Build source page refs from real pages only.
+    const sourcePages: SourcePageRef[] = realPages.map((page) => ({
+      pageId: page.id,
+      pageNumber: page.pageNumber,
+      extractedText: page.extractedText ?? "",
+      title: page.title,
     }));
 
     const req: ContentGenerationRequest = {
@@ -181,7 +185,7 @@ export class ContentGenerationService {
       await prisma.trainingDay.deleteMany({ where: { programId } });
 
       // Build pageId lookup
-      const pageIdByNumber = new Map(pages.map((p) => [p.pageNumber, p.id]));
+      const pageIdByNumber = new Map(realPages.map((page) => [page.pageNumber, page.id]));
 
       let totalQuestions = 0;
       const questionsPerDayMap = new Map<number, number>();

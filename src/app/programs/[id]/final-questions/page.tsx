@@ -5,6 +5,7 @@ import FinalQuestionsClient from "./FinalQuestionsClient";
 import { brand } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export default async function FinalQuestionsPage({
   params,
