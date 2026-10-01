@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: live-training-release-validation
+  group: live-training-release-validation-v2
   cancel-in-progress: true
 
 jobs:
