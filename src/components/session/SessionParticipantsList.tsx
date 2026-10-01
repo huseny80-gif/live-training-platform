@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { io } from "socket.io-client";
-import { REALTIME_EVENTS } from "@/lib/realtime/socket-events";
-import type { ParticipantJoinedPayload } from "@/lib/realtime/types";
 
 interface Participant {
   id: string;
@@ -24,13 +21,7 @@ const STATUS_COLOR: Record<string, string> = {
   COMPLETED: "bg-emerald-100 text-emerald-700",
 };
 
-export default function SessionParticipantsList({
-  sessionId,
-  sessionCode,
-}: {
-  sessionId: string;
-  sessionCode?: string;
-}) {
+export default function SessionParticipantsList({ sessionId }: { sessionId: string }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [error, setError] = useState(false);
 
@@ -46,34 +37,11 @@ export default function SessionParticipantsList({
     }
   }, [sessionId]);
 
-  // Polling fallback — always active
   useEffect(() => {
     fetchParticipants();
     const id = setInterval(fetchParticipants, 5000);
     return () => clearInterval(id);
   }, [fetchParticipants]);
-
-  // Socket.IO realtime listener — active only when sessionCode is provided
-  useEffect(() => {
-    if (!sessionCode) return;
-
-    const socket = io({ path: "/api/socket", transports: ["websocket"] });
-
-    socket.emit("participant:join_room", { room: `session:${sessionCode}` });
-
-    socket.on(
-      REALTIME_EVENTS.PARTICIPANT_JOINED,
-      (_payload: ParticipantJoinedPayload) => {
-        // Re-fetch to get accurate list from the source of truth
-        fetchParticipants();
-      },
-    );
-
-    return () => {
-      socket.off(REALTIME_EVENTS.PARTICIPANT_JOINED);
-      socket.disconnect();
-    };
-  }, [sessionCode, fetchParticipants]);
 
   if (error) {
     return (
