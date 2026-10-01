@@ -11,7 +11,6 @@ export default async function AboutPage() {
 
   const displayName = session.user.name ?? "مدير الحقيبة التدريبية";
   const email = session.user.email ?? null;
-  const image = session.user.image ?? null;
 
   return (
     <main dir="rtl" lang="ar" className="dlp-simple-page">
@@ -31,14 +30,9 @@ export default async function AboutPage() {
           </p>
 
           <div className="dlp-about-preview">
-            {image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={image} alt={`صورة ${displayName}`} referrerPolicy="no-referrer" />
-            ) : (
-              <div className="dlp-about-avatar" aria-hidden>
-                {displayName.slice(0, 1)}
-              </div>
-            )}
+            <div className="dlp-about-avatar" aria-hidden>
+              {displayName.slice(0, 1)}
+            </div>
 
             <div>
               <h2>{displayName}</h2>
