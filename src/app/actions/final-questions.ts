@@ -17,7 +17,14 @@ export type FinalQuestion = {
 
 export type FinalQuestionsState =
   | { ok: false; error: string }
-  | { ok: true; summary: string; questions: FinalQuestion[]; googleAppsScript: string };
+  | {
+      ok: true;
+      summary: string;
+      questions: FinalQuestion[];
+      googleAppsScript: string;
+      sourceFileName: string;
+      sourcePageCount: number;
+    };
 
 type ParsedFinalExam = {
   summary: string;
@@ -204,34 +211,32 @@ export async function generateFinalQuestions(
 
   const program = await prisma.trainingProgram.findFirst({
     where: { id: programId, instructorId: session.user.id },
-    include: {
-      documents: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
+    select: {
+      id: true,
+      title: true,
+      language: true,
     },
   });
 
   if (!program) return { ok: false, error: "PROGRAM_NOT_FOUND" };
 
-  const doc = program.documents[0];
-  if (!doc) return { ok: false, error: "لا يوجد ملف تدريبي مرفوع. ارفع المادة أولاً." };
-
-  const extraction = await extractionService.ensureRealExtraction(
-    doc.id,
+  const sourceDocument = await extractionService.selectBestRealSourceDocument(
+    programId,
     session.user.id
   );
 
-  if (extraction && extraction.status !== "COMPLETED") {
+  if (!sourceDocument.ok) {
     return {
       ok: false,
-      error:
-        extractionErrorToArabic(extraction.errorMessage),
+      error: extractionErrorToArabic(sourceDocument.errorMessage),
     };
   }
 
   const pages = await prisma.documentPage.findMany({
-    where: { documentId: doc.id, extractionStatus: "COMPLETED" },
+    where: {
+      documentId: sourceDocument.documentId,
+      extractionStatus: "COMPLETED",
+    },
     orderBy: { pageNumber: "asc" },
     select: {
       pageNumber: true,
@@ -291,6 +296,8 @@ export async function generateFinalQuestions(
           summary: parsed.summary,
           questions: parsed.questions,
           googleAppsScript: buildGoogleAppsScript(program.title, parsed.questions),
+          sourceFileName: sourceDocument.fileName,
+          sourcePageCount: usable.length,
         };
       }
 
