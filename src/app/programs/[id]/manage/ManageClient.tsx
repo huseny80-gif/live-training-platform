@@ -1,5 +1,6 @@
 "use client";
 
+import { errorLabel } from "@/lib/labels";
 import { useState, useTransition } from "react";
 import {
   createDayAction,
@@ -73,15 +74,15 @@ const SESSION_STATUS_AR: Record<string, string> = {
 };
 
 const SESSION_STATUS_COLOR: Record<string, string> = {
-  DRAFT: "bg-yellow-100 text-yellow-800",
-  ACTIVE: "bg-green-100 text-green-800",
-  PAUSED: "bg-orange-100 text-orange-800",
-  ENDED: "bg-gray-100 text-gray-600",
+  DRAFT: "tp-bg-yellow-100 tp-text-yellow-800",
+  ACTIVE: "tp-bg-green-100 tp-text-green-800",
+  PAUSED: "tp-bg-orange-100 tp-text-orange-800",
+  ENDED: "tp-bg-gray-100 tp-text-gray-600",
 };
 
 function Badge({ text, color }: { text: string; color: string }) {
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${color}`}>{text}</span>
+    <span className={`tp-text-xs tp-px-2 tp-py-0-5 tp-rounded-full tp-font-medium ${color}`}>{text}</span>
   );
 }
 
@@ -129,20 +130,20 @@ export default function ManageClient({ program }: { program: Program }) {
     if (!confirm(`حذف الجلسة ${code}؟ سيتم حذف جميع بياناتها.`)) return;
     startTransition(async () => {
       const r = await deleteSessionAction(sessionId);
-      if (!r.ok) alert(r.error === "CANNOT_DELETE_ACTIVE" ? "لا يمكن حذف جلسة نشطة." : r.error);
+      if (!r.ok) alert(r.error === "CANNOT_DELETE_ACTIVE" ? "لا يمكن حذف جلسة نشطة." : errorLabel(r.error));
     });
   }
 
   return (
-    <div className="space-y-4">
+    <div className="tp-space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="tp-flex tp-gap-1 tp-bg-gray-100 tp-p-1 tp-rounded-xl tp-w-fit">
         {(["days", "sessions"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === tab ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
+            className={`tp-px-4 tp-py-1-5 tp-rounded-lg tp-text-sm tp-font-medium tp-transition-colors ${
+              activeTab === tab ? "tp-bg-white tp-shadow tp-text-gray-900" : "tp-text-gray-500 tp-hover-text-gray-700"
             }`}
           >
             {tab === "days" ? `الأيام والأسئلة (${program.days.length})` : `الجلسات (${program.sessions.length})`}
@@ -152,12 +153,12 @@ export default function ManageClient({ program }: { program: Program }) {
 
       {/* ── Days Tab ──────────────────────────────────────────────────────── */}
       {activeTab === "days" && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-800">الأيام والمواضيع والأسئلة</h2>
+        <div className="tp-space-y-3">
+          <div className="tp-flex tp-items-center tp-justify-between">
+            <h2 className="tp-font-semibold tp-text-gray-800">الأيام والمواضيع والأسئلة</h2>
             <button
               onClick={() => setShowAddDay(true)}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+              className="tp-px-3 tp-py-1-5 tp-bg-blue-600 tp-text-white tp-rounded-lg tp-text-sm tp-hover-bg-blue-700"
             >
               + يوم جديد
             </button>
@@ -171,35 +172,35 @@ export default function ManageClient({ program }: { program: Program }) {
           )}
 
           {program.days.length === 0 && (
-            <div className="text-center py-10 text-gray-400 bg-white rounded-2xl border">
+            <div className="tp-text-center tp-py-10 tp-text-gray-400 tp-bg-white tp-rounded-2xl tp-border">
               لا توجد أيام بعد.
             </div>
           )}
 
           {program.days.map((day) => (
-            <div key={day.id} className="bg-white rounded-2xl border overflow-hidden">
+            <div key={day.id} className="tp-bg-white tp-rounded-2xl tp-border tp-overflow-hidden">
               {/* Day header */}
-              <div className="flex items-center gap-3 p-4">
+              <div className="tp-flex tp-items-center tp-gap-3 tp-p-4">
                 <button
                   onClick={() => setExpandedDay(expandedDay === day.id ? null : day.id)}
-                  className="flex-1 flex items-center gap-3 text-right"
+                  className="tp-flex-1 tp-flex tp-items-center tp-gap-3 tp-text-right"
                 >
-                  <span className="text-lg">{expandedDay === day.id ? "▼" : "▶"}</span>
-                  <span className="font-mono text-sm text-gray-400 w-12">يوم {day.dayNumber}</span>
-                  <span className="font-semibold text-gray-800 flex-1 text-right">{day.title}</span>
-                  <span className="text-xs text-gray-400">{day._count.questions} سؤال</span>
+                  <span className="tp-text-lg">{expandedDay === day.id ? "▼" : "▶"}</span>
+                  <span className="tp-font-mono tp-text-sm tp-text-gray-400 tp-w-12">يوم {day.dayNumber}</span>
+                  <span className="tp-font-semibold tp-text-gray-800 tp-flex-1 tp-text-right">{day.title}</span>
+                  <span className="tp-text-xs tp-text-gray-400">{day._count.questions} سؤال</span>
                 </button>
-                <div className="flex gap-2 flex-shrink-0">
+                <div className="tp-flex tp-gap-2 tp-flex-shrink-0">
                   <button
                     onClick={() => setEditingDayId(day.id)}
-                    className="text-xs px-2 py-1 border rounded-lg hover:bg-gray-50"
+                    className="tp-text-xs tp-px-2 tp-py-1 tp-border tp-rounded-lg tp-hover-bg-gray-50"
                   >
                     تعديل
                   </button>
                   <button
                     onClick={() => handleDeleteDay(day.id, day.title)}
                     disabled={isPending}
-                    className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100"
+                    className="tp-text-xs tp-px-2 tp-py-1 tp-bg-red-50 tp-text-red-600 tp-border tp-border-red-200 tp-rounded-lg tp-hover-bg-red-100"
                   >
                     حذف
                   </button>
@@ -207,20 +208,20 @@ export default function ManageClient({ program }: { program: Program }) {
               </div>
 
               {editingDayId === day.id && (
-                <div className="px-4 pb-4">
+                <div className="tp-px-4 tp-pb-4">
                   <EditDayForm day={day} onClose={() => setEditingDayId(null)} />
                 </div>
               )}
 
               {expandedDay === day.id && (
-                <div className="border-t px-4 py-4 space-y-4 bg-gray-50">
+                <div className="tp-border-t tp-px-4 tp-py-4 tp-space-y-4 tp-bg-gray-50">
                   {/* Topics */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-gray-700">المواضيع</h3>
+                    <div className="tp-flex tp-items-center tp-justify-between tp-mb-2">
+                      <h3 className="tp-text-sm tp-font-semibold tp-text-gray-700">المواضيع</h3>
                       <button
                         onClick={() => setShowAddTopicFor(showAddTopicFor === day.id ? null : day.id)}
-                        className="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-100"
+                        className="tp-text-xs tp-px-2 tp-py-1 tp-bg-indigo-50 tp-text-indigo-600 tp-border tp-border-indigo-200 tp-rounded-lg tp-hover-bg-indigo-100"
                       >
                         + موضوع
                       </button>
@@ -234,21 +235,21 @@ export default function ManageClient({ program }: { program: Program }) {
                     )}
 
                     {day.topics.length === 0 ? (
-                      <p className="text-xs text-gray-400">لا توجد مواضيع.</p>
+                      <p className="tp-text-xs tp-text-gray-400">لا توجد مواضيع.</p>
                     ) : (
-                      <div className="space-y-1">
+                      <div className="tp-space-y-1">
                         {day.topics.map((t) => (
                           <div
                             key={t.id}
-                            className="flex items-center justify-between text-sm bg-white rounded-lg border px-3 py-2"
+                            className="tp-flex tp-items-center tp-justify-between tp-text-sm tp-bg-white tp-rounded-lg tp-border tp-px-3 tp-py-2"
                           >
-                            <span className="text-gray-700">{t.title}</span>
-                            <div className="flex gap-1">
+                            <span className="tp-text-gray-700">{t.title}</span>
+                            <div className="tp-flex tp-gap-1">
                               <EditTopicInline topic={t} />
                               <button
                                 onClick={() => handleDeleteTopic(t.id, t.title)}
                                 disabled={isPending}
-                                className="text-xs px-2 py-0.5 text-red-500 hover:bg-red-50 rounded"
+                                className="tp-text-xs tp-px-2 tp-py-0-5 tp-text-red-500 tp-hover-bg-red-50 tp-rounded"
                               >
                                 حذف
                               </button>
@@ -261,11 +262,11 @@ export default function ManageClient({ program }: { program: Program }) {
 
                   {/* Questions */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-gray-700">الأسئلة</h3>
+                    <div className="tp-flex tp-items-center tp-justify-between tp-mb-2">
+                      <h3 className="tp-text-sm tp-font-semibold tp-text-gray-700">الأسئلة</h3>
                       <button
                         onClick={() => setShowAddQFor(showAddQFor === day.id ? null : day.id)}
-                        className="text-xs px-2 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100"
+                        className="tp-text-xs tp-px-2 tp-py-1 tp-bg-blue-50 tp-text-blue-600 tp-border tp-border-blue-200 tp-rounded-lg tp-hover-bg-blue-100"
                       >
                         + سؤال
                       </button>
@@ -276,9 +277,9 @@ export default function ManageClient({ program }: { program: Program }) {
                     )}
 
                     {day.questions.length === 0 ? (
-                      <p className="text-xs text-gray-400">لا توجد أسئلة.</p>
+                      <p className="tp-text-xs tp-text-gray-400">لا توجد أسئلة.</p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="tp-space-y-2">
                         {day.questions.map((q) => (
                           <QuestionRow
                             key={q.id}
@@ -299,32 +300,32 @@ export default function ManageClient({ program }: { program: Program }) {
 
       {/* ── Sessions Tab ────────────────────────────────────────────────────── */}
       {activeTab === "sessions" && (
-        <div className="space-y-3">
-          <h2 className="font-semibold text-gray-800">الجلسات</h2>
+        <div className="tp-space-y-3">
+          <h2 className="tp-font-semibold tp-text-gray-800">الجلسات</h2>
           {program.sessions.length === 0 && (
-            <div className="text-center py-10 text-gray-400 bg-white rounded-2xl border">
+            <div className="tp-text-center tp-py-10 tp-text-gray-400 tp-bg-white tp-rounded-2xl tp-border">
               لا توجد جلسات بعد.
             </div>
           )}
           {program.sessions.map((s) => (
             <div
               key={s.id}
-              className="bg-white rounded-2xl border p-4 flex items-center gap-3"
+              className="tp-bg-white tp-rounded-2xl tp-border tp-p-4 tp-flex tp-items-center tp-gap-3"
             >
-              <span className="font-mono font-bold text-blue-700 w-20">{s.sessionCode}</span>
-              <span className="flex-1 text-sm text-gray-700 truncate">
+              <span className="tp-font-mono tp-font-bold tp-text-blue-700 tp-w-20">{s.sessionCode}</span>
+              <span className="tp-flex-1 tp-text-sm tp-text-gray-700 tp-truncate">
                 {s.title ?? `يوم ${s.dayNumber}`}
               </span>
-              <span className="text-xs text-gray-400">{s._count.participants} مشارك</span>
+              <span className="tp-text-xs tp-text-gray-400">{s._count.participants} مشارك</span>
               <Badge
                 text={SESSION_STATUS_AR[s.status] ?? s.status}
-                color={SESSION_STATUS_COLOR[s.status] ?? "bg-gray-100 text-gray-600"}
+                color={SESSION_STATUS_COLOR[s.status] ?? "tp-bg-gray-100 tp-text-gray-600"}
               />
               {s.status !== "ACTIVE" && (
                 <button
                   onClick={() => handleDeleteSession(s.id, s.sessionCode)}
                   disabled={isPending}
-                  className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100"
+                  className="tp-text-xs tp-px-2 tp-py-1 tp-bg-red-50 tp-text-red-600 tp-border tp-border-red-200 tp-rounded-lg tp-hover-bg-red-100"
                 >
                   حذف
                 </button>
@@ -349,29 +350,29 @@ function AddDayForm({ programId, onClose }: { programId: string; onClose: () => 
     startTransition(async () => {
       const r = await createDayAction(programId, null, fd);
       if (r.ok) onClose();
-      else setError(r.error);
+      else setError(errorLabel(r.error));
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-blue-800">إضافة يوم جديد</h3>
-      <div className="grid grid-cols-2 gap-3">
+    <form onSubmit={handleSubmit} className="tp-bg-blue-50 tp-border tp-border-blue-200 tp-rounded-xl tp-p-4 tp-space-y-3">
+      <h3 className="tp-text-sm tp-font-semibold tp-text-blue-800">إضافة يوم جديد</h3>
+      <div className="tp-grid tp-grid-cols-2 tp-gap-3">
         <div>
-          <label className="text-xs text-gray-600 mb-1 block">رقم اليوم</label>
+          <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">رقم اليوم</label>
           <input name="dayNumber" type="number" min={1} max={30} required
-            className="w-full rounded-lg border px-2 py-1.5 text-sm" />
+            className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm" />
         </div>
         <div>
-          <label className="text-xs text-gray-600 mb-1 block">العنوان</label>
+          <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">العنوان</label>
           <input name="title" required
-            className="w-full rounded-lg border px-2 py-1.5 text-sm" />
+            className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm" />
         </div>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <div className="flex gap-2">
-        <button type="button" onClick={onClose} className="flex-1 py-1.5 rounded-lg border text-sm">إلغاء</button>
-        <button type="submit" disabled={isPending} className="flex-1 py-1.5 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50">
+      {error && <p className="tp-text-xs tp-text-red-600">{error}</p>}
+      <div className="tp-flex tp-gap-2">
+        <button type="button" onClick={onClose} className="tp-flex-1 tp-py-1-5 tp-rounded-lg tp-border tp-text-sm">إلغاء</button>
+        <button type="submit" disabled={isPending} className="tp-flex-1 tp-py-1-5 tp-rounded-lg tp-bg-blue-600 tp-text-white tp-text-sm tp-disabled-opacity-50">
           {isPending ? "…" : "إضافة"}
         </button>
       </div>
@@ -392,23 +393,23 @@ function EditDayForm({ day, onClose }: { day: Day; onClose: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-amber-800">تعديل اليوم</h3>
-      <div className="grid grid-cols-2 gap-3">
+    <form onSubmit={handleSubmit} className="tp-bg-amber-50 tp-border tp-border-amber-200 tp-rounded-xl tp-p-4 tp-space-y-3">
+      <h3 className="tp-text-sm tp-font-semibold tp-text-amber-800">تعديل اليوم</h3>
+      <div className="tp-grid tp-grid-cols-2 tp-gap-3">
         <div>
-          <label className="text-xs text-gray-600 mb-1 block">رقم اليوم</label>
+          <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">رقم اليوم</label>
           <input name="dayNumber" type="number" min={1} max={30} defaultValue={day.dayNumber}
-            className="w-full rounded-lg border px-2 py-1.5 text-sm" />
+            className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm" />
         </div>
         <div>
-          <label className="text-xs text-gray-600 mb-1 block">العنوان</label>
+          <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">العنوان</label>
           <input name="title" defaultValue={day.title}
-            className="w-full rounded-lg border px-2 py-1.5 text-sm" />
+            className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm" />
         </div>
       </div>
-      <div className="flex gap-2">
-        <button type="button" onClick={onClose} className="flex-1 py-1.5 rounded-lg border text-sm">إلغاء</button>
-        <button type="submit" disabled={isPending} className="flex-1 py-1.5 rounded-lg bg-amber-600 text-white text-sm disabled:opacity-50">
+      <div className="tp-flex tp-gap-2">
+        <button type="button" onClick={onClose} className="tp-flex-1 tp-py-1-5 tp-rounded-lg tp-border tp-text-sm">إلغاء</button>
+        <button type="submit" disabled={isPending} className="tp-flex-1 tp-py-1-5 tp-rounded-lg tp-bg-amber-600 tp-text-white tp-text-sm tp-disabled-opacity-50">
           {isPending ? "…" : "حفظ"}
         </button>
       </div>
@@ -429,17 +430,17 @@ function AddTopicInline({ dayId, onClose }: { dayId: string; onClose: () => void
   }
 
   return (
-    <div className="flex gap-2 mb-2">
+    <div className="tp-flex tp-gap-2 tp-mb-2">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="عنوان الموضوع"
-        className="flex-1 rounded-lg border px-2 py-1 text-sm"
+        className="tp-flex-1 tp-rounded-lg tp-border tp-px-2 tp-py-1 tp-text-sm"
       />
-      <button onClick={handle} disabled={isPending} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded-lg">
+      <button onClick={handle} disabled={isPending} className="tp-px-3 tp-py-1 tp-bg-indigo-600 tp-text-white tp-text-xs tp-rounded-lg">
         إضافة
       </button>
-      <button onClick={onClose} className="px-2 py-1 border text-xs rounded-lg">×</button>
+      <button onClick={onClose} className="tp-px-2 tp-py-1 tp-border tp-text-xs tp-rounded-lg">×</button>
     </div>
   );
 }
@@ -451,23 +452,23 @@ function EditTopicInline({ topic }: { topic: Topic }) {
 
   if (!editing) {
     return (
-      <button onClick={() => setEditing(true)} className="text-xs px-2 py-0.5 text-blue-500 hover:bg-blue-50 rounded">
+      <button onClick={() => setEditing(true)} className="tp-text-xs tp-px-2 tp-py-0-5 tp-text-blue-500 tp-hover-bg-blue-50 tp-rounded">
         تعديل
       </button>
     );
   }
 
   return (
-    <span className="flex gap-1">
-      <input value={val} onChange={(e) => setVal(e.target.value)} className="rounded border px-1 py-0.5 text-xs w-32" />
+    <span className="tp-flex tp-gap-1">
+      <input value={val} onChange={(e) => setVal(e.target.value)} className="tp-rounded tp-border tp-px-1 tp-py-0-5 tp-text-xs tp-w-32" />
       <button
         onClick={() => startTransition(async () => { await updateTopicAction(topic.id, val); setEditing(false); })}
         disabled={isPending}
-        className="text-xs px-1.5 py-0.5 bg-blue-600 text-white rounded"
+        className="tp-text-xs tp-px-1-5 tp-py-0-5 tp-bg-blue-600 tp-text-white tp-rounded"
       >
         ✓
       </button>
-      <button onClick={() => setEditing(false)} className="text-xs px-1.5 py-0.5 border rounded">×</button>
+      <button onClick={() => setEditing(false)} className="tp-text-xs tp-px-1-5 tp-py-0-5 tp-border tp-rounded">×</button>
     </span>
   );
 }
@@ -481,38 +482,38 @@ function QuestionRow({
 }) {
   const correctOpt = question.options.find((o) => o.id === question.correctOptionId);
   return (
-    <div className="bg-white border rounded-xl px-3 py-2.5 space-y-1">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1">
-          <span className="font-mono text-xs text-gray-400 ml-1">Q{question.questionOrder}</span>
-          <span className="text-sm text-gray-800">{question.questionText}</span>
+    <div className="tp-bg-white tp-border tp-rounded-xl tp-px-3 tp-py-2-5 tp-space-y-1">
+      <div className="tp-flex tp-items-start tp-justify-between tp-gap-2">
+        <div className="tp-flex-1">
+          <span className="tp-font-mono tp-text-xs tp-text-gray-400 tp-ml-1">س{question.questionOrder}</span>
+          <span className="tp-text-sm tp-text-gray-800">{question.questionText}</span>
           {question.topic && (
-            <span className="mr-2 text-xs bg-purple-50 text-purple-600 px-1.5 rounded">{question.topic}</span>
+            <span className="tp-mr-2 tp-text-xs tp-bg-purple-50 tp-text-purple-600 tp-px-1-5 tp-rounded">{question.topic}</span>
           )}
         </div>
         <button
           onClick={onDelete}
           disabled={isPending}
-          className="text-xs px-2 py-0.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
+          className="tp-text-xs tp-px-2 tp-py-0-5 tp-text-red-500 tp-hover-bg-red-50 tp-rounded tp-flex-shrink-0"
         >
           حذف
         </button>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="tp-flex tp-flex-wrap tp-gap-1-5">
         {question.options.map((o) => (
           <span
             key={o.id}
-            className={`text-xs px-2 py-0.5 rounded-full border ${
+            className={`tp-text-xs tp-px-2 tp-py-0-5 tp-rounded-full tp-border ${
               o.id === question.correctOptionId
-                ? "bg-green-100 border-green-300 text-green-800 font-bold"
-                : "bg-gray-50 text-gray-600"
+                ? "tp-bg-green-100 tp-border-green-300 tp-text-green-800 tp-font-bold"
+                : "tp-bg-gray-50 tp-text-gray-600"
             }`}
           >
             {o.optionLabel}: {o.optionText}
           </span>
         ))}
         {!correctOpt && (
-          <span className="text-xs text-red-500">⚠ لم تُحدد الإجابة الصحيحة</span>
+          <span className="tp-text-xs tp-text-red-500">⚠ لم تُحدد الإجابة الصحيحة</span>
         )}
       </div>
     </div>
@@ -529,48 +530,48 @@ function AddQuestionForm({ dayId, onClose }: { dayId: string; onClose: () => voi
     startTransition(async () => {
       const r = await createQuestionAction(dayId, null, fd);
       if (r.ok) onClose();
-      else setError(r.error);
+      else setError(errorLabel(r.error));
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3 mb-3">
-      <h3 className="text-sm font-semibold text-blue-800">إضافة سؤال</h3>
+    <form onSubmit={handleSubmit} className="tp-bg-blue-50 tp-border tp-border-blue-200 tp-rounded-xl tp-p-4 tp-space-y-3 tp-mb-3">
+      <h3 className="tp-text-sm tp-font-semibold tp-text-blue-800">إضافة سؤال</h3>
       <div>
-        <label className="text-xs text-gray-600 mb-1 block">نص السؤال *</label>
+        <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">نص السؤال *</label>
         <textarea name="questionText" required rows={2}
-          className="w-full rounded-lg border px-2 py-1.5 text-sm" />
+          className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm" />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="tp-grid tp-grid-cols-2 tp-gap-2">
         {["A", "B", "C", "D"].map((label, i) => (
           <div key={label}>
-            <label className="text-xs text-gray-600 mb-1 block">
+            <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">
               خيار {label}{i < 2 ? " *" : ""}
             </label>
             <input name={`option${label}`} required={i < 2}
-              className="w-full rounded-lg border px-2 py-1.5 text-sm" />
+              className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm" />
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="tp-grid tp-grid-cols-2 tp-gap-2">
         <div>
-          <label className="text-xs text-gray-600 mb-1 block">الإجابة الصحيحة *</label>
+          <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">الإجابة الصحيحة *</label>
           <select name="correctLabel" required
-            className="w-full rounded-lg border px-2 py-1.5 text-sm">
+            className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm">
             {["A", "B", "C", "D"].map((l) => (
               <option key={l} value={l}>{l}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-600 mb-1 block">الموضوع</label>
-          <input name="topic" className="w-full rounded-lg border px-2 py-1.5 text-sm" />
+          <label className="tp-text-xs tp-text-gray-600 tp-mb-1 tp-block">الموضوع</label>
+          <input name="topic" className="tp-w-full tp-rounded-lg tp-border tp-px-2 tp-py-1-5 tp-text-sm" />
         </div>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      <div className="flex gap-2">
-        <button type="button" onClick={onClose} className="flex-1 py-1.5 rounded-lg border text-sm">إلغاء</button>
-        <button type="submit" disabled={isPending} className="flex-1 py-1.5 rounded-lg bg-blue-600 text-white text-sm disabled:opacity-50">
+      {error && <p className="tp-text-xs tp-text-red-600">{error}</p>}
+      <div className="tp-flex tp-gap-2">
+        <button type="button" onClick={onClose} className="tp-flex-1 tp-py-1-5 tp-rounded-lg tp-border tp-text-sm">إلغاء</button>
+        <button type="submit" disabled={isPending} className="tp-flex-1 tp-py-1-5 tp-rounded-lg tp-bg-blue-600 tp-text-white tp-text-sm tp-disabled-opacity-50">
           {isPending ? "…" : "إضافة"}
         </button>
       </div>

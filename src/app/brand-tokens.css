@@ -1,7 +1,7 @@
-/* Digital Leadership & Smart Governance — dependency-free design system */
+/* Training Portfolio — dependency-free Arabic design system */
 :root {
-  --brand-primary: #00a6a6; --brand-primary-dark: #087f86; --brand-navy: #0b1f3a;
-  --brand-interactive: #2563eb; --brand-accent: #d4af37; --brand-bg: #f8fafc;
+  --brand-primary: #0f766e; --brand-primary-dark: #115e59; --brand-navy: #123c3a;
+  --brand-interactive: #0f766e; --brand-accent: #c6a15b; --brand-bg: #f7f6f1;
   --brand-surface: #fff; --brand-border: #e2e8f0; --brand-muted: #64748b;
   --brand-text: #0f172a; --brand-success: #16a34a; --brand-warning: #d97706;
   --brand-danger: #dc2626; --brand-radius-sm: 8px; --brand-radius-md: 12px;
@@ -81,3 +81,51 @@ html[data-theme="dark"] .dlp-program-header{background:rgb(16 27 45 / .94)}
 @media(max-width:700px){.dlp-live-admin{padding:12px}.dlp-live-share{grid-template-columns:1fr}.dlp-live-code-value{font-size:32px}.dlp-participant-page{padding:12px}.dlp-participant-question{padding:18px}}
 
 .dlp-join-card{width:min(100%,430px);padding:28px;border-top:5px solid var(--brand-accent);box-shadow:0 18px 45px rgb(18 60 58 / .12)}.dlp-join-card input{border-color:#ddd7ca!important;background:#fff}.dlp-join-card button[type="submit"]{background:#0f766e!important;border-radius:12px}.dlp-join-card #join-code{color:#0f665f;font-weight:900;background:#edf6f3!important;border-color:#b9d8d1!important}
+
+/* Shared controls, forms and responsive live-session pages. */
+html{scroll-padding-top:96px}
+body{line-height:1.65}
+h1,h2,h3,p{margin-top:0}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.55}
+button,a,input,select,textarea{touch-action:manipulation}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--brand-accent);outline-offset:3px}
+input:not([type="hidden"]):not([type="file"]),textarea,select{min-height:44px;color:var(--brand-text);background:var(--brand-surface)}
+input[type="email"],input[type="password"]{direction:ltr;text-align:left}
+.tp-form-heading{text-align:center;margin-bottom:24px}
+.tp-form-heading h1{font-size:24px;color:var(--brand-navy);margin:12px 0 6px}
+.tp-form-heading p{font-size:14px;color:var(--brand-muted);margin:0}
+.tp-brand-mark{width:52px;height:52px;margin:auto;display:grid;place-items:center;border-radius:16px;background:var(--brand-primary);color:white;font-size:26px;font-weight:900;border-bottom:3px solid var(--brand-accent)}
+.tp-form{display:grid;gap:18px}
+.tp-form label{display:grid;gap:8px;font-size:14px;font-weight:600}
+.tp-form input,.tp-form textarea,.tp-form select{width:100%;border:1px solid var(--brand-border);border-radius:12px;padding:12px}
+.tp-submit{width:100%;min-height:48px;font-weight:700}
+.tp-session-code{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border:1px solid #b9d8d1;border-radius:12px;background:#edf6f3;color:var(--brand-primary-dark);font-size:13px;margin:0}
+.tp-session-code strong{font-family:ui-monospace,monospace;font-size:20px;letter-spacing:.1em}
+.tp-header-signout{border:1px solid rgb(255 255 255 / .35);border-radius:10px;background:rgb(255 255 255 / .12);color:#fff;padding:8px 12px;font-size:12px;min-height:40px}
+.tp-header-signout:hover{background:rgb(255 255 255 / .22)}
+.tp-session-directory{margin-top:32px;scroll-margin-top:90px}
+.tp-session-directory h2{margin-bottom:6px;color:var(--brand-navy);font-size:21px}
+.tp-session-directory>p{color:var(--brand-muted);font-size:14px}
+.tp-live-brand{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 22px;background:linear-gradient(135deg,var(--brand-navy),var(--brand-primary));border-radius:18px;border-bottom:3px solid var(--brand-accent);color:#fff}
+.tp-live-brand span{font-size:13px;color:#d8e8e5}
+.tp-answer-status{font-size:14px;text-align:center;color:var(--brand-primary-dark);margin:0;min-height:24px}
+.tp-result-wrap{width:min(100%,560px)}
+.tp-result-card{padding:32px 24px;border-top:5px solid var(--brand-accent);border-radius:24px;box-shadow:var(--brand-shadow-card)}
+.dlp-participant-options>button{text-align:start;min-height:64px;display:flex;gap:14px;align-items:center;color:var(--brand-text)}
+.dlp-participant-options>button:disabled{opacity:1;cursor:default}
+.dlp-participant-options>button span:first-child{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;border:1px solid;flex-shrink:0;font-weight:700}
+.dlp-participant-options>button span:last-child{line-height:1.8;font-size:16px}
+.dlp-live-wrap .tp-bg-white{box-shadow:var(--brand-shadow-sm)}
+.dlp-live-wrap .tp-flex-wrap{gap:10px}
+.dlp-live-wrap .tp-text-sm{line-height:1.8}
+.dlp-live-wrap img{max-width:100%;height:auto}
+@media(max-width:700px){
+  .dlp-user-copy{display:block;max-width:100px}.dlp-user-copy>p:first-child{display:none}.dlp-user-name{font-size:12px!important;overflow-wrap:anywhere}
+  .dlp-avatar{display:none}.dlp-brand p{display:block;font-size:9px}.dlp-user{gap:8px}.dlp-logo{width:34px;height:34px;border-radius:12px;flex-shrink:0}.dlp-brand{gap:8px}
+  .tp-header-signout{padding:6px 8px;font-size:11px}
+  .dlp-live-share{padding:18px}.tp-live-brand{padding:16px;flex-wrap:wrap}.dlp-live-wrap .tp-flex{flex-wrap:wrap}.dlp-live-wrap .tp-truncate{white-space:normal;overflow-wrap:anywhere}
+  .brand-page header.tp-flex,.brand-page section.tp-flex{flex-wrap:wrap;gap:12px}
+  .brand-page main>.tp-p-8{padding:22px 18px}.tp-result-card{padding:24px 18px}
+}

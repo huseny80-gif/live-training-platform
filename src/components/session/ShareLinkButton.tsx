@@ -13,7 +13,7 @@ export default function ShareLinkButton({ url }: Props) {
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({
-          title: "Live Training Session",
+          title: "جلسة الحقيبة التدريبية",
           text: "انضم إلى جلسة الاختبار",
           url,
         });
@@ -32,7 +32,7 @@ export default function ShareLinkButton({ url }: Props) {
   return (
     <button
       onClick={handleShare}
-      className="w-full mt-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors bg-white hover:bg-green-50 text-green-700 border-green-200"
+      className="tp-w-full tp-mt-2 tp-px-3 tp-py-2 tp-rounded-lg tp-border tp-text-sm tp-font-medium tp-transition-colors tp-bg-white tp-hover-bg-green-50 tp-text-green-700 tp-border-green-200"
     >
       {message ?? "مشاركة رابط الجلسة"}
     </button>

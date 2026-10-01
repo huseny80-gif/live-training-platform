@@ -12,12 +12,14 @@ const STATUS_LABEL: Record<string, string> = {
 
 const navItems = [
   { label: "الرئيسية", icon: "⌂", href: "/dashboard", active: true },
-  { label: "البرامج التدريبية", icon: "▣", href: "/dashboard" },
-  { label: "الجلسات المباشرة", icon: "◉", href: "/dashboard" },
-  { label: "المشاركون", icon: "♙", href: "/dashboard" },
-  { label: "الاختبارات", icon: "✓", href: "/dashboard" },
-  { label: "النتائج والتحليلات", icon: "⌁", href: "/dashboard" },
+  { label: "البرامج التدريبية", icon: "▣", href: "#programs" },
+  { label: "الجلسات والنتائج", icon: "◉", href: "#sessions" },
+  { label: "إنشاء برنامج", icon: "+", href: "/programs/new" },
 ];
+async function logout() {
+  "use server";
+  await signOut({ redirectTo: "/login" });
+}
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -50,6 +52,7 @@ export default async function DashboardPage() {
               <p className="dlp-user-name">{displayName}</p>
             </div>
             <div className="dlp-avatar">{displayName.slice(0, 1).toUpperCase()}</div>
+            <form action={logout}><button type="submit" className="tp-header-signout">تسجيل الخروج</button></form>
           </div>
         </div>
       </header>
@@ -71,10 +74,7 @@ export default async function DashboardPage() {
 
           <form
             className="dlp-signout"
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
+            action={logout}
           >
             <button type="submit">↪ تسجيل الخروج</button>
           </form>
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
             <StatCard label="الجلسات" value={totalSessions} icon="◉" />
           </div>
 
-          <div className="dlp-section-head">
+          <div id="programs" className="dlp-section-head">
             <div>
               <h2>البرامج التدريبية</h2>
               <p>اختر برنامجاً لإدارة المحتوى والجلسات والأسئلة.</p>
@@ -134,7 +134,7 @@ export default async function DashboardPage() {
                           }`}>
                             {STATUS_LABEL[p.status] ?? p.status}
                           </span>
-                          <span className="dlp-language">{p.language === "AR" ? "العربية" : "English"}</span>
+                          <span className="dlp-language">{p.language === "AR" ? "العربية" : "الإنجليزية"}</span>
                         </div>
                         {p.description ? <p className="dlp-description">{p.description}</p> : null}
                       </div>
@@ -152,11 +152,23 @@ export default async function DashboardPage() {
             </div>
           )}
 
+          <section id="sessions" className="tp-session-directory">
+            <h2>الجلسات والنتائج</h2>
+            <p>اختر البرنامج لفتح جلساته ومتابعة المشاركين والنتائج.</p>
+            <div className="dlp-program-grid">
+              {programs.filter((p) => p._count.sessions > 0).map((p) => (
+                <Link key={p.id} href={`/programs/${p.id}#sessions`} className="brand-card dlp-program">
+                  <strong>{p.title}</strong><p className="dlp-description">{p._count.sessions} جلسة · عرض الجلسات والنتائج ←</p>
+                </Link>
+              ))}
+            </div>
+            {totalSessions === 0 && <p className="brand-card dlp-empty">لا توجد جلسات بعد. افتح برنامجاً واختر يوماً لإنشاء جلسة.</p>}
+          </section>
           <nav className="dlp-mobile-nav" aria-label="التنقل الرئيسي">
             <Link href="/dashboard" className="active">⌂<span>الرئيسية</span></Link>
-            <Link href="/dashboard">▣<span>البرامج</span></Link>
-            <Link href="/dashboard">◉<span>الجلسات</span></Link>
-            <Link href="/dashboard">⌁<span>النتائج</span></Link>
+            <Link href="#programs">▣<span>البرامج</span></Link>
+            <Link href="#sessions">◉<span>الجلسات</span></Link>
+            <Link href="/programs/new">+<span>برنامج جديد</span></Link>
           </nav>
           <div className="dlp-mobile-spacer" />
         </section>

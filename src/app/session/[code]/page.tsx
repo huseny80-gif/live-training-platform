@@ -1,5 +1,6 @@
 "use client";
 
+import { errorLabel } from "@/lib/labels";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -102,7 +103,7 @@ export default function ParticipantSessionPage() {
         setSubmitResult({ isCorrect: data.isCorrect, scoreAwarded: data.scoreAwarded });
         await fetchState();
       } else {
-        setSubmitError(data.error ?? "فشل إرسال الإجابة.");
+        setSubmitError(errorLabel(data.error ?? "SUBMIT_ERROR"));
       }
     } catch {
       setSubmitError("خطأ في الشبكة. حاول مجدداً.");
@@ -115,20 +116,20 @@ export default function ParticipantSessionPage() {
   if (error) {
     const isNotFound = error === "SESSION_NOT_FOUND";
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl">⚠️</div>
-          <h1 className="text-lg font-bold text-gray-800">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
+        <div className="brand-card dlp-join-card tp-text-center tp-space-y-4">
+          <div className="tp-text-5xl">⚠️</div>
+          <h1 className="tp-text-lg tp-font-bold tp-text-gray-800">
             {isNotFound ? "الجلسة غير موجودة" : "حدث خطأ"}
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="tp-text-sm tp-text-gray-500">
             {isNotFound
               ? "هذه الجلسة غير متاحة أو انتهت. تحقق من الرمز وحاول مجدداً."
               : error}
           </p>
           <a
             href="/join"
-            className="inline-block mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="tp-inline-block tp-mt-2 tp-px-5 tp-py-2-5 tp-bg-blue-600 tp-text-white tp-rounded-lg tp-text-sm tp-font-medium tp-hover-bg-blue-700"
           >
             العودة للبداية
           </a>
@@ -140,8 +141,8 @@ export default function ParticipantSessionPage() {
   // ── Loading ──────────────────────────────────────────────────────────────
   if (!state) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500 animate-pulse">جاري الاتصال…</p>
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
+        <p className="tp-text-gray-500 tp-animate-pulse">جاري الاتصال…</p>
       </main>
     );
   }
@@ -151,12 +152,12 @@ export default function ParticipantSessionPage() {
   // ── Session ended — redirect soon, show brief message ────────────────────
   if (sessionStatus === "ENDED") {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl">🏁</div>
-          <h1 className="text-xl font-bold text-gray-900">انتهى الاختبار</h1>
-          <p className="text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
-          <p className="text-sm text-blue-600 animate-pulse">جاري الانتقال لعرض نتيجتك…</p>
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
+        <div className="brand-card dlp-join-card tp-text-center tp-space-y-4">
+          <div className="tp-text-5xl">🏁</div>
+          <h1 className="tp-text-xl tp-font-bold tp-text-gray-900">انتهى الاختبار</h1>
+          <p className="tp-text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
+          <p className="tp-text-sm tp-text-blue-600 tp-animate-pulse">جاري الانتقال لعرض نتيجتك…</p>
         </div>
       </main>
     );
@@ -165,18 +166,18 @@ export default function ParticipantSessionPage() {
   // ── Waiting / Paused ─────────────────────────────────────────────────────
   if (sessionStatus === "DRAFT" || sessionStatus === "PAUSED" || !currentQuestion) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border shadow-sm p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl animate-bounce">⏳</div>
-          <h1 className="text-xl font-bold text-gray-900">الحقيبة التدريبية</h1>
-          <p className="text-gray-600 font-medium">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
-          <p className="text-gray-500 text-sm">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
+        <div className="brand-card dlp-join-card tp-text-center tp-space-y-4">
+          <div className="tp-text-5xl tp-animate-bounce">⏳</div>
+          <h1 className="tp-text-xl tp-font-bold tp-text-gray-900">الحقيبة التدريبية</h1>
+          <p className="tp-text-gray-600 tp-font-medium">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
+          <p className="tp-text-gray-500 tp-text-sm">
             {sessionStatus === "PAUSED"
               ? "الاختبار موقوف مؤقتاً… انتظر."
               : "في انتظار المدرب لعرض السؤال التالي…"}
           </p>
-          <p className="text-xs text-gray-400 font-mono bg-gray-50 px-3 py-1 rounded-full inline-block">رمز: {code}</p>
-          <a href="/join" className="block text-xs text-gray-400 hover:text-gray-600 underline mt-2">
+          <p className="tp-text-xs tp-text-gray-400 tp-font-mono tp-bg-gray-50 tp-px-3 tp-py-1 tp-rounded-full tp-inline-block">رمز: {code}</p>
+          <a href="/join" className="tp-block tp-text-xs tp-text-gray-400 tp-hover-text-gray-600 tp-underline tp-mt-2">
             العودة للبداية
           </a>
         </div>
@@ -196,19 +197,19 @@ export default function ParticipantSessionPage() {
     : 0;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
-      <div className="w-full max-w-lg space-y-4 mt-4">
+    <main dir="rtl" lang="ar" className="dlp-participant-page dlp-participant-live">
+      <div className="dlp-participant-wrap">
 
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-lg font-bold text-blue-800">الحقيبة التدريبية</h1>
-          <p className="text-xs text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
+        <div className="dlp-participant-head">
+          <h1 className="tp-text-lg tp-font-bold tp-text-blue-800">الحقيبة التدريبية</h1>
+          <p className="tp-text-xs tp-text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
         </div>
 
         {/* Progress bar */}
         {totalQuestions > 0 && currentQuestionIndex != null && (
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-gray-500">
+          <div className="tp-space-y-1">
+            <div className="tp-flex tp-justify-between tp-text-xs tp-text-gray-500">
               <span>السؤال {currentQuestionIndex} من {totalQuestions}</span>
               <span>{progressPercent}%</span>
             </div>
@@ -218,10 +219,10 @@ export default function ParticipantSessionPage() {
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label={`التقدم: ${progressPercent}%`}
-              className="h-2 bg-gray-200 rounded-full overflow-hidden"
+              className="tp-h-2 tp-bg-gray-200 tp-rounded-full tp-overflow-hidden"
             >
               <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                className="tp-h-full tp-bg-blue-500 tp-rounded-full tp-transition-all tp-duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -229,18 +230,18 @@ export default function ParticipantSessionPage() {
         )}
 
         {/* Question text */}
-        <div className="bg-white rounded-2xl border p-6 shadow-sm">
-          <p className="text-lg font-semibold leading-relaxed text-gray-800">{q.questionText}</p>
+        <div className="dlp-participant-question">
+          <p className="tp-text-lg tp-font-semibold tp-leading-relaxed tp-text-gray-800">{q.questionText}</p>
         </div>
 
         {/* Submit error banner */}
         {submitError && (
-          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-            <span className="text-sm text-red-700">{submitError}</span>
+          <div role="alert" className="tp-bg-red-50 tp-border tp-border-red-200 tp-rounded-xl tp-px-4 tp-py-3 tp-flex tp-items-center tp-justify-between tp-gap-3">
+            <span className="tp-text-sm tp-text-red-700">{submitError}</span>
             <button
               type="button"
               onClick={() => { setSubmitError(null); setSelectedOption(null); }}
-              className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+              className="tp-text-xs tp-text-red-600 tp-underline tp-flex-shrink-0 tp-hover-text-red-800"
             >
               إعادة المحاولة
             </button>
@@ -248,14 +249,14 @@ export default function ParticipantSessionPage() {
         )}
 
         {/* Options */}
-        <div className="space-y-3" role="group" aria-label="خيارات الإجابة">
+        <div className="dlp-participant-options" role="group" aria-label="خيارات الإجابة">
           {q.options.map((opt) => {
             const isSelected = (selectedOption ?? state.myAnswer) === opt.id;
-            let cls = "w-full text-right rounded-xl border p-4 flex items-center gap-3 transition-colors ";
+            let cls = "tp-w-full tp-text-right tp-rounded-xl tp-border tp-p-4 tp-flex tp-items-center tp-gap-3 tp-transition-colors ";
             if (canAnswer) {
-              cls += isSelected ? "border-blue-500 bg-blue-50 " : "hover:bg-gray-50 cursor-pointer ";
+              cls += isSelected ? "tp-border-blue-500 tp-bg-blue-50 " : "tp-hover-bg-gray-50 tp-cursor-pointer ";
             } else {
-              cls += isSelected ? "border-blue-400 bg-blue-50 " : "";
+              cls += isSelected ? "tp-border-blue-400 tp-bg-blue-50 " : "";
             }
             return (
               <button
@@ -266,33 +267,34 @@ export default function ParticipantSessionPage() {
                 onClick={() => canAnswer && submitAnswer(opt.id)}
               >
                 {/* Label letter: dir="ltr" so A/B/C renders correctly inside RTL container */}
-                <span dir="ltr" className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold flex-shrink-0 bg-white">
+                <span dir="ltr" className="tp-w-8 tp-h-8 tp-rounded-full tp-border tp-flex tp-items-center tp-justify-center tp-text-sm tp-font-bold tp-flex-shrink-0 tp-bg-white">
                   {opt.optionLabel}
                 </span>
-                <span className="text-sm text-gray-800 flex-1">{opt.optionText}</span>
+                <span className="tp-text-sm tp-text-gray-800 tp-flex-1">{opt.optionText}</span>
               </button>
             );
           })}
         </div>
 
+        <p className="tp-answer-status" role="status" aria-live="polite">{submitting ? "جاري إرسال الإجابة…" : answered ? "تم حفظ إجابتك" : questionClosed ? "في انتظار السؤال التالي…" : "اختر إجابة واحدة لإرسالها"}</p>
         {/* Feedback */}
         {answered && (
-          <div className={`rounded-xl p-4 text-center ${
-            answerIsCorrect === true ? "bg-green-50 border border-green-200" :
-            answerIsCorrect === false ? "bg-red-50 border border-red-200" :
-            "bg-gray-50 border"
+          <div className={`tp-rounded-xl tp-p-4 tp-text-center ${
+            answerIsCorrect === true ? "tp-bg-green-50 tp-border tp-border-green-200" :
+            answerIsCorrect === false ? "tp-bg-red-50 tp-border tp-border-red-200" :
+            "tp-bg-gray-50 tp-border"
           }`}>
-            {answerIsCorrect === true && <p className="font-bold text-green-700">✓ إجابة صحيحة! +{answeredScore} نقطة</p>}
-            {answerIsCorrect === false && <p className="font-bold text-red-700">✗ إجابة خاطئة</p>}
-            {answerIsCorrect === null && <p className="text-gray-600">تم تسجيل إجابتك. في انتظار النتائج…</p>}
-            {questionClosed && <p className="text-xs text-gray-400 mt-1">في انتظار السؤال التالي…</p>}
+            {answerIsCorrect === true && <p className="tp-font-bold tp-text-green-700">✓ إجابة صحيحة! +{answeredScore} نقطة</p>}
+            {answerIsCorrect === false && <p className="tp-font-bold tp-text-red-700">✗ إجابة خاطئة</p>}
+            {answerIsCorrect === null && <p className="tp-text-gray-600">تم تسجيل إجابتك. في انتظار النتائج…</p>}
+            {questionClosed && <p className="tp-text-xs tp-text-gray-400 tp-mt-1">في انتظار السؤال التالي…</p>}
           </div>
         )}
 
         {/* Closed but not answered */}
         {questionClosed && !answered && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
-            <p className="text-orange-700 text-sm">انتهى وقت هذا السؤال.</p>
+          <div className="tp-bg-orange-50 tp-border tp-border-orange-200 tp-rounded-xl tp-p-4 tp-text-center">
+            <p className="tp-text-orange-700 tp-text-sm">انتهى وقت هذا السؤال.</p>
           </div>
         )}
       </div>

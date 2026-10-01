@@ -56,7 +56,13 @@ export class ContentGenerationService {
 
     // Load extracted pages
     const pages = await prisma.documentPage.findMany({
-      where: { documentId, extractionStatus: "COMPLETED" },
+      where: {
+        documentId,
+        extractionStatus: "COMPLETED",
+        ...(process.env.NODE_ENV === "production" ? {
+          OR: [{ extractionMethod: null }, { extractionMethod: { not: "MOCK" } }],
+        } : {}),
+      },
       orderBy: { pageNumber: "asc" },
       select: {
         id: true,
@@ -76,14 +82,13 @@ export class ContentGenerationService {
       };
     }
 
-    // Allow Mock content when LLAMA_CLOUD_API_KEY is absent (dev/staging without
-    // LlamaParse configured). When the key IS present, still require real content
-    // so we don't silently generate from placeholder text in production.
+    // Production excludes synthetic pages and requires usable real content.
+    // Development can use mock extraction when LlamaParse is not configured.
     const hasRealContent = pages.some(
       (p) => p.extractionMethod !== "MOCK" && (p.extractedText?.trim().length ?? 0) > 50
     );
     const llamaConfigured = !!process.env.LLAMA_CLOUD_API_KEY;
-    if (llamaConfigured && !hasRealContent) {
+    if ((process.env.NODE_ENV === "production" || llamaConfigured) && !hasRealContent) {
       return {
         programId, documentId,
         status: "FAILED",

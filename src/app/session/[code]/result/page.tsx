@@ -17,14 +17,15 @@ export default async function ParticipantResultPage({
   // No token — show Arabic error page instead of redirect
   if (!token) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl">🔒</div>
-          <h1 className="text-lg font-bold text-gray-800">لم يتم التعرف عليك</h1>
-          <p className="text-sm text-gray-500">يجب الانضمام إلى الجلسة أولاً لعرض نتيجتك.</p>
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
+        <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-8 tp-text-center tp-max-w-sm tp-space-y-4">
+          <p className="tp-font-bold tp-text-blue-700">الحقيبة التدريبية</p>
+          <div className="tp-text-5xl">🔒</div>
+          <h1 className="tp-text-lg tp-font-bold tp-text-gray-800">لم يتم التعرف عليك</h1>
+          <p className="tp-text-sm tp-text-gray-500">يجب الانضمام إلى الجلسة أولاً لعرض نتيجتك.</p>
           <Link
             href="/join"
-            className="inline-block mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="tp-inline-block tp-mt-2 tp-px-5 tp-py-2-5 tp-bg-blue-600 tp-text-white tp-rounded-lg tp-text-sm tp-font-medium tp-hover-bg-blue-700"
           >
             العودة للبداية
           </Link>
@@ -40,20 +41,21 @@ export default async function ParticipantResultPage({
     const msg = err instanceof Error ? err.message : "ERROR";
     const isEnded = msg === "SESSION_NOT_FOUND";
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl">⚠️</div>
-          <h1 className="text-lg font-bold text-gray-800">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
+        <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-8 tp-text-center tp-max-w-sm tp-space-y-4">
+          <p className="tp-font-bold tp-text-blue-700">الحقيبة التدريبية</p>
+          <div className="tp-text-5xl">⚠️</div>
+          <h1 className="tp-text-lg tp-font-bold tp-text-gray-800">
             {isEnded ? "الجلسة غير متاحة" : "هذه الجلسة غير متاحة أو انتهت"}
           </h1>
-          <p className="text-sm text-gray-500">
+          <p className="tp-text-sm tp-text-gray-500">
             {isEnded
               ? "هذه الجلسة غير موجودة أو لم تكن جزءاً منها."
               : "لم يتم العثور على نتيجتك. قد تكون الجلسة لا تزال جارية."}
           </p>
           <Link
             href="/join"
-            className="inline-block mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="tp-inline-block tp-mt-2 tp-px-5 tp-py-2-5 tp-bg-blue-600 tp-text-white tp-rounded-lg tp-text-sm tp-font-medium tp-hover-bg-blue-700"
           >
             العودة للبداية
           </Link>
@@ -76,67 +78,67 @@ export default async function ParticipantResultPage({
     : null;
 
   const scoreColor =
-    percentage >= 70 ? "text-emerald-600"
-    : percentage >= 40 ? "text-amber-600"
-    : "text-red-500";
+    percentage >= 70 ? "tp-text-emerald-600"
+    : percentage >= 40 ? "tp-text-amber-600"
+    : "tp-text-red-500";
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-4">
+    <main dir="rtl" lang="ar" className="dlp-participant-page">
+      <div className="tp-result-wrap tp-space-y-4">
         {/* Result card */}
-        <div className="bg-white rounded-3xl shadow-lg p-8 text-center space-y-5">
+        <div className="brand-card tp-result-card tp-text-center tp-space-y-5">
           {/* Emoji / rank */}
-          <div className="text-5xl">{medalEmoji ?? "🎯"}</div>
+          <div className="tp-text-5xl">{medalEmoji ?? "🎯"}</div>
 
           <div>
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">
+            <p className="tp-text-xs tp-text-gray-400 tp-font-medium tp-uppercase tp-tracking-widest tp-mb-1">
               الحقيبة التدريبية
             </p>
-            <p className="text-sm text-gray-500 mb-0.5">{session.title ?? `الجلسة ${session.sessionCode}`}</p>
-            <h1 className="text-xl font-bold text-gray-900">{participant.displayName}</h1>
+            <p className="tp-text-sm tp-text-gray-500 tp-mb-0-5">{session.title ?? `الجلسة ${session.sessionCode}`}</p>
+            <h1 className="tp-text-xl tp-font-bold tp-text-gray-900">{participant.displayName}</h1>
           </div>
 
           {/* Big score */}
           <div>
-            <p className={`text-5xl font-extrabold ${scoreColor}`}>
+            <p className={`tp-text-5xl tp-font-extrabold ${scoreColor}`}>
               {participant.totalScore}
-              <span className="text-2xl text-gray-400 font-normal"> / {totalQuestions * 10}</span>
+              <span className="tp-text-2xl tp-text-gray-400 tp-font-normal"> / {totalQuestions * 10}</span>
             </p>
-            <p className={`text-3xl font-bold mt-1 ${scoreColor}`}>
-              {percentage}<span className="text-xl">%</span>
+            <p className={`tp-text-3xl tp-font-bold tp-mt-1 ${scoreColor}`}>
+              {percentage}<span className="tp-text-xl">%</span>
             </p>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="tp-text-sm tp-text-gray-400 tp-mt-1">
               نتيجتك في الاختبار
             </p>
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-3 gap-3 pt-3 border-t">
-            <div className="flex flex-col gap-0.5 items-center">
-              <span className="text-xs text-gray-400">الإجابات الصحيحة</span>
-              <span className="font-bold text-emerald-600 text-lg">{participant.correctCount}</span>
+          <div className="tp-grid tp-grid-cols-3 tp-gap-3 tp-pt-3 tp-border-t">
+            <div className="tp-flex tp-flex-col tp-gap-0-5 tp-items-center">
+              <span className="tp-text-xs tp-text-gray-400">الإجابات الصحيحة</span>
+              <span className="tp-font-bold tp-text-emerald-600 tp-text-lg">{participant.correctCount}</span>
             </div>
-            <div className="flex flex-col gap-0.5 items-center">
-              <span className="text-xs text-gray-400">الإجابات الخاطئة</span>
-              <span className="font-bold text-red-500 text-lg">{participant.wrongCount}</span>
+            <div className="tp-flex tp-flex-col tp-gap-0-5 tp-items-center">
+              <span className="tp-text-xs tp-text-gray-400">الإجابات الخاطئة</span>
+              <span className="tp-font-bold tp-text-red-500 tp-text-lg">{participant.wrongCount}</span>
             </div>
-            <div className="flex flex-col gap-0.5 items-center">
-              <span className="text-xs text-gray-400">الترتيب</span>
-              <span className="font-bold text-blue-700 text-base">{rankLabel}</span>
+            <div className="tp-flex tp-flex-col tp-gap-0-5 tp-items-center">
+              <span className="tp-text-xs tp-text-gray-400">الترتيب</span>
+              <span className="tp-font-bold tp-text-blue-700 tp-text-base">{rankLabel}</span>
             </div>
           </div>
 
           {/* Total questions */}
-          <p className="text-xs text-gray-400">
+          <p className="tp-text-xs tp-text-gray-400">
             عدد الأسئلة الكلي: {totalQuestions}
           </p>
         </div>
 
         {/* Back button */}
-        <div className="text-center">
+        <div className="tp-text-center">
           <Link
             href="/join"
-            className="inline-block px-6 py-2.5 bg-white border rounded-xl text-sm text-gray-600 hover:bg-gray-50 shadow-sm"
+            className="tp-inline-block tp-px-6 tp-py-2-5 tp-bg-white tp-border tp-rounded-xl tp-text-sm tp-text-gray-600 tp-hover-bg-gray-50 tp-shadow-sm"
           >
             العودة للبداية
           </Link>

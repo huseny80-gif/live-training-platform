@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { errorLabel } from "@/lib/labels";
 import { completeBlobUpload } from "@/app/actions/documents";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -50,22 +51,22 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       const s = data.extractionStatus as string;
 
       if (s === "COMPLETED") {
-        setMessage("Generation completed successfully.");
+        setMessage("اكتمل تجهيز المحتوى بنجاح.");
         setStatus("success");
         router.refresh();
         return;
       }
 
       if (s === "FAILED") {
-        const notes = (data.extractionNotes as string) ?? "Pipeline failed";
+        const notes = (data.extractionNotes as string) ?? "تعذّر تجهيز المستند";
         throw new Error(notes);
       }
 
       if (s === "PROCESSING") {
-        setMessage("Processing document… (this may take a few minutes)");
+        setMessage("جاري معالجة المستند… قد يستغرق ذلك بضع دقائق");
       }
     }
-    throw new Error("Timed out waiting for document processing. Check back later.");
+    throw new Error("استغرقت معالجة المستند وقتاً طويلاً. تحقق من حالته لاحقاً.");
   }
 
   /** Fire-and-forget: start the pipeline, then poll for completion */
@@ -73,8 +74,8 @@ export default function DocumentUpload({ programId }: { programId: string }) {
     setDocumentId(docId);
     setMessage(
       pageCount != null
-        ? `Uploaded: ${fileName} (${pageCount} pages). Starting processing...`
-        : `Uploaded: ${fileName}. Starting processing...`
+        ? `تم رفع ${fileName} (${pageCount} صفحة). جاري المعالجة…`
+        : `تم رفع ${fileName}. جاري المعالجة…`
     );
 
     const res = await fetch("/api/documents/process", {
@@ -86,8 +87,8 @@ export default function DocumentUpload({ programId }: { programId: string }) {
     if (!res.ok && res.status !== 202) {
       const parsed = await safeJson(res);
       const errMsg = parsed.ok
-        ? ((parsed.data as Record<string, unknown>).error as string) ?? "Failed to start processing"
-        : `Processing start failed (${res.status})`;
+        ? ((parsed.data as Record<string, unknown>).error as string) ?? "تعذّر بدء المعالجة"
+        : `تعذّر بدء المعالجة`;
       throw new Error(errMsg);
     }
 
@@ -98,30 +99,30 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
     if (pipelineStatus === "COMPLETED") {
       // Document was already processed (idempotent path)
-      setMessage("Document already processed.");
+      setMessage("تم تجهيز هذا المستند سابقاً.");
       setStatus("success");
       router.refresh();
       return;
     }
 
-    setMessage("Processing document… (this may take a few minutes)");
+    setMessage("جاري معالجة المستند… قد يستغرق ذلك بضع دقائق");
     await pollUntilDone(docId);
   }
 
   async function handleFile(file: File) {
     if (file.type !== "application/pdf") {
       setStatus("error");
-      setMessage("Only PDF files are accepted.");
+      setMessage("يُسمح بملفات PDF فقط.");
       return;
     }
     if (file.size > MAX_SIZE) {
       setStatus("error");
-      setMessage("File exceeds the 50 MB limit.");
+      setMessage("حجم الملف يتجاوز الحد المسموح (٥٠ ميغابايت).");
       return;
     }
 
     setStatus("busy");
-    setMessage("Preparing upload...");
+    setMessage("جاري تجهيز الملف للرفع…");
 
     try {
       // Ask server which upload mode to use
@@ -139,12 +140,12 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       }
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Operation failed");
+      setMessage(error instanceof Error && /[\u0600-\u06FF]/.test(error.message) ? error.message : errorLabel(error instanceof Error ? error.message : "UPLOAD_ERROR"));
     }
   }
 
   async function directUpload(file: File) {
-    setMessage("Uploading PDF...");
+    setMessage("جاري رفع المستند…");
     const formData = new FormData();
     formData.append("programId", programId);
     formData.append("file", file);
@@ -154,8 +155,8 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
     if (!res.ok) {
       const errMsg = parsed.ok
-        ? ((parsed.data as Record<string, unknown>).error as string) ?? "Upload failed."
-        : `Server error (${res.status}). Try a smaller file or contact support.`;
+        ? ((parsed.data as Record<string, unknown>).error as string) ?? "تعذّر رفع الملف."
+        : `تعذّر رفع الملف. جرّب ملفاً أصغر أو تواصل مع الدعم.`;
       throw new Error(errMsg);
     }
 
@@ -172,7 +173,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       return directUpload(file);
     }
 
-    setMessage("Uploading to storage...");
+    setMessage("جاري رفع المستند…");
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const pathname = `uploads/${programId}/${Date.now()}-${safeName}`;
@@ -182,11 +183,11 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       handleUploadUrl: "/api/documents/upload-url",
       clientPayload: JSON.stringify({ programId }),
       onUploadProgress: ({ percentage }) => {
-        setMessage(`Uploading... ${Math.round(percentage)}%`);
+        setMessage(`جاري الرفع… ${Math.round(percentage)}%`);
       },
     });
 
-    setMessage("Finalizing upload...");
+    setMessage("جاري إكمال الرفع…");
 
     const doc = await completeBlobUpload(programId, blob.url, safeName);
 
@@ -209,12 +210,11 @@ export default function DocumentUpload({ programId }: { programId: string }) {
   const busy = status === "busy";
 
   return (
-    <section className="bg-white rounded-xl border p-6 space-y-4">
+    <section className="tp-bg-white tp-rounded-xl tp-border tp-p-6 tp-space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Training Document</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Upload a PDF to extract content and generate training days, topics,
-          and questions.
+        <h2 className="tp-text-lg tp-font-semibold">المستند التدريبي</h2>
+        <p className="tp-text-sm tp-text-gray-500 tp-mt-1">
+          ارفع مستند PDF لاستخراج المحتوى وتجهيز الأيام التدريبية والموضوعات والأسئلة.
         </p>
       </div>
 
@@ -222,40 +222,40 @@ export default function DocumentUpload({ programId }: { programId: string }) {
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         onClick={() => !busy && inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        className={`tp-border-2 tp-border-dashed tp-rounded-lg tp-p-8 tp-text-center tp-transition-colors ${
           busy
-            ? "border-blue-300 bg-blue-50 cursor-wait"
-            : "border-gray-200 cursor-pointer hover:border-blue-400 hover:bg-blue-50"
+            ? "tp-border-blue-300 tp-bg-blue-50 tp-cursor-wait"
+            : "tp-border-gray-200 tp-cursor-pointer tp-hover-border-blue-400 tp-hover-bg-blue-50"
         }`}
       >
-        <p className="text-sm text-gray-500">
-          {busy ? "Processing..." : "Drag & drop a PDF here, or click to select"}
+        <p className="tp-text-sm tp-text-gray-500">
+          {busy ? "جاري المعالجة…" : "اسحب مستند PDF إلى هنا أو اضغط لاختيار الملف"}
         </p>
-        <p className="text-xs text-gray-400 mt-1">PDF only · max 50 MB</p>
+        <p className="tp-text-xs tp-text-gray-400 tp-mt-1">ملفات PDF فقط · بحد أقصى ٥٠ ميغابايت</p>
         <input
           ref={inputRef}
           type="file"
           accept="application/pdf,.pdf"
           disabled={busy}
           onChange={handleChange}
-          className="hidden"
+          className="tp-hidden"
         />
       </div>
 
       {documentId && (
-        <p className="text-xs text-gray-500">
-          Document ID: {documentId}
+        <p className="tp-text-xs tp-text-gray-500">
+          تم رفع المستند وجاري متابعة حالته.
         </p>
       )}
 
       {message && (
         <div
-          className={`text-sm rounded-lg p-3 border ${
+          className={`tp-text-sm tp-rounded-lg tp-p-3 tp-border ${
             status === "error"
-              ? "text-red-700 bg-red-50"
+              ? "tp-text-red-700 tp-bg-red-50"
               : status === "success"
-              ? "text-green-700 bg-green-50"
-              : "text-gray-700 bg-gray-50"
+              ? "tp-text-green-700 tp-bg-green-50"
+              : "tp-text-gray-700 tp-bg-gray-50"
           }`}
         >
           {message}

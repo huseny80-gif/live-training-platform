@@ -15,9 +15,9 @@ interface ReportData {
 
 function Row({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex justify-between text-sm py-2 border-b last:border-0">
-      <span className="text-gray-600">{label}</span>
-      <span className="font-semibold text-gray-800">{value}</span>
+    <div className="tp-flex tp-justify-between tp-text-sm tp-py-2 tp-border-b tp-last-border-0">
+      <span className="tp-text-gray-600">{label}</span>
+      <span className="tp-font-semibold tp-text-gray-800">{value}</span>
     </div>
   );
 }
@@ -38,12 +38,12 @@ export default function SessionFinalReport({ sessionId }: { sessionId: string })
 
   if (error) {
     return (
-      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-700">تعذّر تحميل التقرير النهائي.</p>
+      <div className="tp-bg-white tp-rounded-2xl tp-border tp-border-red-200 tp-p-5 tp-flex tp-items-center tp-justify-between tp-gap-4">
+        <p className="tp-text-sm tp-text-red-700">تعذّر تحميل التقرير النهائي.</p>
         <button
           type="button"
           onClick={fetchReport}
-          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+          className="tp-text-xs tp-text-red-600 tp-underline tp-flex-shrink-0 tp-hover-text-red-800"
         >
           إعادة المحاولة
         </button>
@@ -54,9 +54,9 @@ export default function SessionFinalReport({ sessionId }: { sessionId: string })
   if (!data || data.totalAnswers === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border p-5">
-      <h2 className="font-semibold text-gray-800 mb-3">📋 التقرير النهائي للجلسة</h2>
-      <div className="divide-y">
+    <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-5">
+      <h2 className="tp-font-semibold tp-text-gray-800 tp-mb-3">📋 التقرير النهائي للجلسة</h2>
+      <div className="tp-divide-y">
         <Row label="إجمالي المشاركين" value={data.participantCount} />
         <Row label="أكملوا الاختبار" value={data.completedCount} />
         <Row label="نسبة المشاركة" value={`${data.participationRate}%`} />

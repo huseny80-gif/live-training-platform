@@ -20,26 +20,27 @@ export default function LoginPage() {
   }, [state, router]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm p-8 bg-white rounded-2xl shadow">
-        <h1 className="text-2xl font-bold mb-6 text-center">Instructor Login</h1>
-        <form action={dispatch} className="space-y-4">
+    <main className="dlp-participant-page">
+      <div className="brand-card dlp-join-card">
+        <header className="tp-form-heading"><div className="tp-brand-mark" aria-hidden="true">ح</div><h1>الحقيبة التدريبية</h1><p>تسجيل دخول المدرب</p></header>
+        <form action={dispatch} className="tp-form">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
+            <label htmlFor="email" className="tp-block tp-text-sm tp-font-medium tp-text-gray-700">
+              البريد الإلكتروني
             </label>
             <input
               id="email"
               name="email"
+              dir="ltr"
               type="email"
               required
               autoComplete="email"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="tp-mt-1 tp-block tp-w-full tp-rounded-lg tp-border tp-border-gray-300 tp-px-3 tp-py-2 tp-focus-outline-none tp-focus-ring-2 tp-focus-ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
+            <label htmlFor="password" className="tp-block tp-text-sm tp-font-medium tp-text-gray-700">
+              كلمة المرور
             </label>
             <input
               id="password"
@@ -47,18 +48,18 @@ export default function LoginPage() {
               type="password"
               required
               autoComplete="current-password"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="tp-mt-1 tp-block tp-w-full tp-rounded-lg tp-border tp-border-gray-300 tp-px-3 tp-py-2 tp-focus-outline-none tp-focus-ring-2 tp-focus-ring-blue-500"
             />
           </div>
           {state && !state.success && (
-            <p role="alert" className="text-sm text-red-600 text-center bg-red-50 rounded-lg px-3 py-2">{state.error}</p>
+            <p role="alert" className="tp-text-sm tp-text-red-600 tp-text-center tp-bg-red-50 tp-rounded-lg tp-px-3 tp-py-2">{state.error}</p>
           )}
           <button
             type="submit"
             disabled={isPending}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="tp-w-full tp-py-2 tp-px-4 tp-bg-blue-600 tp-text-white tp-rounded-lg tp-font-medium tp-hover-bg-blue-700 tp-disabled-opacity-50"
           >
-            {isPending ? "Signing in…" : "Sign In"}
+            {isPending ? "جاري تسجيل الدخول…" : "تسجيل الدخول"}
           </button>
         </form>
       </div>

@@ -47,12 +47,12 @@ export default function SessionLeaderboard({
 
   if (error) {
     return (
-      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-700">تعذّر تحميل الترتيب.</p>
+      <div className="tp-bg-white tp-rounded-2xl tp-border tp-border-red-200 tp-p-5 tp-flex tp-items-center tp-justify-between tp-gap-4">
+        <p className="tp-text-sm tp-text-red-700">تعذّر تحميل الترتيب.</p>
         <button
           type="button"
           onClick={fetchLeaderboard}
-          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+          className="tp-text-xs tp-text-red-600 tp-underline tp-flex-shrink-0 tp-hover-text-red-800"
         >
           إعادة المحاولة
         </button>
@@ -63,30 +63,30 @@ export default function SessionLeaderboard({
   if (ranking.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border p-5">
-      <h2 className="font-semibold mb-3 text-gray-800">
+    <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-5">
+      <h2 className="tp-font-semibold tp-mb-3 tp-text-gray-800">
         {isEnded ? "🏆 الترتيب النهائي" : "🏆 الترتيب المباشر"}
       </h2>
-      <div className="space-y-1.5 max-h-80 overflow-y-auto">
+      <div className="tp-space-y-1-5 tp-max-h-80 tp-overflow-y-auto">
         {ranking.map((entry) => (
           <div
             key={entry.rank}
-            className={`flex items-center gap-3 text-sm rounded-xl px-3 py-2 border ${
+            className={`tp-flex tp-items-center tp-gap-3 tp-text-sm tp-rounded-xl tp-px-3 tp-py-2 tp-border ${
               entry.rank <= 3
-                ? "border-yellow-200 bg-yellow-50"
-                : "border-transparent hover:border-gray-100"
+                ? "tp-border-yellow-200 tp-bg-yellow-50"
+                : "tp-border-transparent tp-hover-border-gray-100"
             }`}
           >
-            <span className="w-8 text-center flex-shrink-0 font-bold text-gray-400">
+            <span className="tp-w-8 tp-text-center tp-flex-shrink-0 tp-font-bold tp-text-gray-400">
               {MEDAL[entry.rank] ?? `#${entry.rank}`}
             </span>
-            <span className="flex-1 font-medium text-gray-800 truncate">
+            <span className="tp-flex-1 tp-font-medium tp-text-gray-800 tp-truncate">
               {entry.name}
             </span>
-            <span className="text-xs text-gray-500 flex-shrink-0">
+            <span className="tp-text-xs tp-text-gray-500 tp-flex-shrink-0">
               {entry.correctCount}/{entry.answersCount} صحيح
             </span>
-            <span className="font-bold text-blue-700 flex-shrink-0 w-16 text-left">
+            <span className="tp-font-bold tp-text-blue-700 tp-flex-shrink-0 tp-w-16 tp-text-left">
               {entry.score} نقطة
             </span>
           </div>

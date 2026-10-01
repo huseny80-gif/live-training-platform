@@ -27,39 +27,39 @@ export default function ResetSessionButton({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-100"
+        className="tp-px-4 tp-py-2 tp-bg-red-50 tp-text-red-600 tp-border tp-border-red-200 tp-rounded-lg tp-text-sm tp-hover-bg-red-100"
       >
         🔄 تصفير الجلسة
       </button>
 
       {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="tp-fixed tp-inset-0 tp-bg-black-40 tp-flex tp-items-center tp-justify-center tp-z-50 tp-p-4">
           <div
             dir="rtl"
             lang="ar"
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl space-y-4"
+            className="tp-bg-white tp-rounded-2xl tp-p-6 tp-max-w-sm tp-w-full tp-shadow-xl tp-space-y-4"
           >
-            <div className="text-center space-y-2">
-              <div className="text-4xl">⚠️</div>
-              <h2 className="text-lg font-bold text-gray-900">تأكيد تصفير الجلسة</h2>
-              <p className="text-sm text-gray-600">
+            <div className="tp-text-center tp-space-y-2">
+              <div className="tp-text-4xl">⚠️</div>
+              <h2 className="tp-text-lg tp-font-bold tp-text-gray-900">تأكيد تصفير الجلسة</h2>
+              <p className="tp-text-sm tp-text-gray-600">
                 سيتم حذف جميع المشاركين وإجاباتهم ونتائجهم. لن يتأثر بنك الأسئلة.
               </p>
-              <p className="text-sm font-medium text-red-600">هذا الإجراء لا يمكن التراجع عنه.</p>
+              <p className="tp-text-sm tp-font-medium tp-text-red-600">هذا الإجراء لا يمكن التراجع عنه.</p>
             </div>
 
-            <div className="flex gap-3">
+            <div className="tp-flex tp-gap-3">
               <button
                 onClick={() => setOpen(false)}
                 disabled={isPending}
-                className="flex-1 py-2.5 rounded-xl border text-sm font-medium hover:bg-gray-50"
+                className="tp-flex-1 tp-py-2-5 tp-rounded-xl tp-border tp-text-sm tp-font-medium tp-hover-bg-gray-50"
               >
                 إلغاء
               </button>
               <button
                 onClick={handleReset}
                 disabled={isPending}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
+                className="tp-flex-1 tp-py-2-5 tp-rounded-xl tp-bg-red-600 tp-text-white tp-text-sm tp-font-medium tp-hover-bg-red-700 tp-disabled-opacity-60"
               >
                 {isPending ? "جاري التصفير…" : "تصفير الجلسة"}
               </button>

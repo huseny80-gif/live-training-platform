@@ -32,9 +32,9 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="text-center">
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+    <div className="tp-text-center">
+      <p className={`tp-text-2xl tp-font-bold ${color}`}>{value}</p>
+      <p className="tp-text-xs tp-text-gray-500 tp-mt-0-5">{label}</p>
     </div>
   );
 }
@@ -72,12 +72,12 @@ export default function SessionAnalyticsDashboard({
 
   if (error) {
     return (
-      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-700">تعذّر تحميل التحليلات.</p>
+      <div className="tp-bg-white tp-rounded-2xl tp-border tp-border-red-200 tp-p-5 tp-flex tp-items-center tp-justify-between tp-gap-4">
+        <p className="tp-text-sm tp-text-red-700">تعذّر تحميل التحليلات.</p>
         <button
           type="button"
           onClick={fetchAnalytics}
-          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
+          className="tp-text-xs tp-text-red-600 tp-underline tp-flex-shrink-0 tp-hover-text-red-800"
         >
           إعادة المحاولة
         </button>
@@ -89,48 +89,48 @@ export default function SessionAnalyticsDashboard({
   if (data.totalAnswers === 0 && data.participantCount === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border p-5 space-y-5">
-      <h2 className="font-semibold text-gray-800">
+    <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-5 tp-space-y-5">
+      <h2 className="tp-font-semibold tp-text-gray-800">
         {isEnded ? "📊 تحليلات الجلسة النهائية" : "📊 تحليلات مباشرة"}
       </h2>
 
       {/* Top stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4 border-b">
+      <div className="tp-grid tp-grid-cols-2 tp-sm-grid-cols-4 tp-gap-4 tp-pb-4 tp-border-b">
         <StatCard
           label="نسبة المشاركة"
           value={`${data.participationRate}%`}
-          color="text-blue-700"
+          color="tp-text-blue-700"
         />
         <StatCard
           label="نسبة الإجابات الصحيحة"
           value={`${data.correctRate}%`}
-          color="text-emerald-700"
+          color="tp-text-emerald-700"
         />
         <StatCard
           label="متوسط الدرجة"
           value={data.averageScore}
-          color="text-purple-700"
+          color="tp-text-purple-700"
         />
         <StatCard
           label="أعلى درجة"
           value={data.highestScore}
-          color="text-amber-600"
+          color="tp-text-amber-600"
         />
       </div>
 
       {/* Answer totals */}
-      <div className="flex gap-6 text-sm text-gray-600">
+      <div className="tp-flex tp-gap-6 tp-text-sm tp-text-gray-600">
         <span>
           إجمالي الإجابات:{" "}
-          <strong className="text-gray-800">{data.totalAnswers}</strong>
+          <strong className="tp-text-gray-800">{data.totalAnswers}</strong>
         </span>
         <span>
           صحيح:{" "}
-          <strong className="text-emerald-700">{data.correctAnswers}</strong>
+          <strong className="tp-text-emerald-700">{data.correctAnswers}</strong>
         </span>
         <span>
           خطأ:{" "}
-          <strong className="text-red-600">
+          <strong className="tp-text-red-600">
             {data.totalAnswers - data.correctAnswers}
           </strong>
         </span>
@@ -139,25 +139,25 @@ export default function SessionAnalyticsDashboard({
       {/* Per-question breakdown */}
       {data.questions.length > 0 && (
         <div>
-          <p className="text-sm font-medium text-gray-600 mb-2">
+          <p className="tp-text-sm tp-font-medium tp-text-gray-600 tp-mb-2">
             صعوبة الأسئلة (نسبة الإجابات الخاطئة)
           </p>
-          <div className="space-y-2">
+          <div className="tp-space-y-2">
             {data.questions.map((q) => (
-              <div key={q.questionId} className="flex items-center gap-3 text-sm">
-                <span className="font-mono text-gray-400 w-10 flex-shrink-0">
-                  Q{q.questionOrder}
+              <div key={q.questionId} className="tp-flex tp-items-center tp-gap-3 tp-text-sm">
+                <span className="tp-font-mono tp-text-gray-400 tp-w-10 tp-flex-shrink-0">
+                  س{q.questionOrder}
                 </span>
-                <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div className="tp-flex-1 tp-bg-gray-100 tp-rounded-full tp-h-2 tp-overflow-hidden">
                   <div
-                    className="h-2 rounded-full bg-red-400 transition-all"
+                    className="tp-h-2 tp-rounded-full tp-bg-red-400 tp-transition-all"
                     style={{ width: `${q.difficultyRate}%` }}
                   />
                 </div>
-                <span className="w-12 text-left text-gray-500">
+                <span className="tp-w-12 tp-text-left tp-text-gray-500">
                   {q.difficultyRate}%
                 </span>
-                <span className="text-gray-400 text-xs">
+                <span className="tp-text-gray-400 tp-text-xs">
                   {q.correct}✓ {q.wrong}✗
                 </span>
               </div>

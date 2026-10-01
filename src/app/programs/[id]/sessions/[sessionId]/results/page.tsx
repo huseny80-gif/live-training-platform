@@ -46,7 +46,7 @@ interface Statistics {
 }
 
 const MEDAL = ["🥇", "🥈", "🥉"];
-const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+const BAR_COLORS = ["#0f766e", "#115e59", "#c6a15b", "#be123c", "#123c3a"];
 
 export default function SessionResultsPage() {
   const { id, sessionId } = useParams<{ id: string; sessionId: string }>();
@@ -75,12 +75,12 @@ export default function SessionResultsPage() {
     setExporting(true);
     try {
       const res = await fetch(`/api/session/${sessionId}/export`);
-      if (!res.ok) throw new Error("Export failed");
+      if (!res.ok) throw new Error("تعذّر تصدير النتائج");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "Digital_Leadership_Test_Results.xlsx";
+      a.download = "Training_Portfolio_Results.xlsx";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -95,16 +95,16 @@ export default function SessionResultsPage() {
 
   if (loading) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500 text-sm animate-pulse">جاري تحميل النتائج…</div>
+      <main dir="rtl" lang="ar" className="tp-min-h-screen tp-bg-gray-50 tp-flex tp-items-center tp-justify-center">
+        <div className="tp-text-gray-500 tp-text-sm tp-animate-pulse">جاري تحميل النتائج…</div>
       </main>
     );
   }
 
   if (!data) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-red-500 text-sm">فشل تحميل بيانات الجلسة.</div>
+      <main dir="rtl" lang="ar" className="tp-min-h-screen tp-bg-gray-50 tp-flex tp-items-center tp-justify-center">
+        <div className="tp-text-red-500 tp-text-sm">فشل تحميل بيانات الجلسة.</div>
       </main>
     );
   }
@@ -140,24 +140,24 @@ export default function SessionResultsPage() {
       : 0;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <main dir="rtl" lang="ar" className="tp-min-h-screen tp-bg-gray-50 tp-p-6">
+      <div className="tp-max-w-5xl tp-mx-auto tp-space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="tp-flex tp-items-center tp-justify-between">
+          <div className="tp-flex tp-items-center tp-gap-3">
             <Link
               href={`/programs/${id}/sessions/${sessionId}`}
-              className="text-sm text-gray-500 hover:text-gray-800"
+              className="tp-text-sm tp-text-gray-500 tp-hover-text-gray-800"
             >
               → الجلسة
             </Link>
-            <span className="text-gray-300">/</span>
-            <h1 className="font-bold text-gray-900">تحليلات الاختبار</h1>
+            <span className="tp-text-gray-300">/</span>
+            <h1 className="tp-font-bold tp-text-gray-900">تحليلات الاختبار</h1>
           </div>
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+            className="tp-px-4 tp-py-2 tp-bg-emerald-600 tp-text-white tp-rounded-lg tp-text-sm tp-font-medium tp-hover-bg-emerald-700 tp-disabled-opacity-60 tp-transition-colors"
           >
             {exporting ? "جاري التصدير…" : "⬇ تصدير النتائج Excel"}
           </button>
@@ -165,47 +165,47 @@ export default function SessionResultsPage() {
 
         {/* KPI Cards */}
         {statistics && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="tp-grid tp-grid-cols-2 tp-md-grid-cols-4 tp-gap-4">
             {[
               {
                 label: "المشاركون",
                 value: statistics.totalParticipants,
                 sub: "",
-                color: "bg-blue-50 border-blue-100",
-                text: "text-blue-700",
+                color: "tp-bg-blue-50 tp-border-blue-100",
+                text: "tp-text-blue-700",
               },
               {
                 label: "نسبة المشاركة",
                 value: `${participationPct}%`,
                 sub: "أجاب على سؤال واحد على الأقل",
-                color: "bg-emerald-50 border-emerald-100",
-                text: "text-emerald-700",
+                color: "tp-bg-emerald-50 tp-border-emerald-100",
+                text: "tp-text-emerald-700",
               },
               {
                 label: "متوسط الدرجات",
                 value: statistics.averageScore.toFixed(1),
                 sub: "نقطة",
-                color: "bg-amber-50 border-amber-100",
-                text: "text-amber-700",
+                color: "tp-bg-amber-50 tp-border-amber-100",
+                text: "tp-text-amber-700",
               },
               {
                 label: "أعلى درجة",
                 value: statistics.highestScore,
                 sub: "نقطة",
-                color: "bg-purple-50 border-purple-100",
-                text: "text-purple-700",
+                color: "tp-bg-purple-50 tp-border-purple-100",
+                text: "tp-text-purple-700",
               },
             ].map((kpi) => (
               <div
                 key={kpi.label}
-                className={`rounded-2xl border p-5 ${kpi.color} flex flex-col gap-1`}
+                className={`tp-rounded-2xl tp-border tp-p-5 ${kpi.color} tp-flex tp-flex-col tp-gap-1`}
               >
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                <p className="tp-text-xs tp-text-gray-500 tp-font-medium tp-uppercase tp-tracking-wide">
                   {kpi.label}
                 </p>
-                <p className={`text-3xl font-bold ${kpi.text}`}>{kpi.value}</p>
+                <p className={`tp-text-3xl tp-font-bold ${kpi.text}`}>{kpi.value}</p>
                 {kpi.sub && (
-                  <p className="text-xs text-gray-400">{kpi.sub}</p>
+                  <p className="tp-text-xs tp-text-gray-400">{kpi.sub}</p>
                 )}
               </div>
             ))}
@@ -213,10 +213,10 @@ export default function SessionResultsPage() {
         )}
 
         {/* Charts row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="tp-grid tp-grid-cols-1 tp-md-grid-cols-2 tp-gap-4">
           {/* Score Distribution */}
-          <div className="bg-white rounded-2xl border p-5">
-            <h2 className="font-semibold text-gray-800 mb-4 text-sm">
+          <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-5">
+            <h2 className="tp-font-semibold tp-text-gray-800 tp-mb-4 tp-text-sm">
               توزيع الدرجات
             </h2>
             <ResponsiveContainer width="100%" height={200}>
@@ -235,8 +235,8 @@ export default function SessionResultsPage() {
           </div>
 
           {/* Question Accuracy */}
-          <div className="bg-white rounded-2xl border p-5">
-            <h2 className="font-semibold text-gray-800 mb-4 text-sm">
+          <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-5">
+            <h2 className="tp-font-semibold tp-text-gray-800 tp-mb-4 tp-text-sm">
               دقة الأسئلة
             </h2>
             <ResponsiveContainer width="100%" height={200}>
@@ -251,7 +251,7 @@ export default function SessionResultsPage() {
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v) => `${v}%`} />
-                <Bar dataKey="accuracy" fill="#3b82f6" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="accuracy" fill="#0f766e" radius={[4, 4, 0, 0]}>
                   {questions.map((q) => (
                     <Cell
                       key={q.sessionQuestionId}
@@ -271,30 +271,30 @@ export default function SessionResultsPage() {
         </div>
 
         {/* Leaderboard */}
-        <div className="bg-white rounded-2xl border p-5">
-          <h2 className="font-semibold text-gray-800 mb-4">
+        <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-5">
+          <h2 className="tp-font-semibold tp-text-gray-800 tp-mb-4">
             🏆 المتصدرون ({participants.length})
           </h2>
-          <div className="space-y-2">
+          <div className="tp-space-y-2">
             {participants.map((p, idx) => (
               <div
                 key={p.id}
-                className="flex items-center gap-3 text-sm border rounded-xl px-3 py-2.5"
+                className="tp-flex tp-items-center tp-gap-3 tp-text-sm tp-border tp-rounded-xl tp-px-3 tp-py-2-5"
               >
-                <span className="w-8 text-center text-lg">
+                <span className="tp-w-8 tp-text-center tp-text-lg">
                   {idx < 3 ? MEDAL[idx] : `#${p.rank ?? idx + 1}`}
                 </span>
-                <span className="flex-1 font-medium text-gray-800 truncate">
+                <span className="tp-flex-1 tp-font-medium tp-text-gray-800 tp-truncate">
                   {p.displayName}
                 </span>
-                <span className="text-xs text-gray-400 mr-2">
+                <span className="tp-text-xs tp-text-gray-400 tp-mr-2">
                   {p.correctCount}/{p.answersCount} صحيح
                 </span>
-                <span className="text-xs text-gray-400 mr-2">
+                <span className="tp-text-xs tp-text-gray-400 tp-mr-2">
                   {p.percentage}%
                 </span>
-                <span className="font-bold text-blue-700 min-w-[52px] text-right">
-                  {p.totalScore} pts
+                <span className="tp-font-bold tp-text-blue-700 tp-min-w-52px tp-text-right">
+                  {p.totalScore} نقطة
                 </span>
               </div>
             ))}
@@ -302,44 +302,44 @@ export default function SessionResultsPage() {
         </div>
 
         {/* Question Analysis Table */}
-        <div className="bg-white rounded-2xl border p-5">
-          <h2 className="font-semibold text-gray-800 mb-4">
+        <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-5">
+          <h2 className="tp-font-semibold tp-text-gray-800 tp-mb-4">
             تحليل الأسئلة
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="tp-overflow-x-auto">
+            <table className="tp-w-full tp-text-sm">
               <thead>
-                <tr className="text-right text-xs text-gray-500 border-b">
-                  <th className="pb-2 pr-3 w-10">رقم</th>
-                  <th className="pb-2 pr-3">السؤال</th>
-                  <th className="pb-2 pr-3 text-right w-24">الإجابات</th>
-                  <th className="pb-2 pr-3 text-right w-20">الصحيح</th>
-                  <th className="pb-2 text-right w-20">الدقة</th>
+                <tr className="tp-text-right tp-text-xs tp-text-gray-500 tp-border-b">
+                  <th className="tp-pb-2 tp-pr-3 tp-w-10">رقم</th>
+                  <th className="tp-pb-2 tp-pr-3">السؤال</th>
+                  <th className="tp-pb-2 tp-pr-3 tp-text-right tp-w-24">الإجابات</th>
+                  <th className="tp-pb-2 tp-pr-3 tp-text-right tp-w-20">الصحيح</th>
+                  <th className="tp-pb-2 tp-text-right tp-w-20">الدقة</th>
                 </tr>
               </thead>
               <tbody>
                 {questions.map((q) => (
-                  <tr key={q.sessionQuestionId} className="border-b last:border-0">
-                    <td className="py-2 pr-3 font-mono text-gray-400">
-                      Q{q.questionOrder}
+                  <tr key={q.sessionQuestionId} className="tp-border-b tp-last-border-0">
+                    <td className="tp-py-2 tp-pr-3 tp-font-mono tp-text-gray-400">
+                      س{q.questionOrder}
                     </td>
-                    <td className="py-2 pr-3 text-gray-700 max-w-xs truncate">
+                    <td className="tp-py-2 tp-pr-3 tp-text-gray-700 tp-max-w-xs tp-truncate">
                       {q.questionText}
                     </td>
-                    <td className="py-2 pr-3 text-right text-gray-600">
+                    <td className="tp-py-2 tp-pr-3 tp-text-right tp-text-gray-600">
                       {q.totalAnswers}
                     </td>
-                    <td className="py-2 pr-3 text-right text-gray-600">
+                    <td className="tp-py-2 tp-pr-3 tp-text-right tp-text-gray-600">
                       {q.correctAnswers}
                     </td>
-                    <td className="py-2 text-right font-medium">
+                    <td className="tp-py-2 tp-text-right tp-font-medium">
                       <span
                         className={
                           q.accuracy >= 70
-                            ? "text-emerald-600"
+                            ? "tp-text-emerald-600"
                             : q.accuracy >= 40
-                            ? "text-amber-600"
-                            : "text-red-500"
+                            ? "tp-text-amber-600"
+                            : "tp-text-red-500"
                         }
                       >
                         {q.accuracy}%

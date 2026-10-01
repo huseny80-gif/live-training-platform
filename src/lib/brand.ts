@@ -1,11 +1,12 @@
 export const brand = {
+  productionUrl: "https://live-training-platform.vercel.app",
   nameAr: "الحقيبة التدريبية",
   nameEn: "Training Portfolio",
   taglineAr: "محتوى تدريبي ذكي من المصدر إلى التقييم",
   taglineEn: "Smart training content from source to assessment",
   colors: {
-    primary: "#00A6A6", primaryDark: "#087F86", navy: "#0B1F3A",
-    interactive: "#2563EB", accent: "#D4AF37", background: "#F8FAFC",
+    primary: "#0F766E", primaryDark: "#115E59", navy: "#123C3A",
+    interactive: "#0F766E", accent: "#C6A15B", background: "#F7F6F1",
     surface: "#FFFFFF", border: "#E2E8F0", muted: "#64748B", text: "#0F172A",
     success: "#16A34A", warning: "#D97706", danger: "#DC2626",
   },

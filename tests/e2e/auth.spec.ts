@@ -14,7 +14,7 @@ test.describe("E2E Authentication Flow", () => {
 
     await page.waitForURL(/\/dashboard/, { timeout: 10000 });
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.locator("h1")).toContainText("Live Training Platform");
+    await expect(page.locator("h1")).toContainText("الحقيبة التدريبية");
   });
 
   test("E2E-02: Wrong password shows error, stays on login", async ({ page }) => {
@@ -25,7 +25,7 @@ test.describe("E2E Authentication Flow", () => {
 
     await page.waitForTimeout(2000);
     await expect(page).toHaveURL(/\/login/);
-    await expect(page.locator("text=Invalid email or password")).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "البريد الإلكتروني أو كلمة المرور غير صحيحة" })).toBeVisible();
   });
 
   test("E2E-03: Unauthenticated access to /dashboard redirects to /login", async ({ page }) => {
@@ -43,7 +43,7 @@ test.describe("E2E Authentication Flow", () => {
     await page.waitForURL(/\/dashboard/, { timeout: 10000 });
 
     // Logout
-    await page.click('button[type="submit"]'); // Sign Out button
+    await page.getByRole("button", { name: "تسجيل الخروج", exact: true }).click();
     await page.waitForURL(/\/login/, { timeout: 10000 });
     await expect(page).toHaveURL(/\/login/);
 
@@ -67,6 +67,6 @@ test.describe("E2E Authentication Flow", () => {
     await page.click('button[type="submit"]');
     await page.waitForTimeout(1500);
     await expect(page).toHaveURL(/\/login/);
-    await expect(page.locator("text=Too many login attempts")).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "محاولات دخول كثيرة" })).toBeVisible();
   });
 });

@@ -25,22 +25,22 @@ export default async function ManageProgramPage({
   if (!program) notFound();
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-4xl mx-auto space-y-5">
+    <main dir="rtl" lang="ar" className="tp-min-h-screen tp-bg-gray-50 tp-p-4 tp-md-p-6">
+      <div className="tp-max-w-4xl tp-mx-auto tp-space-y-5">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link href={`/programs/${id}`} className="text-sm text-gray-500 hover:text-gray-800">
+        <div className="tp-flex tp-items-center tp-gap-3">
+          <Link href={`/programs/${id}`} className="tp-text-sm tp-text-gray-500 tp-hover-text-gray-800">
             → البرنامج
           </Link>
-          <span className="text-gray-300">/</span>
-          <h1 className="font-bold text-gray-800">إدارة المحتوى</h1>
+          <span className="tp-text-gray-300">/</span>
+          <h1 className="tp-font-bold tp-text-gray-800">إدارة المحتوى</h1>
         </div>
 
         {/* Program info row */}
-        <div className="bg-white rounded-2xl border p-4 flex items-center gap-4">
-          <div className="flex-1">
-            <p className="font-bold text-gray-900">{program.title}</p>
-            <p className="text-sm text-gray-500">
+        <div className="tp-bg-white tp-rounded-2xl tp-border tp-p-4 tp-flex tp-items-center tp-gap-4">
+          <div className="tp-flex-1">
+            <p className="tp-font-bold tp-text-gray-900">{program.title}</p>
+            <p className="tp-text-sm tp-text-gray-500">
               {program.days.length} يوم ·{" "}
               {program.days.reduce((s, d) => s + d._count.questions, 0)} سؤال ·{" "}
               {program.sessions.length} جلسة

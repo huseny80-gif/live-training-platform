@@ -26,7 +26,7 @@ export default function CopyLinkButton({ url }: { url: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="w-full mt-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors bg-white hover:bg-blue-50 text-blue-700 border-blue-200"
+      className="tp-w-full tp-mt-2 tp-px-3 tp-py-2 tp-rounded-lg tp-border tp-text-sm tp-font-medium tp-transition-colors tp-bg-white tp-hover-bg-blue-50 tp-text-blue-700 tp-border-blue-200"
     >
       {copied ? "✓ تم نسخ الرابط بنجاح" : "نسخ رابط الجلسة"}
     </button>

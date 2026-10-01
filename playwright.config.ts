@@ -6,13 +6,14 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     headless: true,
-    // Use the pre-installed Chromium
+    // Optional system browser override; otherwise use Playwright's installed Chromium.
     launchOptions: {
-      executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+      executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
     },
   },
   webServer: {
-    command: "npm run dev",
+    command: process.env.E2E_SERVER_MODE === "production" ? "npm run start" : "npm run server",
+    env: { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require dotenv/config`.trim() },
     url: "http://localhost:3000",
     reuseExistingServer: true,
     timeout: 60000,

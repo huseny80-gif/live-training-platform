@@ -46,3 +46,7 @@ coverage/
 *.swo
 
 /generated/prisma
+
+# Browser test artifacts
+/test-results/
+/playwright-report/

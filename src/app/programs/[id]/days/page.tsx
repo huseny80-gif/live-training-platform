@@ -1,5 +1,6 @@
 "use client";
 
+import { errorLabel } from "@/lib/labels";
 import { useActionState } from "react";
 import { createDay } from "@/app/actions/days";
 import { useRouter, useParams } from "next/navigation";
@@ -20,66 +21,66 @@ export default function AddDayPage() {
   }, [state, router, params.id]);
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-xl mx-auto bg-white rounded-2xl border p-8">
-        <h1 className="text-xl font-bold mb-6">Add Training Day</h1>
-        <form action={dispatch} className="space-y-4">
+    <main className="tp-min-h-screen tp-bg-gray-50 tp-p-6">
+      <div className="tp-max-w-xl tp-mx-auto tp-bg-white tp-rounded-2xl tp-border tp-p-8">
+        <h1 className="tp-text-xl tp-font-bold tp-mb-6">إضافة يوم تدريبي</h1>
+        <form action={dispatch} className="tp-space-y-4">
           <input type="hidden" name="programId" value={params.id} />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Day Number (1–10) *</label>
+            <label className="tp-block tp-text-sm tp-font-medium tp-text-gray-700 tp-mb-1">رقم اليوم (١–١٠) *</label>
             <input
               name="dayNumber"
               type="number"
               min={1}
               max={10}
               required
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="tp-w-full tp-rounded-lg tp-border tp-px-3 tp-py-2 tp-text-sm tp-focus-outline-none tp-focus-ring-2 tp-focus-ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label className="tp-block tp-text-sm tp-font-medium tp-text-gray-700 tp-mb-1">عنوان اليوم *</label>
             <input
               name="title"
               required
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="tp-w-full tp-rounded-lg tp-border tp-px-3 tp-py-2 tp-text-sm tp-focus-outline-none tp-focus-ring-2 tp-focus-ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Objectives (one per line)
+            <label className="tp-block tp-text-sm tp-font-medium tp-text-gray-700 tp-mb-1">
+              الأهداف (هدف في كل سطر)
             </label>
             <textarea
               name="objectives"
               rows={4}
-              placeholder="Understand X&#10;Apply Y&#10;Analyze Z"
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="أدخل أهداف اليوم التدريبي، كل هدف في سطر مستقل"
+              className="tp-w-full tp-rounded-lg tp-border tp-px-3 tp-py-2 tp-text-sm tp-focus-outline-none tp-focus-ring-2 tp-focus-ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Content Summary</label>
+            <label className="tp-block tp-text-sm tp-font-medium tp-text-gray-700 tp-mb-1">ملخص المحتوى</label>
             <textarea
               name="contentSummary"
               rows={3}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="tp-w-full tp-rounded-lg tp-border tp-px-3 tp-py-2 tp-text-sm tp-focus-outline-none tp-focus-ring-2 tp-focus-ring-blue-500"
             />
           </div>
           {state && !state.ok && (
-            <p className="text-sm text-red-600">{state.error}</p>
+            <p className="tp-text-sm tp-text-red-600">{errorLabel(state.error)}</p>
           )}
-          <div className="flex gap-3 pt-2">
+          <div className="tp-flex tp-gap-3 tp-pt-2">
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 py-2 rounded-lg border text-sm hover:bg-gray-50"
+              className="tp-flex-1 tp-py-2 tp-rounded-lg tp-border tp-text-sm tp-hover-bg-gray-50"
             >
-              Cancel
+              إلغاء
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="tp-flex-1 tp-py-2 tp-rounded-lg tp-bg-blue-600 tp-text-white tp-text-sm tp-hover-bg-blue-700 tp-disabled-opacity-50"
             >
-              {isPending ? "Adding…" : "Add Day"}
+              {isPending ? "جاري الإضافة…" : "إضافة اليوم"}
             </button>
           </div>
         </form>

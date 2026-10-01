@@ -30,9 +30,12 @@ export function resetRateLimit(key: string): void {
 }
 
 // Prune expired entries every 30 minutes to prevent unbounded memory growth
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
   const now = Date.now();
   store.forEach((entry, key) => {
     if (now > entry.resetAt) store.delete(key);
   });
 }, 30 * 60 * 1000);
+
+// Housekeeping should not keep CLI tests or a stopped server process alive.
+cleanupTimer.unref();

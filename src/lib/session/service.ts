@@ -58,7 +58,7 @@ export async function createSession(
       instructorId,
       sessionCode,
       dayNumber,
-      title: title ?? `${program.title} — Day ${dayNumber}`,
+      title: title ?? `${program.title} — اليوم ${dayNumber}`,
       status: "DRAFT",
     },
   });

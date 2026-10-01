@@ -35,8 +35,10 @@ function getAdapters(): ExtractionAdapter[] {
   if (process.env.LLAMA_CLOUD_API_KEY) {
     adapters.push(new LlamaParseAdapter());
   }
-  // MockAdapter as final fallback — always available, used in test/dev
-  adapters.push(new MockExtractionAdapter());
+  // Synthetic source content must never be persisted in production.
+  if (process.env.NODE_ENV !== "production") {
+    adapters.push(new MockExtractionAdapter());
+  }
   return adapters;
 }
 
