@@ -7,6 +7,7 @@ import { contentGenerationService } from "@/lib/ai/service";
 import { extractionErrorToArabic } from "@/lib/extraction/errors";
 import { generationErrorToArabic } from "@/lib/ai/errors";
 import { requiredReadablePages } from "@/lib/extraction/coverage";
+import { representativePageOrder } from "@/lib/extraction/page-sampling";
 
 export const maxDuration = 300;
 
@@ -170,10 +171,7 @@ export async function POST(
   // real source text. Each request processes a bounded chunk, so 147-page
   // PDFs survive serverless execution limits and preserve progress.
   if (selected.completedPages < selected.requiredPages) {
-    const allPageNumbers = Array.from(
-      { length: selected.totalPages },
-      (_, index) => index + 1
-    );
+    const allPageNumbers = representativePageOrder(selected.totalPages);
     const unattemptedPages = allPageNumbers.filter(
       (pageNumber) => !selected!.attemptedRealPageNumbers.has(pageNumber)
     );
