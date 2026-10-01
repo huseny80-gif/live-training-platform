@@ -1,0 +1,12 @@
+"use client";
+import { useActionState } from "react";
+import { savePlatformSettings } from "@/app/actions/platform-settings";
+type S={platformNameAr:string;platformNameEn:string;taglineAr:string;taglineEn:string;logoUrl:string|null;primaryColor:string;primaryDark:string;navyColor:string;accentColor:string;defaultLanguage:"AR"|"EN";defaultTheme:string;fontScale:string};
+export default function BrandAdminForm({settings}: {settings:S}){
+ const [state,action,pending]=useActionState(savePlatformSettings,null);
+ return <form action={action} className="dlp-admin-brand"><h2>الهوية الإدارية</h2><p>هذه الإعدادات محفوظة في قاعدة البيانات وتبقى مع المنصة على جميع الأجهزة.</p>
+ <div className="dlp-form-grid"><label>اسم المنصة بالعربية<input name="platformNameAr" defaultValue={settings.platformNameAr}/></label><label>English name<input name="platformNameEn" defaultValue={settings.platformNameEn}/></label><label>الشعار النصي العربي<input name="taglineAr" defaultValue={settings.taglineAr}/></label><label>English tagline<input name="taglineEn" defaultValue={settings.taglineEn}/></label><label className="wide">رابط الشعار (اختياري)<input name="logoUrl" defaultValue={settings.logoUrl||""} placeholder="https://..."/></label></div>
+ <div className="dlp-color-grid">{[["primaryColor","اللون الرئيسي",settings.primaryColor],["primaryDark","اللون الرئيسي الداكن",settings.primaryDark],["navyColor","الكحلي",settings.navyColor],["accentColor","الذهبي",settings.accentColor]].map(([n,l,v])=><label key={n}>{l}<span><input type="color" name={n} defaultValue={v}/><code>{v}</code></span></label>)}</div>
+ <div className="dlp-form-grid"><label>اللغة الافتراضية<select name="defaultLanguage" defaultValue={settings.defaultLanguage}><option value="AR">العربية</option><option value="EN">English</option></select></label><label>المظهر الافتراضي<select name="defaultTheme" defaultValue={settings.defaultTheme}><option value="light">فاتح</option><option value="dark">داكن</option></select></label><label>حجم الخط الافتراضي<select name="fontScale" defaultValue={settings.fontScale}><option value="small">صغير</option><option value="medium">متوسط</option><option value="large">كبير</option></select></label></div>
+ {state?.error&&<p className="dlp-error">{state.error}</p>}{state?.ok&&<p className="dlp-success">تم حفظ الهوية بنجاح.</p>}<button disabled={pending} className="brand-button-primary dlp-save-brand">{pending?"جارٍ الحفظ…":"حفظ الهوية"}</button></form>
+}
