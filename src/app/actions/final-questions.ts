@@ -226,7 +226,8 @@ export async function generateFinalQuestions(
 
   const sourceDocument = await extractionService.selectBestRealSourceDocument(
     programId,
-    session.user.id
+    session.user.id,
+    false
   );
 
   if (!sourceDocument.ok) {

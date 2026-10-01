@@ -4,6 +4,7 @@ import { getProgram, deleteProgram } from "@/app/actions/programs";
 import Link from "next/link";
 import DocumentUpload from "./DocumentUpload";
 import DeleteDocumentButton from "./DeleteDocumentButton";
+import ReprocessDocumentButton from "./ReprocessDocumentButton";
 import { brand } from "@/lib/brand";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -22,6 +23,37 @@ const EXTRACTION_LABEL: Record<string, string> = {
   OCR_REQUIRED: "يحتاج OCR",
   FAILED: "فشل التحليل",
 };
+
+function formatExtractionNote(note: string | null): string | null {
+  if (!note) return null;
+
+  const progress = note.match(/EXTRACTING_REAL_SOURCE\s+(\d+)\/(\d+)/);
+  if (progress) {
+    return `تم استخراج ${progress[1]} صفحة حقيقية من أصل ${progress[2]} مطلوبة قبل توليد الأسئلة.`;
+  }
+
+  if (note.includes("GENERATING_ARABIC_CONTENT")) {
+    return "اكتمل استخراج المصدر الحقيقي، وجارٍ الآن إنشاء 10 أيام و50 سؤالًا بالعربية.";
+  }
+
+  const completed = note.match(/(\d+)\s*days\s*·\s*(\d+)\s*questions/i);
+  if (completed) {
+    return `اكتملت المعالجة: ${completed[1]} أيام و${completed[2]} سؤالًا.`;
+  }
+
+  if (
+    note.includes("MOCK_ONLY_CONTENT") ||
+    note.includes("REAL_SOURCE_REQUIRED")
+  ) {
+    return "المحتوى القديم غير مستخرج من PDF الحقيقي بشكل موثوق. اضغط إعادة المعالجة.";
+  }
+
+  if (note.includes("OPENAI") || note.includes("EXTRACTION")) {
+    return "لم تكتمل المعالجة السابقة. اضغط إعادة المعالجة لمتابعة المصدر الحقيقي من حيث توقف.";
+  }
+
+  return "توجد ملاحظة معالجة محفوظة. يمكنك استخدام إعادة المعالجة بأمان؛ التقدم السابق لن يضيع.";
+}
 
 export default async function ProgramPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -83,11 +115,22 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
                   <strong>{doc.fileName}</strong>
                   <span>{doc.pageCount != null ? `${doc.pageCount} صفحة` : "عدد الصفحات غير محدد"}</span>
                   <span>{EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}</span>
+                  <ReprocessDocumentButton
+                    programId={id}
+                    documentId={doc.id}
+                    status={doc.extractionStatus}
+                    totalQuestions={totalQuestions}
+                  />
                   <DeleteDocumentButton
                     documentId={doc.id}
                     fileName={doc.fileName}
                     status={doc.extractionStatus}
                   />
+                  {formatExtractionNote(doc.extractionNotes) ? (
+                    <small className="dlp-doc-note">
+                      {formatExtractionNote(doc.extractionNotes)}
+                    </small>
+                  ) : null}
                 </div>
               ))}
             </div>

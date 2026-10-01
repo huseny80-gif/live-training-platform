@@ -125,10 +125,21 @@ export class OpenAIAdapter implements AIAdapter {
     }
 
     const questions: GeneratedQuestion[] = [];
+    const QUESTION_CONCURRENCY = 2;
 
-    for (const day of days) {
+    const generateDayQuestions = async (
+      day: GeneratedDayPlan,
+      priorQuestionTexts: string[]
+    ): Promise<{
+      dayNumber: number;
+      accepted: GeneratedQuestion[];
+      inputTokens: number;
+      outputTokens: number;
+    }> => {
       let accepted: GeneratedQuestion[] | null = null;
       let failure = "";
+      let dayInputTokens = 0;
+      let dayOutputTokens = 0;
 
       for (
         let attempt = 1;
@@ -146,11 +157,11 @@ export class OpenAIAdapter implements AIAdapter {
             req.pages,
             req.language,
             req.questionsPerDay,
-            questions.map((question) => question.questionText)
+            priorQuestionTexts
           ) + repair
         );
-        inputTokens += questionResponse.inputTokens;
-        outputTokens += questionResponse.outputTokens;
+        dayInputTokens += questionResponse.inputTokens;
+        dayOutputTokens += questionResponse.outputTokens;
 
         try {
           const candidate = parseQuestions(
@@ -183,7 +194,37 @@ export class OpenAIAdapter implements AIAdapter {
         );
       }
 
-      questions.push(...accepted);
+      return {
+        dayNumber: day.dayNumber,
+        accepted,
+        inputTokens: dayInputTokens,
+        outputTokens: dayOutputTokens,
+      };
+    };
+
+    // Two days at a time keeps the total generation under serverless time
+    // limits while staying conservative with provider rate limits. Each batch
+    // still sees all questions accepted by earlier batches, preserving the
+    // duplicate-avoidance context across the course.
+    for (let index = 0; index < days.length; index += QUESTION_CONCURRENCY) {
+      const batch = days.slice(index, index + QUESTION_CONCURRENCY);
+      const priorQuestionTexts = questions.map(
+        (question) => question.questionText
+      );
+
+      const generated = await Promise.all(
+        batch.map((day) =>
+          generateDayQuestions(day, priorQuestionTexts)
+        )
+      );
+
+      generated
+        .sort((a, b) => a.dayNumber - b.dayNumber)
+        .forEach((result) => {
+          inputTokens += result.inputTokens;
+          outputTokens += result.outputTokens;
+          questions.push(...result.accepted);
+        });
     }
 
     if (questions.length !== req.totalDays * req.questionsPerDay) {

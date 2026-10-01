@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { regenerateProgramInArabic } from "@/app/actions/generation";
+import { runProgramRebuild } from "@/lib/client/program-rebuild";
 import {
   createDayAction,
   updateDayAction,
@@ -100,6 +100,8 @@ export default function ManageClient({ program }: { program: Program }) {
   const [showAddQFor, setShowAddQFor] = useState<string | null>(null);
   const [showAddTopicFor, setShowAddTopicFor] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isRebuilding, setIsRebuilding] = useState(false);
+  const [pipelineMessage, setPipelineMessage] = useState("");
 
   // ── Day actions ────────────────────────────────────────────────────────────
 
@@ -162,24 +164,34 @@ export default function ManageClient({ program }: { program: Program }) {
     });
   }
 
-  function handleRegenerateArabic() {
+  async function handleRegenerateArabic() {
     const message =
       program.language === "AR"
-        ? "إعادة استخراج الملف التدريبي الحقيقي عند الحاجة، ثم إعادة توليد الأيام والأسئلة بالعربية؟\n\nلن يُستبدل المحتوى الحالي إلا بعد نجاح الاستخراج والتوليد والتحقق الكامل."
-        : "استخراج الملف التدريبي الحقيقي وتحويل البرنامج إلى العربية ثم إعادة توليد الأيام والأسئلة؟\n\nلن يتم استخدام أي محتوى Mock.";
+        ? "إعادة تحليل ملف PDF الحقيقي ثم إعادة بناء 10 أيام و50 سؤالًا بالعربية؟\n\nلن يُستبدل المحتوى الحالي إلا بعد نجاح التوليد الكامل والتحقق."
+        : "تحليل ملف PDF الحقيقي وتحويل البرنامج إلى العربية ثم بناء 10 أيام و50 سؤالًا؟\n\nلن يتم استخدام أي محتوى Mock.";
     if (!confirm(message)) return;
 
-    startTransition(async () => {
-      const result = await regenerateProgramInArabic(program.id);
-      if (result.status !== "COMPLETED") {
-        alert(result.errorMessage ?? "تعذر إعادة توليد المحتوى بالعربية.");
-        return;
-      }
-      alert(
-        `تم إنشاء المحتوى العربي بنجاح: ${result.daysGenerated} أيام و${result.questionsGenerated} سؤالًا.`
+    setIsRebuilding(true);
+    setPipelineMessage("جارٍ بدء تحليل المصدر الحقيقي…");
+
+    try {
+      const result = await runProgramRebuild({
+        programId: program.id,
+        onProgress: (text) => setPipelineMessage(text),
+      });
+      setPipelineMessage(
+        `اكتمل بنجاح: ${result.daysGenerated} أيام و${result.questionsGenerated} سؤالًا عربيًا.`
       );
       router.refresh();
-    });
+    } catch (error) {
+      setPipelineMessage(
+        error instanceof Error
+          ? error.message
+          : "تعذر إعادة بناء المحتوى والأسئلة."
+      );
+    } finally {
+      setIsRebuilding(false);
+    }
   }
 
   return (
@@ -214,10 +226,10 @@ export default function ManageClient({ program }: { program: Program }) {
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={handleRegenerateArabic}
-                disabled={isPending}
+                disabled={isPending || isRebuilding}
                 className="px-3 py-1.5 bg-teal-700 text-white rounded-lg text-sm hover:bg-teal-800 disabled:opacity-50"
               >
-                {isPending
+                {isRebuilding
                   ? "جاري استخراج الملف والتوليد…"
                   : program.language === "AR"
                   ? "إعادة توليد المحتوى بالعربية"
@@ -240,6 +252,18 @@ export default function ManageClient({ program }: { program: Program }) {
               </button>
             </div>
           </div>
+
+          {pipelineMessage ? (
+            <div className={`rounded-xl border p-3 text-sm ${
+              isRebuilding
+                ? "border-teal-200 bg-teal-50 text-teal-800"
+                : pipelineMessage.startsWith("اكتمل")
+                ? "border-green-200 bg-green-50 text-green-800"
+                : "border-amber-200 bg-amber-50 text-amber-800"
+            }`}>
+              {pipelineMessage}
+            </div>
+          ) : null}
 
           {showAddDay && (
             <AddDayForm

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import {
   generateFinalQuestions,
   type FinalQuestionsState,
@@ -21,7 +22,14 @@ export default function FinalQuestionsClient({ programId }: { programId: string 
         </button>
       </form>
 
-      {state && !state.ok ? <p className="dlp-error">{state.error}</p> : null}
+      {state && !state.ok ? (
+        <div className="dlp-final-error-box">
+          <p className="dlp-error">{state.error}</p>
+          <Link href={`/programs/${programId}`} className="dlp-control-button primary">
+            العودة إلى المادة وتشغيل تحليل PDF
+          </Link>
+        </div>
+      ) : null}
 
       {state?.ok ? (
         <>
