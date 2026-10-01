@@ -1,32 +1,81 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   generateFinalQuestions,
   type FinalQuestionsState,
 } from "@/app/actions/final-questions";
+import { runProgramRebuild } from "@/lib/client/program-rebuild";
 import CopyCodeButton from "@/components/CopyCodeButton";
 
 export default function FinalQuestionsClient({ programId }: { programId: string }) {
-  const [state, dispatch, pending] = useActionState<FinalQuestionsState | null, FormData>(
-    async (prevState, formData) => generateFinalQuestions(programId, prevState, formData),
-    null
-  );
+  const [state, setState] = useState<FinalQuestionsState | null>(null);
+  const [pending, setPending] = useState(false);
+  const [progress, setProgress] = useState("");
+
+  async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+
+    setPending(true);
+    setState(null);
+    setProgress("جارٍ التحقق من المصدر الحقيقي…");
+
+    try {
+      let result = await generateFinalQuestions(programId, null, new FormData());
+
+      if (!result.ok && result.code === "SOURCE_NOT_READY") {
+        setProgress(
+          "المصدر غير مكتمل. جارٍ إصلاح استخراج PDF ثم إنشاء 10 أيام و50 سؤالًا بالعربية قبل الامتحان النهائي…"
+        );
+
+        await runProgramRebuild({
+          programId,
+          onProgress: (message) => setProgress(message),
+        });
+
+        setProgress(
+          "اكتمل بنك الأسئلة اليومي. جارٍ الآن إنشاء 10 أسئلة اختيار من متعدد و20 سؤال صح/خطأ…"
+        );
+        result = await generateFinalQuestions(programId, null, new FormData());
+      }
+
+      setState(result);
+      setProgress(result.ok ? "اكتمل إنشاء الامتحان النهائي بنجاح." : "");
+    } catch (error) {
+      setState({
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "تعذر إكمال إصلاح المصدر وإنشاء الأسئلة النهائية.",
+      });
+      setProgress("");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="dlp-final-wrap">
-      <form action={dispatch}>
+      <form onSubmit={handleGenerate}>
         <button className="brand-button-primary dlp-generate-button" disabled={pending}>
-          {pending ? "جارٍ مراجعة الملف وإنشاء الامتحان…" : "إنشاء الملخص والأسئلة النهائية"}
+          {pending ? "جارٍ الإصلاح والتوليد…" : "إنشاء الملخص والأسئلة النهائية"}
         </button>
       </form>
+
+      {progress ? (
+        <div className="brand-card dlp-final-progress" role="status">
+          {progress}
+        </div>
+      ) : null}
 
       {state && !state.ok ? (
         <div className="dlp-final-error-box">
           <p className="dlp-error">{state.error}</p>
           <Link href={`/programs/${programId}`} className="dlp-control-button primary">
-            العودة إلى المادة وتشغيل تحليل PDF
+            فتح المادة التدريبية
           </Link>
         </div>
       ) : null}
