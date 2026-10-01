@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { storage } from "@/lib/storage";
 import { inspectPdf } from "./pdf-inspector";
-import type { ExtractionAdapter, PdfInspectionResult, ExtractedPage } from "./types";
+import type { ExtractionAdapter, PdfInspectionResult, ExtractedPage, ExtractionResult } from "./types";
 import { LlamaParseAdapter } from "./adapters/llamaparse";
 import { OpenAIPdfExtractionAdapter } from "./adapters/openai-pdf";
 import { MockExtractionAdapter } from "./adapters/mock";
@@ -33,6 +33,100 @@ export interface ProcessingProgress {
 // Adapter registry — ordered by production preference.
 // IMPORTANT: Mock extraction is never a production fallback. It is available
 // only in tests/dev when explicitly enabled.
+const OPENAI_PDF_BATCH_SIZE = 15;
+const OPENAI_PDF_CONCURRENCY = 2;
+const MIN_REAL_SOURCE_COVERAGE = 0.7;
+
+function requiredReadablePages(totalPages: number): number {
+  if (totalPages <= 0) return 1;
+  return Math.max(1, Math.ceil(totalPages * MIN_REAL_SOURCE_COVERAGE));
+}
+
+function chunkPageNumbers(values: number[], size: number): number[][] {
+  const chunks: number[][] = [];
+  for (let i = 0; i < values.length; i += size) {
+    chunks.push(values.slice(i, i + size));
+  }
+  return chunks;
+}
+
+async function extractWithAdapter(
+  adapter: ExtractionAdapter,
+  params: {
+    fileBuffer: Buffer;
+    fileName: string;
+    mimeType: string;
+    targetPages: number[];
+  }
+): Promise<ExtractionResult> {
+  const { fileBuffer, fileName, mimeType, targetPages } = params;
+
+  if (adapter.name !== "OPENAI_PDF" || targetPages.length <= OPENAI_PDF_BATCH_SIZE) {
+    return adapter.extract({
+      fileBuffer,
+      fileName,
+      mimeType,
+      pageNumbers: targetPages.length > 0 ? targetPages : undefined,
+    });
+  }
+
+  const batches = chunkPageNumbers(targetPages, OPENAI_PDF_BATCH_SIZE);
+  const byPage = new Map<number, ExtractedPage>();
+  const batchErrors: string[] = [];
+  let processingMs = 0;
+
+  for (let i = 0; i < batches.length; i += OPENAI_PDF_CONCURRENCY) {
+    const group = batches.slice(i, i + OPENAI_PDF_CONCURRENCY);
+    const groupResults = await Promise.all(
+      group.map(async (pageBatch) => {
+        try {
+          return await adapter.extract({
+            fileBuffer,
+            fileName,
+            mimeType,
+            pageNumbers: pageBatch,
+          });
+        } catch (error) {
+          batchErrors.push(
+            `pages ${pageBatch[0]}-${pageBatch[pageBatch.length - 1]}: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+          return null;
+        }
+      })
+    );
+
+    for (const result of groupResults) {
+      if (!result) continue;
+      processingMs += result.processingMs;
+      for (const page of result.pages) {
+        byPage.set(page.pageNumber, page);
+      }
+    }
+  }
+
+  const pages = [...byPage.values()].sort((a, b) => a.pageNumber - b.pageNumber);
+  const successCount = pages.filter(
+    (page) => page.extractionStatus === "COMPLETED"
+  ).length;
+
+  if (successCount === 0) {
+    throw new Error(
+      `OPENAI_PDF_BATCH_EXTRACTION_FAILED — ${batchErrors.join(" | ")}`
+    );
+  }
+
+  return {
+    pages,
+    method: "OPENAI_PDF",
+    totalPages: targetPages.length,
+    successCount,
+    failureCount: Math.max(0, targetPages.length - successCount),
+    processingMs,
+  };
+}
+
 function getAdapters(): ExtractionAdapter[] {
   const adapters: ExtractionAdapter[] = [];
 
@@ -112,16 +206,23 @@ export class DocumentExtractionService {
         );
       }
 
-      let result: Awaited<ReturnType<ExtractionAdapter["extract"]>> | null = null;
+      const targetPages =
+        pageNumbers && pageNumbers.length > 0
+          ? [...new Set(pageNumbers)].sort((a, b) => a - b)
+          : inspection.pageCount > 0
+          ? Array.from({ length: inspection.pageCount }, (_, index) => index + 1)
+          : [];
+
+      let result: ExtractionResult | null = null;
       const adapterErrors: string[] = [];
 
       for (const adapter of adapters) {
         try {
-          const candidate = await adapter.extract({
+          const candidate = await extractWithAdapter(adapter, {
             fileBuffer: buffer,
             fileName: doc.fileName,
             mimeType: "application/pdf",
-            pageNumbers,
+            targetPages,
           });
 
           if (candidate.successCount > 0 && candidate.method !== "MOCK") {
@@ -159,20 +260,33 @@ export class DocumentExtractionService {
         });
       }
 
-      // Partial success is still usable — treat as COMPLETED so content
-      // generation can proceed with the pages that did extract.
+      // A large training document must have enough real coverage before it is
+      // considered safe for 10-day / 50-question generation.
+      const intendedPageCount =
+        targetPages.length > 0
+          ? targetPages.length
+          : Math.max(result.totalPages, inspection.pageCount);
+      const requiredPages = requiredReadablePages(intendedPageCount);
       const finalStatus: DocumentProcessingStatus =
-        result.successCount > 0 ? "COMPLETED" : "FAILED";
+        result.successCount >= requiredPages
+          ? "COMPLETED"
+          : result.successCount > 0
+          ? "OCR_REQUIRED"
+          : "FAILED";
 
       await this.updateDocumentStatus(documentId, finalStatus);
 
       return {
         documentId,
         status: finalStatus,
-        totalPages: result.totalPages,
+        totalPages: intendedPageCount,
         completedPages: result.successCount,
-        failedPages: result.failureCount,
+        failedPages: Math.max(0, intendedPageCount - result.successCount),
         inspection,
+        errorMessage:
+          finalStatus === "COMPLETED"
+            ? undefined
+            : `INSUFFICIENT_REAL_EXTRACTION_COVERAGE — extracted ${result.successCount}/${intendedPageCount}; require at least ${requiredPages}`,
       };
     } catch (err) {
       await this.updateDocumentStatus(documentId, "FAILED");
