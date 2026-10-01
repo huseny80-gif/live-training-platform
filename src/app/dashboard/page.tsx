@@ -5,6 +5,9 @@ import Link from "next/link";
 import { brand } from "@/lib/brand";
 import { brandAssets } from "@/lib/brand-assets";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "مسودة",
   ACTIVE: "نشط",
