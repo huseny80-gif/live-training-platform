@@ -88,7 +88,7 @@ Return STRICT JSON only in this exact shape:
   "pages": [
     {
       "pageNumber": 1,
-      "title": "page title or null",
+      "title": "page title or empty string",
       "text": "faithful extracted source text"
     }
   ]
@@ -101,6 +101,7 @@ Rules:
 - Keep meaningful headings, bullets, labels, definitions, and table text.
 - pageNumber must be the real 1-based PDF page number.
 - Include each requested page once.
+- If a page has no clear title, return title as an empty string.
 - If a requested page has no recoverable content, return it with an empty text string.
 - For very dense pages, preserve the important source wording while keeping each page under about 4000 characters.
 - Output JSON only. No Markdown fences and no commentary.
