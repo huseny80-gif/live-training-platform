@@ -16,7 +16,12 @@ export type FinalQuestion = {
 };
 
 export type FinalQuestionsState =
-  | { ok: false; error: string; code?: "SOURCE_NOT_READY" | "GENERATION_FAILED"; documentId?: string }
+  | {
+      ok: false;
+      error: string;
+      code?: "SOURCE_NOT_READY" | "GENERATION_FAILED";
+      documentId?: string;
+    }
   | {
       ok: true;
       summary: string;
@@ -26,10 +31,12 @@ export type FinalQuestionsState =
       sourcePageCount: number;
     };
 
-type ParsedFinalExam = {
-  summary: string;
-  questions: FinalQuestion[];
+type ParsedBatch = {
+  summary?: string;
+  questions?: FinalQuestion[];
 };
+
+type FinalQuestionType = "MCQ" | "TF";
 
 function extractJson(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -40,88 +47,144 @@ function extractJson(text: string): string {
   return raw.slice(start, end + 1);
 }
 
-function validateFinalExam(
-  parsed: ParsedFinalExam,
+function validateOneQuestion(
+  question: FinalQuestion,
+  expectedType: FinalQuestionType,
   validPages: Set<number>,
   requireArabic: boolean,
 ): string | null {
-  if (!parsed || typeof parsed.summary !== "string" || !Array.isArray(parsed.questions)) {
-    return "بنية الاستجابة غير صحيحة.";
+  if (!question || question.type !== expectedType) {
+    return `نوع السؤال يجب أن يكون ${expectedType}.`;
+  }
+  if (typeof question.text !== "string" || question.text.trim().length < 5) {
+    return "السؤال لا يحتوي نصًا صالحًا.";
+  }
+  if (
+    typeof question.explanation !== "string" ||
+    question.explanation.trim().length < 3
+  ) {
+    return "السؤال لا يحتوي شرحًا صالحًا.";
+  }
+  if (
+    !Number.isInteger(question.sourcePage) ||
+    !validPages.has(question.sourcePage)
+  ) {
+    return "السؤال يشير إلى صفحة مصدر غير صالحة.";
   }
 
-  const mcq = parsed.questions.filter((q) => q.type === "MCQ");
-  const tf = parsed.questions.filter((q) => q.type === "TF");
+  if (expectedType === "MCQ") {
+    if (!Array.isArray(question.options) || question.options.length !== 4) {
+      return "سؤال الاختيار من متعدد يجب أن يحتوي أربعة خيارات.";
+    }
+    if (
+      question.options.some(
+        (option) => typeof option !== "string" || option.trim().length === 0,
+      )
+    ) {
+      return "أحد خيارات السؤال فارغ.";
+    }
+    if (!question.options.includes(question.correctAnswer)) {
+      return "الإجابة الصحيحة ليست واحدة من الخيارات الأربعة.";
+    }
 
-  if (mcq.length !== 10 || tf.length !== 20 || parsed.questions.length !== 30) {
-    return `يجب أن تكون النتيجة 10 أسئلة اختيار من متعدد و20 سؤال صح/خطأ بالضبط. الناتج الحالي: ${mcq.length} MCQ و${tf.length} T/F.`;
+    if (
+      requireArabic &&
+      !isArabicQuestionContent(
+        question.text,
+        question.options.map((text) => ({ text })),
+      )
+    ) {
+      return "نص السؤال أو خياراته لا يطابق متطلبات اللغة العربية.";
+    }
+  } else if (
+    question.correctAnswer !== "TRUE" &&
+    question.correctAnswer !== "FALSE"
+  ) {
+    return "إجابة سؤال الصح/الخطأ يجب أن تكون TRUE أو FALSE.";
   }
 
-  for (const [index, question] of parsed.questions.entries()) {
-    if (!question || typeof question.text !== "string" || question.text.trim().length < 5) {
-      return `السؤال رقم ${index + 1} لا يحتوي نصًا صالحًا.`;
-    }
-    if (typeof question.explanation !== "string" || question.explanation.trim().length < 3) {
-      return `السؤال رقم ${index + 1} لا يحتوي شرحًا صالحًا.`;
-    }
-    if (!Number.isInteger(question.sourcePage) || !validPages.has(question.sourcePage)) {
-      return `السؤال رقم ${index + 1} يشير إلى صفحة مصدر غير صالحة.`;
-    }
-
-    if (question.type === "MCQ") {
-      if (!Array.isArray(question.options) || question.options.length !== 4) {
-        return `السؤال رقم ${index + 1} يجب أن يحتوي أربعة خيارات.`;
-      }
-      if (question.options.some((option) => typeof option !== "string" || option.trim().length === 0)) {
-        return `السؤال رقم ${index + 1} يحتوي خيارًا فارغًا.`;
-      }
-      if (!question.options.includes(question.correctAnswer)) {
-        return `الإجابة الصحيحة في السؤال رقم ${index + 1} ليست واحدة من الخيارات الأربعة.`;
-      }
-    } else if (question.type === "TF") {
-      if (question.correctAnswer !== "TRUE" && question.correctAnswer !== "FALSE") {
-        return `السؤال رقم ${index + 1} من نوع صح/خطأ يجب أن تكون إجابته TRUE أو FALSE.`;
-      }
-    } else {
-      return `نوع السؤال رقم ${index + 1} غير مدعوم.`;
-    }
-
-    if (requireArabic) {
-      if (!isPredominantlyArabic(question.text) || !isPredominantlyArabic(question.explanation)) {
-        return `السؤال رقم ${index + 1} أو شرحه ليس بالعربية.`;
-      }
-      if (
-        question.type === "MCQ" &&
-        !isArabicQuestionContent(
-          question.text,
-          (question.options ?? []).map((text) => ({ text })),
-        )
-      ) {
-        return `خيارات السؤال رقم ${index + 1} لا تطابق متطلبات اللغة العربية.`;
-      }
-    }
-  }
-
-  if (requireArabic && !isPredominantlyArabic(parsed.summary)) {
-    return "ملخص المادة ليس بالعربية.";
+  if (
+    requireArabic &&
+    (!isPredominantlyArabic(question.text) ||
+      !isPredominantlyArabic(question.explanation))
+  ) {
+    return "نص السؤال أو شرحه ليس بالعربية.";
   }
 
   return null;
 }
 
-function buildPrompt(
-  source: string,
-  programTitle: string,
+function validateBatch(
+  parsed: ParsedBatch,
+  expectedType: FinalQuestionType,
+  expectedCount: number,
+  validPages: Set<number>,
   requireArabic: boolean,
-  previousFailure?: string,
-): string {
+  requireSummary: boolean,
+): string | null {
+  if (!parsed || !Array.isArray(parsed.questions)) {
+    return "بنية الاستجابة غير صحيحة أو لا تحتوي قائمة أسئلة.";
+  }
+
+  if (parsed.questions.length !== expectedCount) {
+    return `تم إنشاء ${parsed.questions.length} سؤالًا بدل ${expectedCount} من نوع ${expectedType}.`;
+  }
+
+  if (requireSummary) {
+    if (typeof parsed.summary !== "string" || parsed.summary.trim().length < 20) {
+      return "الملخص النهائي غير موجود أو قصير جدًا.";
+    }
+    if (requireArabic && !isPredominantlyArabic(parsed.summary)) {
+      return "ملخص المادة ليس بالعربية.";
+    }
+  }
+
+  const seen = new Set<string>();
+  for (const [index, question] of parsed.questions.entries()) {
+    const error = validateOneQuestion(
+      question,
+      expectedType,
+      validPages,
+      requireArabic,
+    );
+    if (error) return `السؤال رقم ${index + 1}: ${error}`;
+
+    const key = question.text.trim().toLocaleLowerCase("ar").replace(/\s+/g, " ");
+    if (seen.has(key)) {
+      return `السؤال رقم ${index + 1} مكرر.`;
+    }
+    seen.add(key);
+  }
+
+  return null;
+}
+
+function buildBatchPrompt(params: {
+  source: string;
+  programTitle: string;
+  requireArabic: boolean;
+  type: FinalQuestionType;
+  count: number;
+  includeSummary: boolean;
+  previousFailure?: string;
+}): string {
+  const {
+    source,
+    programTitle,
+    requireArabic,
+    type,
+    count,
+    includeSummary,
+    previousFailure,
+  } = params;
+
   const languageRules = requireArabic
     ? `
 قواعد اللغة الإلزامية:
-- اكتب الملخص بالعربية.
-- اكتب نص كل سؤال بالعربية.
-- اكتب جميع خيارات MCQ بالعربية؛ يسمح بالمصطلح التقني الإنجليزي القصير بين قوسين عند الحاجة فقط.
-- اكتب شرح كل إجابة بالعربية.
-- لا تحول السؤال إلى الإنجليزية حتى لو كان المصدر إنجليزيًا؛ ترجم المعنى بأمانة مع إبقاء المصطلح التقني بين قوسين عند الحاجة.
+- اكتب كل النصوص التعليمية بالعربية.
+- إذا كان المصدر إنجليزيًا فترجم المعنى بأمانة إلى العربية.
+- يسمح بإبقاء المصطلح التقني الإنجليزي القصير بين قوسين بعد المصطلح العربي.
+- لا تُرجع سؤالًا أو شرحًا كاملًا بالإنجليزية.
 `
     : `
 لغة المخرجات: الإنجليزية.
@@ -131,28 +194,46 @@ function buildPrompt(
     ? `
 المحاولة السابقة رُفضت آليًا للسبب التالي:
 ${previousFailure}
-صحح هذا السبب بالكامل في هذه المحاولة ولا تكرر الخطأ.
+صحح السبب بالكامل في هذه المحاولة ولا تكرر الخطأ.
 `
     : "";
+
+  const task =
+    type === "MCQ"
+      ? `
+أنشئ بالضبط ${count} أسئلة اختيار من متعدد.
+- لكل سؤال 4 خيارات نصية بالضبط.
+- correctAnswer يجب أن يطابق نص أحد الخيارات حرفيًا.
+`
+      : `
+أنشئ بالضبط ${count} سؤال صح/خطأ.
+- لا ترسل options.
+- correctAnswer يجب أن يكون TRUE أو FALSE فقط.
+`;
+
+  const summaryRule = includeSummary
+    ? "أضف summary عربيًا مركزًا يغطي المادة كلها."
+    : "لا حاجة إلى summary في هذه الدفعة.";
 
   return `أنت منشئ امتحان نهائي مقيد بالمصدر لبرنامج تدريبي بعنوان "${programTitle}".
 استخدم حصراً النص الموجود بين SOURCE START وSOURCE END.
 ممنوع استخدام المعرفة العامة أو اختراع معلومة غير موجودة في المصدر.
 ${languageRules}
 ${repair}
-المطلوب:
-1) summary: ملخص مركز يغطي المادة.
-2) exactly 10 MCQ، لكل سؤال 4 خيارات وإجابة واحدة صحيحة.
-3) exactly 20 TRUE/FALSE.
-4) كل سؤال يجب أن يحتوي sourcePage حقيقية من المصدر وشرحًا موجزًا مستندًا إليها.
-5) correctAnswer في MCQ يجب أن يطابق نص أحد الخيارات حرفيًا.
-6) correctAnswer في TRUE/FALSE يجب أن يكون TRUE أو FALSE فقط.
-7) إذا لم يدعم المصدر حقيقة السؤال بوضوح فلا تنشئ ذلك السؤال.
-8) لا تنسخ الأسئلة اليومية حرفيًا؛ أنشئ تقييمًا شاملاً للمادة.
-9) أعد JSON فقط، بلا Markdown ولا شرح خارجي.
+${task}
+${summaryRule}
+
+قواعد مشتركة:
+- كل سؤال يجب أن يحتوي sourcePage حقيقية من المصدر.
+- explanation يجب أن يشرح الإجابة باختصار استنادًا إلى نفس المصدر.
+- لا تكرر السؤال نفسه أو نفس الفكرة بصياغة شبه مطابقة.
+- لا تنشئ سؤالًا لا تدعمه المادة بوضوح.
+- أعد JSON فقط بلا Markdown أو تعليق خارجي.
 
 الشكل المطلوب:
-{"summary":"...","questions":[{"type":"MCQ","text":"...","options":["...","...","...","..."],"correctAnswer":"النص الصحيح حرفياً","explanation":"...","sourcePage":1},{"type":"TF","text":"...","correctAnswer":"TRUE","explanation":"...","sourcePage":2}]}
+${includeSummary
+  ? '{"summary":"...","questions":[{"type":"' + type + '","text":"...","options":["...","...","...","..."],"correctAnswer":"...","explanation":"...","sourcePage":1}]}'
+  : '{"questions":[{"type":"' + type + '","text":"...","correctAnswer":"TRUE","explanation":"...","sourcePage":1}]}'}
 
 SOURCE START
 ${source}
@@ -177,18 +258,19 @@ async function requestFinalExamOpenAI(
     body: JSON.stringify({
       model,
       input: prompt,
-      max_output_tokens: 24000,
+      max_output_tokens: 18000,
     }),
   });
 
   if (!response.ok) {
+    const body = await response.text();
     return {
       ok: false,
-      error: `تعذر إنشاء الأسئلة النهائية عبر OpenAI (${response.status}).`,
+      error: `OpenAI (${response.status}): ${body.slice(0, 300)}`,
     };
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     output_text?: string;
     output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
   };
@@ -231,19 +313,20 @@ async function requestFinalExamAnthropic(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 24000,
+      max_tokens: 18000,
       messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
     }),
   });
 
   if (!response.ok) {
+    const body = await response.text();
     return {
       ok: false,
-      error: `تعذر إنشاء الأسئلة النهائية عبر Anthropic (${response.status}).`,
+      error: `Anthropic (${response.status}): ${body.slice(0, 300)}`,
     };
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     content?: Array<{ type?: string; text?: string }>;
   };
 
@@ -263,13 +346,19 @@ async function requestFinalExam(
   prompt: string,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const explicit = process.env.AI_PROVIDER?.trim().toLowerCase();
-  const attempts: Array<() => Promise<{ ok: true; text: string } | { ok: false; error: string }>> = [];
+  const attempts: Array<
+    () => Promise<{ ok: true; text: string } | { ok: false; error: string }>
+  > = [];
 
   const addOpenAI = () => {
-    if (process.env.OPENAI_API_KEY) attempts.push(() => requestFinalExamOpenAI(prompt));
+    if (process.env.OPENAI_API_KEY) {
+      attempts.push(() => requestFinalExamOpenAI(prompt));
+    }
   };
   const addAnthropic = () => {
-    if (process.env.ANTHROPIC_API_KEY) attempts.push(() => requestFinalExamAnthropic(prompt));
+    if (process.env.ANTHROPIC_API_KEY) {
+      attempts.push(() => requestFinalExamAnthropic(prompt));
+    }
   };
 
   if (explicit === "openai") {
@@ -287,7 +376,7 @@ async function requestFinalExam(
     return {
       ok: false,
       error:
-        "لا يوجد مزود ذكاء اصطناعي مفعّل للأسئلة النهائية. اضبط OPENAI_API_KEY أو ANTHROPIC_API_KEY في Vercel.",
+        "لا يوجد مزود ذكاء اصطناعي مفعّل. اضبط OPENAI_API_KEY أو ANTHROPIC_API_KEY في Vercel.",
     };
   }
 
@@ -300,8 +389,65 @@ async function requestFinalExam(
 
   return {
     ok: false,
-    error: `تعذر إنشاء الأسئلة النهائية عبر جميع المزودين المفعّلين: ${errors.join(" | ")}`,
+    error: `تعذر التوليد عبر جميع المزودين: ${errors.join(" | ")}`,
   };
+}
+
+async function generateValidatedBatch(params: {
+  source: string;
+  programTitle: string;
+  requireArabic: boolean;
+  type: FinalQuestionType;
+  count: number;
+  includeSummary: boolean;
+  validPages: Set<number>;
+}): Promise<{ summary?: string; questions: FinalQuestion[] }> {
+  let previousFailure: string | undefined;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const prompt = buildBatchPrompt({
+      source: params.source,
+      programTitle: params.programTitle,
+      requireArabic: params.requireArabic,
+      type: params.type,
+      count: params.count,
+      includeSummary: params.includeSummary,
+      previousFailure,
+    });
+
+    const response = await requestFinalExam(prompt);
+    if (!response.ok) throw new Error(response.error);
+
+    try {
+      const parsed = JSON.parse(extractJson(response.text)) as ParsedBatch;
+      const validation = validateBatch(
+        parsed,
+        params.type,
+        params.count,
+        params.validPages,
+        params.requireArabic,
+        params.includeSummary,
+      );
+
+      if (!validation) {
+        return {
+          summary: parsed.summary,
+          questions: parsed.questions ?? [],
+        };
+      }
+
+      previousFailure = validation;
+    } catch (error) {
+      previousFailure =
+        error instanceof Error
+          ? error.message
+          : "الاستجابة لم تكن JSON صالحًا بالشكل المطلوب.";
+    }
+  }
+
+  throw new Error(
+    `فشل إنشاء دفعة ${params.type} بعد ثلاث محاولات. السبب الأخير: ${previousFailure ?? "مخرجات غير صالحة"}`,
+  );
 }
 
 export async function generateFinalQuestions(
@@ -310,7 +456,9 @@ export async function generateFinalQuestions(
   _formData: FormData,
 ): Promise<FinalQuestionsState> {
   const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "UNAUTHENTICATED" };
+  if (!session?.user?.id) {
+    return { ok: false, error: "UNAUTHENTICATED" };
+  }
 
   const program = await prisma.trainingProgram.findFirst({
     where: { id: programId, instructorId: session.user.id },
@@ -321,12 +469,14 @@ export async function generateFinalQuestions(
     },
   });
 
-  if (!program) return { ok: false, error: "PROGRAM_NOT_FOUND" };
+  if (!program) {
+    return { ok: false, error: "PROGRAM_NOT_FOUND" };
+  }
 
   const sourceDocument = await extractionService.selectBestRealSourceDocument(
     programId,
     session.user.id,
-    false
+    false,
   );
 
   if (!sourceDocument.ok) {
@@ -362,22 +512,21 @@ export async function generateFinalQuestions(
     (page) =>
       page.extractionMethod !== null &&
       page.extractionMethod !== "MOCK" &&
-      (page.extractedText?.trim().length ?? 0) > 20
+      (page.extractedText?.trim().length ?? 0) > 20,
   );
 
   if (!usable.length) {
     return {
       ok: false,
       code: "SOURCE_NOT_READY",
-      error: "لا توجد صفحات حقيقية مستخرجة من الملف. سيحاول النظام الآن إصلاح المصدر وتوليد بنك الأسئلة قبل إنشاء الامتحان النهائي.",
+      documentId: sourceDocument.documentId,
+      error: "المصدر مقبول لكن لا توجد صفحات نصية حقيقية قابلة للاستخدام في الامتحان النهائي.",
     };
   }
 
-  // Keep all usable page references while bounding each page contribution so
-  // a large 147-page source remains inside a reliable model context window.
   const source = usable
     .map((page) => {
-      const text = (page.extractedText ?? "").trim().slice(0, 1200);
+      const text = (page.extractedText ?? "").trim().slice(0, 1400);
       return `[PAGE ${page.pageNumber}${page.title ? ` — ${page.title}` : ""}]\n${text}`;
     })
     .join("\n\n");
@@ -385,45 +534,50 @@ export async function generateFinalQuestions(
   const requireArabic = program.language === "AR";
   const validPages = new Set(usable.map((page) => page.pageNumber));
 
-  let previousFailure: string | undefined;
+  try {
+    const mcq = await generateValidatedBatch({
+      source,
+      programTitle: program.title,
+      requireArabic,
+      type: "MCQ",
+      count: 10,
+      includeSummary: true,
+      validPages,
+    });
 
-  // Two automatic attempts: the second one is a repair attempt driven by the
-  // exact validation failure from the first response.
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const prompt = buildPrompt(source, program.title, requireArabic, previousFailure);
-    const response = await requestFinalExam(prompt);
+    const tf = await generateValidatedBatch({
+      source,
+      programTitle: program.title,
+      requireArabic,
+      type: "TF",
+      count: 20,
+      includeSummary: false,
+      validPages,
+    });
 
-    if (!response.ok) {
-      return { ok: false, error: response.error };
+    const questions = [...mcq.questions, ...tf.questions];
+    if (questions.length !== 30) {
+      throw new Error(`FINAL_QUESTION_TOTAL_MISMATCH: ${questions.length}`);
     }
 
-    try {
-      const parsed = JSON.parse(extractJson(response.text)) as ParsedFinalExam;
-      const validationError = validateFinalExam(parsed, validPages, requireArabic);
-
-      if (!validationError) {
-        return {
-          ok: true,
-          summary: parsed.summary,
-          questions: parsed.questions,
-          googleAppsScript: buildGoogleAppsScript(program.title, parsed.questions),
-          sourceFileName: sourceDocument.fileName,
-          sourcePageCount: usable.length,
-        };
-      }
-
-      previousFailure = validationError;
-    } catch {
-      previousFailure = "الاستجابة لم تكن JSON صالحًا بالشكل المطلوب.";
-    }
+    return {
+      ok: true,
+      summary: mcq.summary ?? "",
+      questions,
+      googleAppsScript: buildGoogleAppsScript(program.title, questions),
+      sourceFileName: sourceDocument.fileName,
+      sourcePageCount: usable.length,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: "GENERATION_FAILED",
+      error:
+        error instanceof Error
+          ? error.message
+          : "تعذر إنشاء الأسئلة النهائية من المصدر المقبول.",
+    };
   }
-
-  return {
-    ok: false,
-    code: "GENERATION_FAILED",
-    error:
-      `تمت محاولتان تلقائيتان لإنشاء الامتحان النهائي، لكن التحقق الصارم لم ينجح. السبب الأخير: ${previousFailure ?? "مخرجات غير صالحة"}`,
-  };
 }
 
 function buildGoogleAppsScript(title: string, questions: FinalQuestion[]) {
