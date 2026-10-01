@@ -5,6 +5,7 @@ import {
   generateFinalQuestions,
   type FinalQuestionsState,
 } from "@/app/actions/final-questions";
+import CopyCodeButton from "@/components/CopyCodeButton";
 
 export default function FinalQuestionsClient({ programId }: { programId: string }) {
   const [state, dispatch, pending] = useActionState<FinalQuestionsState | null, FormData>(
@@ -56,12 +57,23 @@ export default function FinalQuestionsClient({ programId }: { programId: string 
           </section>
 
           <section className="brand-card dlp-final-section">
-            <h2>Google Apps Script</h2>
+            <h2>Google Forms Quiz</h2>
             <p>
               انسخ الكود إلى Google Apps Script وشغّل الدالة
               <code dir="ltr"> createTrainingExam </code>
-              لإنشاء Google Form Quiz.
+              لإنشاء Google Form Quiz مع الإجابات الصحيحة والنقاط.
             </p>
+            <div className="dlp-google-actions">
+              <CopyCodeButton value={state.googleAppsScript} />
+              <a
+                href="https://script.google.com/home/projects/create"
+                target="_blank"
+                rel="noreferrer"
+                className="dlp-control-button neutral"
+              >
+                فتح Google Apps Script
+              </a>
+            </div>
             <textarea
               className="dlp-code"
               readOnly

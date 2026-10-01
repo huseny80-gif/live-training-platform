@@ -51,6 +51,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         <div className="dlp-program-actions">
           <Link href={`/programs/${id}/manage`}>إدارة المحتوى</Link>
           <Link href={`/programs/${id}/final-questions`}>الأسئلة النهائية</Link>
+          <Link href={`/programs/${id}/google-forms`}>Google Forms</Link>
           <Link href={`/programs/${id}/edit`}>تعديل البرنامج</Link>
         </div>
       </header>

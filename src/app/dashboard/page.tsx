@@ -15,6 +15,7 @@ const navItems = [
   { label: "الرئيسية", icon: "⌂", href: "/dashboard", active: true },
   { label: "البرامج التدريبية", icon: "▣", href: "/dashboard#programs" },
   { label: "من نحن", icon: "ⓘ", href: "/about" },
+  { label: "الإعدادات", icon: "⚙", href: "/settings" },
 ];
 
 export default async function DashboardPage() {
@@ -48,6 +49,9 @@ export default async function DashboardPage() {
           </div>
 
           <div className="dlp-user">
+            <Link href="/settings" className="dlp-settings-shortcut" aria-label="الإعدادات" title="الإعدادات">
+              ⚙
+            </Link>
             <div className="dlp-user-copy">
               <p>مرحباً بك</p>
               <p className="dlp-user-name">{displayName}</p>
@@ -159,6 +163,7 @@ export default async function DashboardPage() {
             <Link href="/dashboard" className="active">⌂<span>الرئيسية</span></Link>
             <Link href="/dashboard#programs">▣<span>البرامج</span></Link>
             <Link href="/about">ⓘ<span>من نحن</span></Link>
+            <Link href="/settings">⚙<span>الإعدادات</span></Link>
             <Link href="/programs/new">＋<span>برنامج جديد</span></Link>
           </nav>
           <div className="dlp-mobile-spacer" />

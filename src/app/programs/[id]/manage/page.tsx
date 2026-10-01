@@ -41,6 +41,9 @@ export default async function ManageProgramPage({
             <Link href={`/programs/${id}/final-questions`} className="dlp-session-button">
               الأسئلة النهائية
             </Link>
+            <Link href={`/programs/${id}/google-forms`} className="dlp-session-button">
+              Google Forms
+            </Link>
           </div>
         </div>
 
