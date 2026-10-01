@@ -206,6 +206,30 @@ export async function createQuestionAction(
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
+  const program = await prisma.trainingProgram.findUnique({
+    where: { id: programId },
+    select: { language: true },
+  });
+  if (!program) return { ok: false, error: "NOT_FOUND" };
+
+  if (program.language === "AR") {
+    const arabicPattern = /[\u0600-\u06FF]/;
+    const texts = [
+      parsed.data.questionText,
+      parsed.data.optionA,
+      parsed.data.optionB,
+      parsed.data.optionC,
+      parsed.data.optionD,
+    ].filter((value): value is string => Boolean(value));
+
+    if (texts.some((value) => !arabicPattern.test(value))) {
+      return {
+        ok: false,
+        error: "البرنامج مضبوط على العربية؛ يجب أن يكون نص السؤال وجميع الخيارات باللغة العربية.",
+      };
+    }
+  }
+
   const count = await prisma.question.count({ where: { dayId } });
 
   const question = await prisma.question.create({
