@@ -30,6 +30,7 @@ import {
   getLiveQuestionPayload,
   buildQuestionResult,
   getSessionByCode,
+  deleteSessionCompletely,
 } from "../src/lib/session/service";
 import { verifyGuestToken } from "../src/lib/session/guest-token";
 
@@ -304,6 +305,44 @@ async function runTests() {
     assert.strictEqual(ended.status, "ENDED");
     assert.ok(ended.endedAt instanceof Date);
     await prisma.liveSession.delete({ where: { id: session.id } });
+  });
+
+  // LIVE-14A: complete deletion works for DRAFT sessions
+  await test("LIVE-14A: deleteSessionCompletely removes a DRAFT session and its question snapshot", async () => {
+    const session = await createSession(programId, instructorId, 1);
+    const before = await prisma.sessionQuestion.count({ where: { sessionId: session.id } });
+    assert.ok(before > 0, "Draft session should have a question snapshot");
+
+    await deleteSessionCompletely(session.id, instructorId);
+
+    assert.strictEqual(await prisma.liveSession.findUnique({ where: { id: session.id } }), null);
+    assert.strictEqual(await prisma.sessionQuestion.count({ where: { sessionId: session.id } }), 0);
+  });
+
+  // LIVE-14B: complete deletion works for ACTIVE sessions with participant data
+  await test("LIVE-14B: deleteSessionCompletely removes an ACTIVE session with participants and answers", async () => {
+    const session = await createSession(programId, instructorId, 1);
+    await startSession(session.id, instructorId);
+
+    const sessionQuestions = await prisma.sessionQuestion.findMany({
+      where: { sessionId: session.id },
+      orderBy: { questionOrder: "asc" },
+    });
+    assert.ok(sessionQuestions.length > 0, "Active session should have questions");
+
+    await showQuestion(session.id, sessionQuestions[0].id, instructorId);
+    const joined = await participantJoin(session.sessionCode, "حسين ياسين");
+    await submitAnswer(joined.token, sessionQuestions[0].id, optionBId);
+
+    assert.strictEqual(await prisma.sessionParticipant.count({ where: { sessionId: session.id } }), 1);
+    assert.strictEqual(await prisma.participantAnswer.count({ where: { sessionId: session.id } }), 1);
+
+    await deleteSessionCompletely(session.id, instructorId);
+
+    assert.strictEqual(await prisma.liveSession.findUnique({ where: { id: session.id } }), null);
+    assert.strictEqual(await prisma.sessionParticipant.count({ where: { sessionId: session.id } }), 0);
+    assert.strictEqual(await prisma.participantAnswer.count({ where: { sessionId: session.id } }), 0);
+    assert.strictEqual(await prisma.sessionQuestion.count({ where: { sessionId: session.id } }), 0);
   });
 
   // ── Question lifecycle ─────────────────────────────────────────────────────

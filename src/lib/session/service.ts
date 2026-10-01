@@ -510,6 +510,36 @@ async function computeSessionResult(sessionId: string) {
   }
 }
 
+// ── Session deletion ───────────────────────────────────────────────────────────
+
+export async function deleteSessionCompletely(sessionId: string, instructorId: string) {
+  const session = await prisma.liveSession.findFirst({
+    where: { id: sessionId, instructorId },
+    select: { id: true, programId: true, sessionCode: true, status: true },
+  });
+  if (!session) throw new Error("SESSION_NOT_FOUND_OR_UNAUTHORIZED");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.participantAnswer.deleteMany({ where: { sessionId } });
+    await tx.participantDayResult.deleteMany({ where: { sessionId } });
+    await tx.dailyResult.deleteMany({ where: { sessionId } });
+    await tx.sessionResult.deleteMany({ where: { sessionId } });
+    await tx.sessionParticipant.deleteMany({ where: { sessionId } });
+
+    // Older deployed schemas may enforce a reference from currentQuestionId.
+    // Clear it explicitly before removing the SessionQuestion snapshot.
+    await tx.liveSession.update({
+      where: { id: sessionId },
+      data: { currentQuestionId: null },
+    });
+
+    await tx.sessionQuestion.deleteMany({ where: { sessionId } });
+    await tx.liveSession.delete({ where: { id: sessionId } });
+  });
+
+  return session;
+}
+
 // ── Session reset ─────────────────────────────────────────────────────────────
 
 export async function resetSession(sessionId: string, instructorId: string) {

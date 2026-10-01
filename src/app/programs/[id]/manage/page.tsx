@@ -40,9 +40,6 @@ export default async function ManageProgramPage({
             <Link href={`/programs/${id}/final-questions`} className="dlp-session-button">
               الأسئلة النهائية
             </Link>
-            <Link href="/about" className="dlp-session-button">
-              من نحن
-            </Link>
           </div>
         </div>
 
