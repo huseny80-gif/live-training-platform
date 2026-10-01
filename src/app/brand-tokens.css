@@ -127,3 +127,14 @@ html[data-theme="dark"] .dlp-program-header{background:rgb(16 27 45 / .94)}
 @media(max-width:760px){.dlp-day-grid{grid-template-columns:1fr}.dlp-session-ready{flex-direction:column;align-items:stretch}.dlp-session-create-button{width:100%}}
 
 .dlp-session-error-action{margin-top:12px;width:max-content;max-width:100%}
+
+
+/* Eng.Husen yasen identity assets */
+.dlp-logo-image{width:48px;height:48px;object-fit:contain;border-radius:14px;background:#fff;padding:3px;box-shadow:0 4px 14px rgb(0 0 0 / .14)}
+.dlp-about-heading{display:flex;align-items:center;gap:18px;margin-bottom:22px}
+.dlp-about-heading h1{margin:0 0 6px;color:var(--brand-navy)}
+.dlp-about-heading p{margin:0;color:var(--brand-muted);line-height:1.8}
+.dlp-about-logo{width:92px!important;height:92px!important;object-fit:contain!important;border-radius:18px!important;background:#fff!important;padding:5px;box-shadow:var(--brand-shadow-card)}
+.dlp-about-photo{width:150px!important;height:150px!important;border-radius:22px!important;object-fit:cover!important;border:3px solid rgb(255 255 255 / .65);box-shadow:0 12px 28px rgb(0 0 0 / .20)}
+.dlp-about-preview{grid-template-columns:150px 1fr}
+@media(max-width:700px){.dlp-logo-image{width:42px;height:42px}.dlp-about-heading{align-items:flex-start}.dlp-about-logo{width:72px!important;height:72px!important}.dlp-about-preview{grid-template-columns:1fr}.dlp-about-photo{justify-self:center}}
