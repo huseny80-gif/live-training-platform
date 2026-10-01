@@ -90,8 +90,7 @@ export async function regenerateProgramInArabic(programId: string) {
       sessions: { select: { id: true, sessionCode: true, status: true } },
       documents: {
         orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { id: true, extractionStatus: true },
+        select: { id: true },
       },
     },
   });
@@ -110,8 +109,7 @@ export async function regenerateProgramInArabic(programId: string) {
     };
   }
 
-  const document = program.documents[0];
-  if (!document) {
+  if (program.documents.length === 0) {
     return {
       programId,
       documentId: "",
@@ -122,29 +120,25 @@ export async function regenerateProgramInArabic(programId: string) {
     };
   }
 
-  // Recover automatically from historical MOCK extraction. The original
-  // private PDF remains in storage, so re-extract it with a real provider
-  // before asking the generation model to build Arabic content.
-  const extraction = await extractionService.ensureRealExtraction(
-    document.id,
+  const source = await extractionService.selectBestRealSourceDocument(
+    programId,
     instructorId
   );
 
-  if (extraction && extraction.status !== "COMPLETED") {
+  if (!source.ok) {
     return {
       programId,
-      documentId: document.id,
+      documentId: "",
       status: "FAILED" as const,
       daysGenerated: 0,
       questionsGenerated: 0,
-      errorMessage:
-        extractionErrorToArabic(extraction.errorMessage),
+      errorMessage: extractionErrorToArabic(source.errorMessage),
     };
   }
 
   const result = await contentGenerationService.generateForProgram(
     programId,
-    document.id,
+    source.documentId,
     instructorId,
     "AR"
   );

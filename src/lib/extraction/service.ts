@@ -222,6 +222,149 @@ export class DocumentExtractionService {
     return this.processDocument(documentId, instructorId);
   }
 
+  /**
+   * Select the best real source document for a program.
+   *
+   * Selection rules:
+   * 1) Prefer documents that already contain real, readable extracted pages.
+   * 2) Rank by real readable page count, then extracted character count,
+   *    then recency.
+   * 3) If none is ready, attempt real extraction document-by-document
+   *    (newest first) until a usable source is found.
+   *
+   * This prevents duplicate uploads / stale MOCK rows / a newer pending file
+   * from hiding an older, fully extracted real source.
+   */
+  async selectBestRealSourceDocument(
+    programId: string,
+    instructorId: string
+  ): Promise<
+    | {
+        ok: true;
+        documentId: string;
+        fileName: string;
+        realPageCount: number;
+        realCharacterCount: number;
+      }
+    | {
+        ok: false;
+        errorMessage: string;
+      }
+  > {
+    const program = await prisma.trainingProgram.findFirst({
+      where: { id: programId, instructorId },
+      select: { id: true },
+    });
+    if (!program) {
+      return { ok: false, errorMessage: "PROGRAM_NOT_FOUND" };
+    }
+
+    const documents = await prisma.trainingDocument.findMany({
+      where: { programId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        fileName: true,
+        createdAt: true,
+        pages: {
+          where: { extractionStatus: "COMPLETED" },
+          select: {
+            extractionMethod: true,
+            extractedText: true,
+          },
+        },
+      },
+    });
+
+    if (documents.length === 0) {
+      return { ok: false, errorMessage: "NO_TRAINING_DOCUMENT" };
+    }
+
+    const scoreDocument = (doc: (typeof documents)[number]) => {
+      const realPages = doc.pages.filter(
+        (page) =>
+          page.extractionMethod !== null &&
+          page.extractionMethod !== "MOCK" &&
+          (page.extractedText?.trim().length ?? 0) > 20
+      );
+      return {
+        doc,
+        realPageCount: realPages.length,
+        realCharacterCount: realPages.reduce(
+          (sum, page) => sum + (page.extractedText?.trim().length ?? 0),
+          0
+        ),
+      };
+    };
+
+    const ready = documents
+      .map(scoreDocument)
+      .filter((entry) => entry.realPageCount > 0)
+      .sort((a, b) => {
+        if (b.realPageCount !== a.realPageCount) {
+          return b.realPageCount - a.realPageCount;
+        }
+        if (b.realCharacterCount !== a.realCharacterCount) {
+          return b.realCharacterCount - a.realCharacterCount;
+        }
+        return b.doc.createdAt.getTime() - a.doc.createdAt.getTime();
+      })[0];
+
+    if (ready) {
+      return {
+        ok: true,
+        documentId: ready.doc.id,
+        fileName: ready.doc.fileName,
+        realPageCount: ready.realPageCount,
+        realCharacterCount: ready.realCharacterCount,
+      };
+    }
+
+    let lastError = "REAL_SOURCE_REQUIRED";
+
+    for (const doc of documents) {
+      const extraction = await this.ensureRealExtraction(doc.id, instructorId);
+      if (extraction && extraction.status !== "COMPLETED") {
+        lastError = extraction.errorMessage ?? "REAL_EXTRACTION_FAILED";
+        continue;
+      }
+
+      const realPages = await prisma.documentPage.findMany({
+        where: {
+          documentId: doc.id,
+          extractionStatus: "COMPLETED",
+          NOT: { extractionMethod: "MOCK" },
+        },
+        select: {
+          extractionMethod: true,
+          extractedText: true,
+        },
+      });
+
+      const readable = realPages.filter(
+        (page) =>
+          page.extractionMethod !== null &&
+          page.extractionMethod !== "MOCK" &&
+          (page.extractedText?.trim().length ?? 0) > 20
+      );
+
+      if (readable.length > 0) {
+        return {
+          ok: true,
+          documentId: doc.id,
+          fileName: doc.fileName,
+          realPageCount: readable.length,
+          realCharacterCount: readable.reduce(
+            (sum, page) => sum + (page.extractedText?.trim().length ?? 0),
+            0
+          ),
+        };
+      }
+    }
+
+    return { ok: false, errorMessage: lastError };
+  }
+
   /** Retry a single failed page without reprocessing the whole document */
   async retryPage(
     documentId: string,
