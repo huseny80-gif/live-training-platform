@@ -24,8 +24,9 @@ export default function DocumentUpload({ programId }: { programId: string }) {
   const [message, setMessage] = useState("");
   const [documentId, setDocumentId] = useState("");
 
-  /** Upload success and source adoption are a dedicated stage.
-   *  Do not generate or replace days/questions here. */
+  /** End-to-end upload flow:
+   *  upload → adopt real PDF source → atomically generate 10 days × 5 questions.
+   *  Existing content is replaced only after complete validated generation. */
   async function startPipeline(docId: string, fileName: string, pageCount?: number) {
     setDocumentId(docId);
     setMessage(
