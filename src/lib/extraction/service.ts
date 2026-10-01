@@ -388,7 +388,8 @@ export class DocumentExtractionService {
    */
   async selectBestRealSourceDocument(
     programId: string,
-    instructorId: string
+    instructorId: string,
+    attemptExtraction = true
   ): Promise<
     | {
         ok: true;
@@ -471,6 +472,14 @@ export class DocumentExtractionService {
         fileName: ready.doc.fileName,
         realPageCount: ready.realPageCount,
         realCharacterCount: ready.realCharacterCount,
+      };
+    }
+
+    if (!attemptExtraction) {
+      return {
+        ok: false,
+        errorMessage:
+          "REAL_SOURCE_REQUIRED — عالج ملف PDF من صفحة البرنامج أولًا حتى تكتمل الصفحات الحقيقية.",
       };
     }
 
