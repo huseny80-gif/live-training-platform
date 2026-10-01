@@ -19,7 +19,10 @@ export default function JoinPage() {
   const [initialCode, setInitialCode] = useState("");
   useEffect(() => {
     const queryCode = new URLSearchParams(window.location.search).get("code");
-    const pathCode = window.location.pathname.match(/^\\/join\\/([^/]+)$/)?.[1];
+    const pathParts = window.location.pathname.split("/").filter(Boolean);
+    const pathCode = pathParts[0] === "join" && pathParts[1]
+      ? decodeURIComponent(pathParts[1])
+      : null;
     const code = (queryCode || pathCode || "").trim().toUpperCase();
     if (code) setInitialCode(code.slice(0, 6));
   }, []);
