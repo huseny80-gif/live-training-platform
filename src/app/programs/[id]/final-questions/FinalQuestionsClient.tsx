@@ -3,8 +3,7 @@ import { useActionState } from "react";
 import { generateFinalQuestions, type FinalQuestionsState } from "@/app/actions/final-questions";
 
 export default function FinalQuestionsClient({ programId }: { programId: string }) {
-  const action = generateFinalQuestions.bind(null, programId);
-  const [state, dispatch, pending] = useActionState<FinalQuestionsState | null, FormData>(async (prevState, _formData) => generateFinalQuestions(programId, prevState), null);
+  const [state, dispatch, pending] = useActionState<FinalQuestionsState | null, FormData>(async (prevState, _formData) => generateFinalQuestions(programId, prevState, _formData), null);
   return <div className="dlp-final-wrap">
     <form action={dispatch}><button className="brand-button-primary dlp-generate-button" disabled={pending}>{pending ? "جارٍ مراجعة الملف وإنشاء الامتحان…" : "إنشاء الملخص والأسئلة النهائية"}</button></form>
     {state && !state.ok && <p className="dlp-error">{state.error}</p>}
