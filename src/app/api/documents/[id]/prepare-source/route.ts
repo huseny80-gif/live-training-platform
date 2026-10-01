@@ -3,16 +3,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { extractionService } from "@/lib/extraction/service";
 import { extractionErrorToArabic } from "@/lib/extraction/errors";
+import { requiredReadablePages } from "@/lib/extraction/coverage";
 
 export const maxDuration = 300;
 
 const EXTRACTION_BATCH_SIZE = 20;
-const MIN_REAL_SOURCE_COVERAGE = 0.7;
-
-function requiredReadablePages(totalPages: number): number {
-  return Math.max(1, Math.ceil(Math.max(totalPages, 1) * MIN_REAL_SOURCE_COVERAGE));
-}
-
 async function sourceReadiness(documentId: string, instructorId: string) {
   const doc = await prisma.trainingDocument.findFirst({
     where: {
