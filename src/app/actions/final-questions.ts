@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { isArabicQuestionContent, isPredominantlyArabic } from "@/lib/language";
 import { extractionService } from "@/lib/extraction/service";
 import { extractionErrorToArabic } from "@/lib/extraction/errors";
-import { verifyArabicProgramBank } from "@/lib/ai/program-acceptance";
 
 export type FinalQuestion = {
   type: "MCQ" | "TF";
@@ -17,7 +16,7 @@ export type FinalQuestion = {
 };
 
 export type FinalQuestionsState =
-  | { ok: false; error: string; code?: "SOURCE_NOT_READY" | "DAILY_BANK_NOT_READY" | "GENERATION_FAILED" }
+  | { ok: false; error: string; code?: "SOURCE_NOT_READY" | "GENERATION_FAILED"; documentId?: string }
   | {
       ok: true;
       summary: string;
@@ -324,17 +323,6 @@ export async function generateFinalQuestions(
 
   if (!program) return { ok: false, error: "PROGRAM_NOT_FOUND" };
 
-  const dailyBank = await verifyArabicProgramBank(programId);
-
-  if (!dailyBank.ok) {
-    return {
-      ok: false,
-      code: "DAILY_BANK_NOT_READY",
-      error:
-        `بنك الأسئلة اليومية غير جاهز للاعتماد: ${dailyBank.days} أيام، ${dailyBank.questions} سؤالًا. سيُعاد اعتماد PDF وبناء 10 أيام و50 سؤالًا عربيًا أولًا.`,
-    };
-  }
-
   const sourceDocument = await extractionService.selectBestRealSourceDocument(
     programId,
     session.user.id,
@@ -342,9 +330,16 @@ export async function generateFinalQuestions(
   );
 
   if (!sourceDocument.ok) {
+    const candidate = await prisma.trainingDocument.findFirst({
+      where: { programId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+
     return {
       ok: false,
       code: "SOURCE_NOT_READY",
+      documentId: candidate?.id,
       error: extractionErrorToArabic(sourceDocument.errorMessage),
     };
   }
