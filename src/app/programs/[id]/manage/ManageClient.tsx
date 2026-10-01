@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { regenerateProgramInArabic } from "@/app/actions/generation";
 import {
   createDayAction,
@@ -91,6 +92,7 @@ function Badge({ text, color }: { text: string; color: string }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ManageClient({ program }: { program: Program }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"days" | "sessions">("days");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [showAddDay, setShowAddDay] = useState(false);
@@ -136,7 +138,11 @@ export default function ManageClient({ program }: { program: Program }) {
     if (!confirm(`حذف الجلسة ${code}؟ سيتم حذف جميع بياناتها نهائيًا.${activeWarning}`)) return;
     startTransition(async () => {
       const r = await deleteSessionAction(sessionId);
-      if (!r.ok) alert(r.error);
+      if (!r.ok) {
+        alert(r.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
