@@ -24,6 +24,12 @@ export function extractionErrorToArabic(message?: string): string {
     return "وصل مزود الذكاء الاصطناعي إلى حد الاستخدام مؤقتًا. حاول مرة أخرى بعد قليل أو راجع الرصيد وحدود الاستخدام.";
   }
   if (
+    value.includes("INSUFFICIENT_REAL_EXTRACTION_COVERAGE") ||
+    value.includes("OPENAI_PDF_BATCH_EXTRACTION_FAILED")
+  ) {
+    return "تم استخراج جزء من ملف PDF الحقيقي، لكن التغطية غير كافية لبناء 10 أيام و50 سؤالًا بصورة موثوقة. أعد المحاولة ليكمل النظام استخراج الصفحات الحقيقية المتبقية.";
+  }
+  if (
     value.includes("OPENAI_PDF_NO_READABLE_CONTENT") ||
     value.includes("OPENAI_PDF_PAGES_MISSING")
   ) {
