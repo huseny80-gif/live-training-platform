@@ -5,6 +5,7 @@ import { contentGenerationService } from "@/lib/ai/service";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { extractionService } from "@/lib/extraction/service";
+import { extractionErrorToArabic } from "@/lib/extraction/errors";
 
 async function requireInstructor(): Promise<string> {
   const session = await auth();
@@ -137,8 +138,7 @@ export async function regenerateProgramInArabic(programId: string) {
       daysGenerated: 0,
       questionsGenerated: 0,
       errorMessage:
-        "تعذر استخراج المحتوى الحقيقي من الملف التدريبي. " +
-        (extraction.errorMessage ?? "تحقق من إعداد OPENAI_API_KEY أو مزود الاستخراج ثم أعد المحاولة."),
+        extractionErrorToArabic(extraction.errorMessage),
     };
   }
 
