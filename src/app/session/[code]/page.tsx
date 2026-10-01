@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { brand } from "@/lib/brand";
 
 interface QuestionOption {
   id: string;
@@ -115,7 +116,7 @@ export default function ParticipantSessionPage() {
   if (error) {
     const isNotFound = error === "SESSION_NOT_FOUND";
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl">⚠️</div>
           <h1 className="text-lg font-bold text-gray-800">
@@ -140,7 +141,7 @@ export default function ParticipantSessionPage() {
   // ── Loading ──────────────────────────────────────────────────────────────
   if (!state) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <p className="text-gray-500 animate-pulse">جاري الاتصال…</p>
       </main>
     );
@@ -151,7 +152,7 @@ export default function ParticipantSessionPage() {
   // ── Session ended — redirect soon, show brief message ────────────────────
   if (sessionStatus === "ENDED") {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl">🏁</div>
           <h1 className="text-xl font-bold text-gray-900">انتهى الاختبار</h1>
@@ -165,10 +166,10 @@ export default function ParticipantSessionPage() {
   // ── Waiting / Paused ─────────────────────────────────────────────────────
   if (sessionStatus === "DRAFT" || sessionStatus === "PAUSED" || !currentQuestion) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <div className="bg-white rounded-2xl border shadow-sm p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl animate-bounce">⏳</div>
-          <h1 className="text-xl font-bold text-gray-900">القيادة الرقمية</h1>
+          <h1 className="text-xl font-bold text-gray-900">{brand.nameAr}</h1>
           <p className="text-gray-600 font-medium">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
           <p className="text-gray-500 text-sm">
             {sessionStatus === "PAUSED"
@@ -196,12 +197,12 @@ export default function ParticipantSessionPage() {
     : 0;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-4 flex flex-col items-center">
-      <div className="w-full max-w-lg space-y-4 mt-4">
+    <main dir="rtl" lang="ar" className="dlp-participant-page dlp-participant-live">
+      <div className="dlp-participant-wrap">
 
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-lg font-bold text-blue-800">القيادة الرقمية</h1>
+        <div className="dlp-participant-head">
+          <h1 className="text-lg font-bold text-blue-800">{brand.nameAr}</h1>
           <p className="text-xs text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
         </div>
 
@@ -229,7 +230,7 @@ export default function ParticipantSessionPage() {
         )}
 
         {/* Question text */}
-        <div className="bg-white rounded-2xl border p-6 shadow-sm">
+        <div className="dlp-participant-question">
           <p className="text-lg font-semibold leading-relaxed text-gray-800">{q.questionText}</p>
         </div>
 
@@ -248,7 +249,7 @@ export default function ParticipantSessionPage() {
         )}
 
         {/* Options */}
-        <div className="space-y-3" role="group" aria-label="خيارات الإجابة">
+        <div className="dlp-participant-options" role="group" aria-label="خيارات الإجابة">
           {q.options.map((opt) => {
             const isSelected = (selectedOption ?? state.myAnswer) === opt.id;
             let cls = "w-full text-right rounded-xl border p-4 flex items-center gap-3 transition-colors ";
