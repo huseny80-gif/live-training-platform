@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { regenerateProgramQuestionsArabic } from "@/app/actions/generation";
 import {
   createDayAction,
   updateDayAction,
@@ -88,6 +90,7 @@ function Badge({ text, color }: { text: string; color: string }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ManageClient({ program }: { program: Program }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"days" | "sessions">("days");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [showAddDay, setShowAddDay] = useState(false);
@@ -95,6 +98,7 @@ export default function ManageClient({ program }: { program: Program }) {
   const [showAddQFor, setShowAddQFor] = useState<string | null>(null);
   const [showAddTopicFor, setShowAddTopicFor] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [generationMessage, setGenerationMessage] = useState<string | null>(null);
 
   // ── Day actions ────────────────────────────────────────────────────────────
 
@@ -153,6 +157,13 @@ export default function ManageClient({ program }: { program: Program }) {
       {/* ── Days Tab ──────────────────────────────────────────────────────── */}
       {activeTab === "days" && (
         <div className="space-y-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><h3 className="font-semibold text-amber-900">إعادة استحداث بنك الأسئلة بالعربية</h3><p className="text-xs text-amber-800">يعيد تحليل المادة المعتمدة وإنشاء 10 أيام × 5 أسئلة = 50 سؤالاً من المصدر حصراً.</p></div>
+              <button disabled={isPending} onClick={() => { if (!confirm("سيتم استبدال الأيام والأسئلة الحالية بالكامل. هل تريد المتابعة؟")) return; setGenerationMessage(null); startTransition(async()=>{ const r=await regenerateProgramQuestionsArabic(program.id); if(r.ok){setGenerationMessage(`تم إنشاء ${r.questionsGenerated} سؤالاً عربياً عبر ${r.modelUsed}.`); router.refresh();} else { const map:Record<string,string>={DELETE_SESSIONS_FIRST:"احذف جلسات البرنامج الحالية أولاً لحماية نتائجها ومراجع أسئلتها.",NO_DOCUMENT:"لا توجد مادة تدريبية مرفقة.",DOCUMENT_NOT_EXTRACTED:"يجب إكمال استخراج محتوى المادة أولاً."}; setGenerationMessage(map[r.error] ?? `فشل التوليد: ${r.error}`); }}); }} className="px-4 py-2 rounded-lg bg-amber-700 text-white text-sm disabled:opacity-50">{isPending ? "جارٍ إنشاء 50 سؤالاً…" : "إعادة استحداث 50 سؤالاً بالعربية"}</button>
+            </div>
+            {generationMessage && <p className="text-sm font-medium text-amber-900">{generationMessage}</p>}
+          </div>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-800">الأيام والمواضيع والأسئلة</h2>
             <button

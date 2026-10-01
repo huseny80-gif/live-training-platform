@@ -116,6 +116,9 @@ export async function registerBlobUpload(params: {
   });
   if (!program) throw new Error("PROGRAM_NOT_FOUND");
 
+  const currentMaterial = await prisma.trainingDocument.findFirst({ where: { programId }, select: { id: true, storagePath: true } });
+  if (currentMaterial && currentMaterial.storagePath !== blobUrl) throw new Error("APPROVED_MATERIAL_ALREADY_EXISTS");
+
   // blobUrl is client-supplied (completeBlobUpload) or comes from Vercel's
   // upload-completed webhook — either way it names a blob this function is
   // about to read and attach to programId, so verify it actually is a
@@ -254,5 +257,19 @@ export async function deleteDocument(documentId: string) {
   }
 
   await prisma.trainingDocument.delete({ where: { id: documentId } });
+  revalidatePath(`/programs/${doc.programId}`);
+  return { success: true };
+}
+
+
+/** Rename the single approved training material without changing its source content. */
+export async function renameDocument(documentId: string, fileName: string) {
+  const instructorId = await requireInstructor();
+  const clean = fileName.trim().slice(0, 200);
+  if (!clean) throw new Error("INVALID_FILE_NAME");
+  const doc = await prisma.trainingDocument.findFirst({ where: { id: documentId, program: { instructorId } }, select: { id: true, programId: true } });
+  if (!doc) throw new Error("NOT_FOUND");
+  await prisma.trainingDocument.update({ where: { id: documentId }, data: { fileName: clean } });
+  revalidatePath(`/programs/${doc.programId}`);
   return { success: true };
 }

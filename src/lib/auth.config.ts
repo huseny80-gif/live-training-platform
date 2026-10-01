@@ -2,6 +2,10 @@
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig: NextAuthConfig = {
+  // Vercel terminates TLS at its proxy and forwards the original host.
+  // Trust that host so Auth.js keeps Preview requests on the Preview domain
+  // while Production requests remain on the Production domain.
+  trustHost: true,
   providers: [],
   session: { strategy: "jwt" },
   pages: {

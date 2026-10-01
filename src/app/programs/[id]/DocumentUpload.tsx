@@ -211,10 +211,9 @@ export default function DocumentUpload({ programId }: { programId: string }) {
   return (
     <section className="bg-white rounded-xl border p-6 space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Training Document</h2>
+        <h2 className="text-lg font-semibold">رفع ملف المادة المعتمد</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Upload a PDF to extract content and generate training days, topics,
-          and questions.
+          ارفع ملف PDF المعتمد لاستخراج المحتوى وإنشاء الأيام والأسئلة منه حصراً.
         </p>
       </div>
 
@@ -229,9 +228,9 @@ export default function DocumentUpload({ programId }: { programId: string }) {
         }`}
       >
         <p className="text-sm text-gray-500">
-          {busy ? "Processing..." : "Drag & drop a PDF here, or click to select"}
+          {busy ? "جارٍ المعالجة..." : "اسحب ملف PDF هنا أو اضغط للاختيار"}
         </p>
-        <p className="text-xs text-gray-400 mt-1">PDF only · max 50 MB</p>
+        <p className="text-xs text-gray-400 mt-1">PDF فقط · الحد الأقصى 50 MB</p>
         <input
           ref={inputRef}
           type="file"
@@ -244,7 +243,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
       {documentId && (
         <p className="text-xs text-gray-500">
-          Document ID: {documentId}
+          معرّف الملف: {documentId}
         </p>
       )}
 

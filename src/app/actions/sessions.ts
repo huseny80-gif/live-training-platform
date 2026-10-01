@@ -270,3 +270,24 @@ export async function joinSessionAction(formData: FormData) {
 
   redirect(`/session/${code}`);
 }
+
+
+export async function deleteLiveSession(sessionId: string) {
+  const instructorId = await requireInstructor();
+  const session = await prisma.liveSession.findFirst({ where: { id: sessionId, instructorId }, select: { id: true, programId: true, status: true } });
+  if (!session) throw new Error("SESSION_NOT_FOUND");
+  await prisma.liveSession.delete({ where: { id: sessionId } });
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath(`/programs/${session.programId}`);
+  return { ok: true };
+}
+
+export async function deleteAllProgramSessions(programId: string) {
+  const instructorId = await requireInstructor();
+  const program = await prisma.trainingProgram.findFirst({ where: { id: programId, instructorId }, select: { id: true } });
+  if (!program) throw new Error("PROGRAM_NOT_FOUND");
+  const result = await prisma.liveSession.deleteMany({ where: { programId, instructorId } });
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath(`/programs/${programId}`);
+  return { ok: true, deleted: result.count };
+}

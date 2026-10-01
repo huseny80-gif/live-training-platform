@@ -70,3 +70,30 @@ export async function getProgramQuestionStats(programId: string) {
     byDay: days.map((d) => ({ dayNumber: d.dayNumber, questionCount: d._count.questions })),
   };
 }
+
+
+/** Recreate the 10-day / 50-question bank in Arabic from the latest extracted source document. */
+export async function regenerateProgramQuestionsArabic(programId: string) {
+  const instructorId = await requireInstructor();
+  const program = await prisma.trainingProgram.findFirst({
+    where: { id: programId, instructorId },
+    include: {
+      documents: { orderBy: { createdAt: "desc" }, take: 1 },
+      _count: { select: { sessions: true } },
+    },
+  });
+  if (!program) throw new Error("PROGRAM_NOT_FOUND");
+  if (program._count.sessions > 0) {
+    return { ok: false as const, error: "DELETE_SESSIONS_FIRST" };
+  }
+  const document = program.documents[0];
+  if (!document) return { ok: false as const, error: "NO_DOCUMENT" };
+  if (document.extractionStatus !== "COMPLETED") {
+    return { ok: false as const, error: "DOCUMENT_NOT_EXTRACTED" };
+  }
+  const result = await contentGenerationService.generateForProgram(programId, document.id, instructorId, "AR");
+  if (result.status !== "COMPLETED") {
+    return { ok: false as const, error: result.errorMessage ?? "GENERATION_FAILED" };
+  }
+  return { ok: true as const, daysGenerated: result.daysGenerated, questionsGenerated: result.questionsGenerated, modelUsed: result.modelUsed };
+}

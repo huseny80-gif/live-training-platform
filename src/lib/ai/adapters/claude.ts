@@ -134,14 +134,8 @@ function parseDayPlans(
     };
   });
 
-  // If fewer than totalDays returned, pad with fallback days
-  if (days.length < totalDays) {
-    const fallback = fallbackDayPlans(totalDays, pages);
-    for (let i = days.length; i < totalDays; i++) {
-      days.push(fallback[i]);
-    }
-  }
-
+  // Fail closed: never fabricate a training plan to satisfy the 10-day quota.
+  // The service will report the shortfall instead of persisting invented content.
   return days;
 }
 
