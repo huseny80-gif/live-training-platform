@@ -288,7 +288,7 @@ export default function ManageClient({ program }: { program: Program }) {
             </div>
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={handleRegenerateArabic}
+                onClick={() => handleRegenerateArabic()}
                 disabled={isPending || isRebuilding}
                 className="px-3 py-1.5 bg-teal-700 text-white rounded-lg text-sm hover:bg-teal-800 disabled:opacity-50"
               >
