@@ -6,6 +6,7 @@ import { extractionService } from "@/lib/extraction/service";
 import { contentGenerationService } from "@/lib/ai/service";
 import { extractionErrorToArabic } from "@/lib/extraction/errors";
 import { generationErrorToArabic } from "@/lib/ai/errors";
+import { verifyArabicProgramBank } from "@/lib/ai/program-acceptance";
 import { requiredReadablePages } from "@/lib/extraction/coverage";
 import { representativePageOrder } from "@/lib/extraction/page-sampling";
 
@@ -287,6 +288,33 @@ export async function POST(
     );
   }
 
+  const acceptance = await verifyArabicProgramBank(programId);
+
+  if (!acceptance.ok) {
+    const rawError = `PROGRAM_ACCEPTANCE_FAILED — ${acceptance.reason}`;
+    await prisma.trainingDocument.update({
+      where: { id: selected.id },
+      data: {
+        extractionStatus: "FAILED",
+        extractionNotes: rawError,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        stage: "FAILED",
+        error:
+          `فشل تحقق القبول النهائي بعد الحفظ: ${acceptance.days} أيام، ${acceptance.questions} سؤالًا. لم تُعتمد العملية كناجحة.`,
+        rawError,
+        documentId: selected.id,
+        daysGenerated: acceptance.days,
+        questionsGenerated: acceptance.questions,
+        questionsPerDay: acceptance.questionsPerDay,
+      },
+      { status: 422 }
+    );
+  }
+
   await prisma.$transaction([
     prisma.trainingProgram.update({
       where: { id: programId },
@@ -296,7 +324,8 @@ export async function POST(
       where: { id: selected.id },
       data: {
         extractionStatus: "COMPLETED",
-        extractionNotes: `10 days · ${generation.questionsGenerated} questions · real source ${selected.completedPages}/${selected.totalPages}`,
+        extractionNotes:
+          `SOURCE_ACCEPTED · 10 days · 50 questions · 5/day · real source ${selected.completedPages}/${selected.totalPages}`,
         extractedAt: new Date(),
       },
     }),
@@ -311,8 +340,9 @@ export async function POST(
     stage: "COMPLETED",
     documentId: selected.id,
     fileName: selected.fileName,
-    daysGenerated: generation.daysGenerated,
-    questionsGenerated: generation.questionsGenerated,
+    daysGenerated: acceptance.days,
+    questionsGenerated: acceptance.questions,
+    questionsPerDay: acceptance.questionsPerDay,
     completedPages: selected.completedPages,
     requiredPages: selected.requiredPages,
     totalPages: selected.totalPages,
