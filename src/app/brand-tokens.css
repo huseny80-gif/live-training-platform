@@ -1,0 +1,60 @@
+/* Digital Leadership & Smart Governance — Phase UI-1 design tokens */
+:root {
+  --brand-primary: #00a6a6;
+  --brand-primary-dark: #087f86;
+  --brand-navy: #0b1f3a;
+  --brand-interactive: #2563eb;
+  --brand-accent: #d4af37;
+  --brand-bg: #f8fafc;
+  --brand-surface: #ffffff;
+  --brand-border: #e2e8f0;
+  --brand-muted: #64748b;
+  --brand-text: #0f172a;
+  --brand-success: #16a34a;
+  --brand-warning: #d97706;
+  --brand-danger: #dc2626;
+  --brand-radius-sm: 8px;
+  --brand-radius-md: 12px;
+  --brand-radius-lg: 16px;
+  --brand-radius-xl: 24px;
+  --brand-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
+  --brand-shadow-card: 0 8px 24px rgb(15 23 42 / 0.06);
+  --brand-font-ar: "Cairo", "Noto Sans Arabic", system-ui, sans-serif;
+  --brand-font-en: "Inter", system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  --brand-bg: #08111f;
+  --brand-surface: #0f1b2d;
+  --brand-border: #203047;
+  --brand-muted: #94a3b8;
+  --brand-text: #f8fafc;
+  --brand-primary: #22c1c3;
+  --brand-primary-dark: #18a7aa;
+}
+
+.brand-page {
+  background: var(--brand-bg);
+  color: var(--brand-text);
+}
+
+.brand-card {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--brand-radius-lg);
+  box-shadow: var(--brand-shadow-sm);
+}
+
+.brand-button-primary {
+  background: var(--brand-primary);
+  color: #fff;
+  border-radius: var(--brand-radius-md);
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+.brand-button-primary:hover { background: var(--brand-primary-dark); }
+.brand-button-primary:active { transform: translateY(1px); }
+
+.brand-focus:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-primary) 35%, transparent);
+  outline-offset: 2px;
+}
