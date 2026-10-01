@@ -254,5 +254,19 @@ export async function deleteDocument(documentId: string) {
   }
 
   await prisma.trainingDocument.delete({ where: { id: documentId } });
+  revalidatePath(`/programs/${doc.programId}`);
+  return { success: true };
+}
+
+
+/** Rename the single approved training material without changing its source content. */
+export async function renameDocument(documentId: string, fileName: string) {
+  const instructorId = await requireInstructor();
+  const clean = fileName.trim().slice(0, 200);
+  if (!clean) throw new Error("INVALID_FILE_NAME");
+  const doc = await prisma.trainingDocument.findFirst({ where: { id: documentId, program: { instructorId } }, select: { id: true, programId: true } });
+  if (!doc) throw new Error("NOT_FOUND");
+  await prisma.trainingDocument.update({ where: { id: documentId }, data: { fileName: clean } });
+  revalidatePath(`/programs/${doc.programId}`);
   return { success: true };
 }
