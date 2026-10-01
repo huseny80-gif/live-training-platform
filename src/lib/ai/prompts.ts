@@ -1,7 +1,7 @@
 // Versioned prompt templates — bump PROMPT_VERSION when changing prompts
 // so aiPromptVersion on Question tracks which prompt produced each question.
 
-export const PROMPT_VERSION = "v1.1-source-grounded";
+export const PROMPT_VERSION = "v1.2-source-language-grounded";
 
 export function buildDayPlanPrompt(
   pages: Array<{ pageNumber: number; title?: string | null; extractedText: string }>,
@@ -109,5 +109,7 @@ ${pageContent || "لا يوجد محتوى مصدر صالح — لا تنشئ �
 - sourcePageNumber يجب أن يكون من الصفحات: [${dayPlan.sourcePages.join(", ")}]
 - difficulty يجب أن يكون EASY أو MEDIUM أو HARD
 - الأسئلة يجب أن تقيس الفهم الحقيقي وليس الحفظ فقط
-- لا تكرر نفس المعنى في سؤالين مختلفين`;
+- لا تكرر نفس المعنى في سؤالين مختلفين
+- إذا كانت اللغة المطلوبة العربية، اكتب السؤال والخيارات والتفسير بالعربية حتى لو احتوى المصدر على مصطلحات إنجليزية؛ احتفظ بالمصطلح الإنجليزي بين قوسين عند الحاجة فقط
+- إذا كان المصدر ثنائي اللغة، لا تغيّر لغة السؤال إلى الإنجليزية لمجرد وجود نص إنجليزي ما دامت اللغة المطلوبة العربية`;
 }
