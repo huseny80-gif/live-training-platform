@@ -116,6 +116,9 @@ export async function registerBlobUpload(params: {
   });
   if (!program) throw new Error("PROGRAM_NOT_FOUND");
 
+  const currentMaterial = await prisma.trainingDocument.findFirst({ where: { programId }, select: { id: true, storagePath: true } });
+  if (currentMaterial && currentMaterial.storagePath !== blobUrl) throw new Error("APPROVED_MATERIAL_ALREADY_EXISTS");
+
   // blobUrl is client-supplied (completeBlobUpload) or comes from Vercel's
   // upload-completed webhook — either way it names a blob this function is
   // about to read and attach to programId, so verify it actually is a
