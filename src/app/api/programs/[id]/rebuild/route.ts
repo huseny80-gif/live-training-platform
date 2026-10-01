@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { extractionService } from "@/lib/extraction/service";
 import { contentGenerationService } from "@/lib/ai/service";
 import { extractionErrorToArabic } from "@/lib/extraction/errors";
+import { generationErrorToArabic } from "@/lib/ai/errors";
 
 export const maxDuration = 300;
 
@@ -271,16 +272,18 @@ export async function POST(
   );
 
   if (generation.status !== "COMPLETED") {
-    const error = generation.errorMessage ?? "تعذر توليد المحتوى والأسئلة.";
+    const rawError = generation.errorMessage ?? "GENERATION_FAILED";
+    const error = generationErrorToArabic(rawError);
     await prisma.trainingDocument.update({
       where: { id: selected.id },
-      data: { extractionStatus: "FAILED", extractionNotes: error },
+      data: { extractionStatus: "FAILED", extractionNotes: rawError },
     });
 
     return NextResponse.json(
       {
         stage: "FAILED",
         error,
+        rawError,
         documentId: selected.id,
       },
       { status: 422 }
