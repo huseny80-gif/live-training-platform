@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { contentGenerationService } from "@/lib/ai/service";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 
 async function requireInstructor(): Promise<string> {
   const session = await auth();
@@ -69,4 +70,73 @@ export async function getProgramQuestionStats(programId: string) {
     totalQuestions: days.reduce((sum, d) => sum + d._count.questions, 0),
     byDay: days.map((d) => ({ dayNumber: d.dayNumber, questionCount: d._count.questions })),
   };
+}
+
+
+/**
+ * Rebuild a program's days/questions in Arabic from its most recent successfully
+ * extracted document. Existing content is preserved if generation fails.
+ * Sessions must be removed first because they intentionally preserve question history.
+ */
+export async function regenerateProgramInArabic(programId: string) {
+  const instructorId = await requireInstructor();
+
+  const program = await prisma.trainingProgram.findFirst({
+    where: { id: programId, instructorId },
+    select: {
+      id: true,
+      sessions: { select: { id: true, sessionCode: true, status: true } },
+      documents: {
+        where: { extractionStatus: "COMPLETED" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!program) throw new Error("PROGRAM_NOT_FOUND");
+
+  if (program.sessions.length > 0) {
+    return {
+      programId,
+      documentId: program.documents[0]?.id ?? "",
+      status: "FAILED" as const,
+      daysGenerated: 0,
+      questionsGenerated: 0,
+      errorMessage:
+        "احذف الجلسات القديمة أولًا؛ فهي تحتفظ بنسخة تاريخية من بنك الأسئلة ولا يجوز استبدال الأسئلة أثناء ارتباطها بجلسات.",
+    };
+  }
+
+  const document = program.documents[0];
+  if (!document) {
+    return {
+      programId,
+      documentId: "",
+      status: "FAILED" as const,
+      daysGenerated: 0,
+      questionsGenerated: 0,
+      errorMessage: "لا يوجد ملف مكتمل التحليل لإعادة توليد المحتوى منه.",
+    };
+  }
+
+  const result = await contentGenerationService.generateForProgram(
+    programId,
+    document.id,
+    instructorId,
+    "AR"
+  );
+
+  if (result.status === "COMPLETED") {
+    await prisma.trainingProgram.update({
+      where: { id: programId },
+      data: { language: "AR" },
+    });
+    revalidatePath(`/programs/${programId}`);
+    revalidatePath(`/programs/${programId}/manage`);
+    revalidatePath("/dashboard");
+  }
+
+  return result;
 }
