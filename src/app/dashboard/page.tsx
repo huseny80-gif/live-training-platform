@@ -4,6 +4,8 @@ import { listOwnedPrograms } from "@/app/actions/programs";
 import Link from "next/link";
 import { brand } from "@/lib/brand";
 import LanguageToggle from "@/components/LanguageToggle";
+import PlatformTheme from "@/components/PlatformTheme";
+import { getPlatformSettings } from "@/app/actions/platform-settings";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "مسودة",
@@ -32,6 +34,7 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
 
   const programs = await listOwnedPrograms();
+  const settings = await getPlatformSettings();
   const totalDays = programs.reduce((s, p) => s + p._count.days, 0);
   const totalQuestions = programs.reduce(
     (sum, p) => sum + p.days.reduce((s, d) => s + d._count.questions, 0),
@@ -47,8 +50,8 @@ export default async function DashboardPage() {
           <div className="dlp-brand">
             <div className="dlp-logo">ق</div>
             <div>
-              <h1 >{brand.nameAr}</h1>
-              <p >{brand.nameEn}</p>
+              <h1 >{settings.platformNameAr}</h1>
+              <p >{settings.platformNameEn}</p>
             </div>
           </div>
           <LanguageToggle />
@@ -95,7 +98,7 @@ export default async function DashboardPage() {
           <div className="dlp-hero">
             <p className="dlp-hero-eyebrow">مرحباً بك في منصة</p>
             <h2 >{brand.nameAr}</h2>
-            <p className="dlp-hero-desc">{brand.taglineAr}</p>
+            <p className="dlp-hero-desc">{settings.taglineAr}</p>
             <Link href="/programs/new" className="dlp-hero-action">
               + إنشاء برنامج تدريبي
             </Link>
