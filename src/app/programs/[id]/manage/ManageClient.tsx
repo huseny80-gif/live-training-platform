@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { regenerateProgramInArabic } from "@/app/actions/generation";
 import {
   createDayAction,
   updateDayAction,
@@ -155,6 +156,25 @@ export default function ManageClient({ program }: { program: Program }) {
     });
   }
 
+  function handleRegenerateArabic() {
+    const message =
+      program.language === "AR"
+        ? "إعادة توليد الأيام والأسئلة بالعربية من آخر ملف تم تحليله بنجاح؟\n\nلن يُستبدل المحتوى الحالي إلا بعد نجاح توليد بنك كامل والتحقق منه."
+        : "تحويل البرنامج إلى العربية وإعادة توليد الأيام والأسئلة من آخر ملف تم تحليله بنجاح؟\n\nيجب حذف الجلسات القديمة أولًا.";
+    if (!confirm(message)) return;
+
+    startTransition(async () => {
+      const result = await regenerateProgramInArabic(program.id);
+      if (result.status !== "COMPLETED") {
+        alert(result.errorMessage ?? "تعذر إعادة توليد المحتوى بالعربية.");
+        return;
+      }
+      alert(
+        `تم إنشاء المحتوى العربي بنجاح: ${result.daysGenerated} أيام و${result.questionsGenerated} سؤالًا.`
+      );
+    });
+  }
+
   return (
     <div className="space-y-4">
       {/* Tabs */}
@@ -185,6 +205,13 @@ export default function ManageClient({ program }: { program: Program }) {
               ) : null}
             </div>
             <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={handleRegenerateArabic}
+                disabled={isPending}
+                className="px-3 py-1.5 bg-teal-700 text-white rounded-lg text-sm hover:bg-teal-800 disabled:opacity-50"
+              >
+                {program.language === "AR" ? "إعادة توليد المحتوى بالعربية" : "تحويل وإعادة التوليد بالعربية"}
+              </button>
               {program.language === "AR" ? (
                 <button
                   onClick={handleCleanLegacyQuestions}
