@@ -15,23 +15,30 @@ function buildTwoPagePdf(): Buffer {
   return Buffer.from("%PDF-1.4\n" + objects.join("") + "%%EOF\n", "latin1");
 }
 
-const adapter = new NativeTextExtractionAdapter();
-assert.equal(adapter.supports("TEXT_BASED"), true);
-assert.equal(adapter.supports("UNKNOWN"), true);
-assert.equal(adapter.supports("IMAGE_BASED"), false);
+async function main() {
+  const adapter = new NativeTextExtractionAdapter();
+  assert.equal(adapter.supports("TEXT_BASED"), true);
+  assert.equal(adapter.supports("UNKNOWN"), true);
+  assert.equal(adapter.supports("IMAGE_BASED"), false);
 
-const result = await adapter.extract({
-  fileBuffer: buildTwoPagePdf(),
-  fileName: "sample.pdf",
-  mimeType: "application/pdf",
+  const result = await adapter.extract({
+    fileBuffer: buildTwoPagePdf(),
+    fileName: "sample.pdf",
+    mimeType: "application/pdf",
+  });
+
+  assert.equal(result.method, "NATIVE_TEXT");
+  assert.equal(result.successCount, 2);
+  assert.equal(result.pages.length, 2);
+  assert.match(result.pages[0].extractedText, /Introduction to GIS fundamentals/);
+  assert.match(result.pages[1].extractedText, /Spatial data types and coordinate systems/);
+  assert.equal(result.pages[0].pageNumber, 1);
+  assert.equal(result.pages[1].pageNumber, 2);
+
+  console.log("✓ native PDF text extraction tests passed");
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
 });
-
-assert.equal(result.method, "NATIVE_TEXT");
-assert.equal(result.successCount, 2);
-assert.equal(result.pages.length, 2);
-assert.match(result.pages[0].extractedText, /Introduction to GIS fundamentals/);
-assert.match(result.pages[1].extractedText, /Spatial data types and coordinate systems/);
-assert.equal(result.pages[0].pageNumber, 1);
-assert.equal(result.pages[1].pageNumber, 2);
-
-console.log("✓ native PDF text extraction tests passed");
