@@ -11,10 +11,10 @@ async function main() {
 
   const instructor = await prisma.instructor.upsert({
     where: { email: "test@example.com" },
-    update: {},
+    update: { name: "Eng.Husen yasen" },
     create: {
       email: "test@example.com",
-      name: "Test Instructor",
+      name: "Eng.Husen yasen",
       passwordHash,
       role: "INSTRUCTOR",
       isActive: true,
