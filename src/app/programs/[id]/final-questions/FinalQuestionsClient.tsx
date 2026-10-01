@@ -25,6 +25,11 @@ export default function FinalQuestionsClient({ programId }: { programId: string 
       {state?.ok ? (
         <>
           <section className="brand-card dlp-final-section">
+            <div className="dlp-final-source">
+              <span>المصدر المستخدم</span>
+              <strong>{state.sourceFileName}</strong>
+              <small>{state.sourcePageCount} صفحة حقيقية مستخرجة</small>
+            </div>
             <h2>ملخص المادة</h2>
             <p>{state.summary}</p>
           </section>
