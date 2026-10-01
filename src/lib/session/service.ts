@@ -173,9 +173,22 @@ export async function showQuestion(sessionId: string, sessionQuestionId: string,
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { id: sessionQuestionId, sessionId },
+    include: {
+      session: { select: { program: { select: { language: true } } } },
+      question: { include: { options: { orderBy: { displayOrder: "asc" } } } },
+    },
   });
   if (!sq) throw new Error("QUESTION_NOT_IN_SESSION");
   if (sq.status !== "DRAFT" && sq.status !== "READY") throw new Error("INVALID_QUESTION_STATE");
+  if (
+    sq.session.program.language === "AR" &&
+    !isArabicQuestionContent(
+      sq.question.questionText,
+      sq.question.options.map((option) => ({ text: option.optionText }))
+    )
+  ) {
+    throw new Error("NON_ARABIC_SESSION_QUESTION");
+  }
 
   const updated = await prisma.sessionQuestion.update({
     where: { id: sessionQuestionId },
@@ -220,8 +233,21 @@ export async function gotoQuestion(sessionId: string, questionOrder: number, ins
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { sessionId, questionOrder },
+    include: {
+      session: { select: { program: { select: { language: true } } } },
+      question: { include: { options: { orderBy: { displayOrder: "asc" } } } },
+    },
   });
   if (!sq) throw new Error("QUESTION_NOT_FOUND");
+  if (
+    sq.session.program.language === "AR" &&
+    !isArabicQuestionContent(
+      sq.question.questionText,
+      sq.question.options.map((option) => ({ text: option.optionText }))
+    )
+  ) {
+    throw new Error("NON_ARABIC_SESSION_QUESTION");
+  }
 
   const updated = await prisma.sessionQuestion.update({
     where: { id: sq.id },
@@ -367,6 +393,7 @@ export async function getLiveQuestionPayload(sessionQuestionId: string) {
   const sq = await prisma.sessionQuestion.findUnique({
     where: { id: sessionQuestionId },
     include: {
+      session: { select: { program: { select: { language: true } } } },
       question: {
         include: {
           options: { orderBy: { displayOrder: "asc" } },
@@ -375,6 +402,15 @@ export async function getLiveQuestionPayload(sessionQuestionId: string) {
     },
   });
   if (!sq) throw new Error("NOT_FOUND");
+  if (
+    sq.session.program.language === "AR" &&
+    !isArabicQuestionContent(
+      sq.question.questionText,
+      sq.question.options.map((option) => ({ text: option.optionText }))
+    )
+  ) {
+    throw new Error("NON_ARABIC_SESSION_QUESTION");
+  }
 
   return {
     sessionQuestionId: sq.id,
