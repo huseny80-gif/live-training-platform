@@ -10,6 +10,9 @@ export function generationErrorToArabic(message?: string): string {
   if (value.includes("OPENAI_EMPTY_RESPONSE")) {
     return "أعاد نموذج الذكاء الاصطناعي استجابة فارغة. أعد المحاولة؛ لم يتم استبدال المحتوى الحالي.";
   }
+  if (value.includes("AI_PROVIDERS_FAILED")) {
+    return "تعذر التوليد عبر مزود الذكاء الاصطناعي الأساسي والاحتياطي. لم يتم حفظ أي بنك أسئلة ناقص، ويمكن إعادة المحاولة بعد مراجعة مفاتيح المزودين.";
+  }
   if (value.includes("AI_DAY_PLAN_VALIDATION_FAILED")) {
     return "لم يجتز تقسيم المادة إلى 10 أيام التحقق الصارم بعد محاولات الإصلاح. أعد المحاولة؛ سيبقى المحتوى الحالي محفوظًا.";
   }

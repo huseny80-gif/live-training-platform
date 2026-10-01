@@ -50,7 +50,7 @@ export async function runProgramRebuild(params: {
   onProgress?: (message: string, progress?: ProgramRebuildProgress) => void;
   maxSteps?: number;
 }): Promise<Extract<ProgramRebuildProgress, { stage: "COMPLETED" }>> {
-  const { programId, documentId, onProgress, maxSteps = 16 } = params;
+  const { programId, documentId, onProgress, maxSteps = 30 } = params;
   let lastCompleted = -1;
 
   for (let step = 0; step < maxSteps; step++) {

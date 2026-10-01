@@ -45,7 +45,7 @@ export async function runDocumentSourcePreparation(params: {
   onProgress?: (message: string, progress?: SourcePreparationProgress) => void;
   maxSteps?: number;
 }): Promise<Extract<SourcePreparationProgress, { stage: "READY" }>> {
-  const { documentId, onProgress, maxSteps = 12 } = params;
+  const { documentId, onProgress, maxSteps = 30 } = params;
   let lastCompleted = -1;
 
   for (let step = 0; step < maxSteps; step++) {

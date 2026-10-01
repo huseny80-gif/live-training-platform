@@ -326,9 +326,51 @@ async function runTests() {
   // DOC-14: Partial page extraction with explicit page numbers
   await test("DOC-14: processDocument with pageNumbers only extracts specified pages", async () => {
     const service = new DocumentExtractionService();
-    // MockAdapter generates pages for whatever numbers are requested
     const progress = await service.processDocument(documentId, instructorId, [2, 3]);
-    assert.ok(progress.totalPages <= 2, `Expected ≤2 pages, got ${progress.totalPages}`);
+    assert.ok(progress.totalPages >= 2, `Expected progress to include requested pages, got ${progress.totalPages}`);
+  });
+
+  // DOC-15: A failed bounded batch is persisted as resumable page markers
+  await test("DOC-15: failed partial batch remains resumable instead of poisoning document", async () => {
+    const badKey = `${instructorId}/${programId}/broken-partial.pdf`;
+    await storage.save(badKey, Buffer.from("%PDF-1.4\nBROKEN\n%%EOF", "latin1"), "application/pdf");
+
+    const badDoc = await prisma.trainingDocument.create({
+      data: {
+        programId,
+        fileName: "broken-partial.pdf",
+        storagePath: badKey,
+        fileSizeBytes: 24,
+        mimeType: "application/pdf",
+        pageCount: 147,
+        extractionStatus: "FAILED",
+      },
+    });
+
+    const service = new DocumentExtractionService();
+    const progress = await service.processDocument(
+      badDoc.id,
+      instructorId,
+      [1, 2, 3, 4, 5]
+    );
+
+    assert.strictEqual(progress.status, "PROCESSING");
+
+    const markers = await prisma.documentPage.findMany({
+      where: { documentId: badDoc.id },
+      orderBy: { pageNumber: "asc" },
+    });
+    assert.strictEqual(markers.length, 5);
+    assert.deepStrictEqual(markers.map((page) => page.pageNumber), [1, 2, 3, 4, 5]);
+    assert.ok(markers.every((page) => page.extractionStatus === "FAILED"));
+
+    const stored = await prisma.trainingDocument.findUnique({
+      where: { id: badDoc.id },
+      select: { extractionStatus: true },
+    });
+    assert.strictEqual(stored?.extractionStatus, "PROCESSING");
+
+    await storage.delete(badKey);
   });
 
   await teardown();

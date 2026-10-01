@@ -34,9 +34,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
 
-  // Idempotency: skip if already past PENDING
-  if (doc.extractionStatus !== "PENDING") {
-    return NextResponse.json({ status: doc.extractionStatus, documentId }, { status: 200 });
+  // Idempotency: only a fully completed document is terminal.
+  // FAILED and OCR_REQUIRED are intentionally retryable; PROCESSING may also
+  // be resumed after a previous serverless invocation was interrupted.
+  if (doc.extractionStatus === "COMPLETED") {
+    return NextResponse.json({ status: "COMPLETED", documentId }, { status: 200 });
   }
 
   // Mark PROCESSING synchronously so the client sees immediate progress
