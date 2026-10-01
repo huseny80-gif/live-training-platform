@@ -5,6 +5,7 @@ import Link from "next/link";
 import DocumentUpload from "./DocumentUpload";
 import DeleteDocumentButton from "./DeleteDocumentButton";
 import ReprocessDocumentButton from "./ReprocessDocumentButton";
+import AutoProgramRecovery from "./AutoProgramRecovery";
 import { brand } from "@/lib/brand";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -86,6 +87,10 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
   if (!program) notFound();
 
   const totalQuestions = program.days.reduce((sum, day) => sum + day._count.questions, 0);
+  const shouldAutoRecover =
+    totalQuestions === 0 &&
+    program._count.sessions === 0 &&
+    program.documents.length > 0;
 
   return (
     <main dir="rtl" lang="ar" className="dlp-simple-page">
@@ -113,6 +118,8 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
             {program.description ? <p>{program.description}</p> : null}
           </div>
         </section>
+
+        <AutoProgramRecovery programId={id} enabled={shouldAutoRecover} />
 
         <section className="dlp-stats">
           <div className="brand-card dlp-stat"><p className="dlp-stat-value">{program._count.days}</p><p className="dlp-stat-label">الأيام التدريبية</p></div>
