@@ -54,8 +54,12 @@ async function sourceReadiness(documentId: string, instructorId: string) {
     doc.pages
       .filter(
         (page) =>
-          page.extractionMethod !== null &&
-          page.extractionMethod !== "MOCK"
+          page.extractionMethod !== "MOCK" &&
+          (
+            page.extractionMethod !== null ||
+            page.extractionStatus === "FAILED" ||
+            page.extractionStatus === "OCR_REQUIRED"
+          )
       )
       .map((page) => page.pageNumber)
   );
