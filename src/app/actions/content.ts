@@ -6,6 +6,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "./programs";
 import { isArabicQuestionContent } from "@/lib/language";
+import { deleteSessionCompletely } from "@/lib/session/service";
 
 async function requireInstructor(): Promise<string> {
   const session = await auth();
@@ -290,49 +291,24 @@ export async function deleteQuestionAction(questionId: string): Promise<ActionRe
 
 export async function deleteSessionAction(sessionId: string): Promise<ActionResult> {
   const instructorId = await requireInstructor();
-  const session = await prisma.liveSession.findFirst({
-    where: { id: sessionId, instructorId },
-    select: { programId: true, status: true, sessionCode: true },
-  });
-  if (!session) return { ok: false, error: "الجلسة غير موجودة أو لا تملك صلاحية حذفها." };
 
   try {
-    await prisma.$transaction(async (tx) => {
-      // Delete in explicit dependency order. This intentionally does not rely
-      // on database CASCADE definitions, which may differ across old deployments.
-      await tx.participantAnswer.deleteMany({ where: { sessionId } });
-      await tx.participantDayResult.deleteMany({ where: { sessionId } });
-      await tx.dailyResult.deleteMany({ where: { sessionId } });
-      await tx.sessionResult.deleteMany({ where: { sessionId } });
-      await tx.sessionParticipant.deleteMany({ where: { sessionId } });
-
-      // Clear the pointer before removing SessionQuestion rows. Older database
-      // schemas may enforce this reference even though Prisma models it as scalar.
-      await tx.liveSession.update({
-        where: { id: sessionId },
-        data: { currentQuestionId: null },
-      });
-
-      await tx.sessionQuestion.deleteMany({ where: { sessionId } });
-      await tx.liveSession.delete({ where: { id: sessionId } });
-    });
+    const deleted = await deleteSessionCompletely(sessionId, instructorId);
+    revalidatePath(`/programs/${deleted.programId}/manage`);
+    revalidatePath(`/programs/${deleted.programId}`);
+    revalidatePath("/dashboard");
+    return { ok: true, data: undefined };
   } catch (error) {
-    console.error("DELETE_SESSION_FAILED", {
-      sessionId,
-      sessionCode: session.sessionCode,
-      status: session.status,
-      error,
-    });
+    console.error("DELETE_SESSION_FAILED", { sessionId, error });
+    const message = error instanceof Error ? error.message : "";
+    if (message === "SESSION_NOT_FOUND_OR_UNAUTHORIZED") {
+      return { ok: false, error: "الجلسة غير موجودة أو لا تملك صلاحية حذفها." };
+    }
     return {
       ok: false,
-      error: `تعذر حذف الجلسة ${session.sessionCode}. لم يتم حذف جزء من بياناتها؛ أعد المحاولة بعد تحديث الصفحة.`,
+      error: "تعذر حذف الجلسة. لم يتم حذف جزء من بياناتها؛ أعد المحاولة بعد تحديث الصفحة.",
     };
   }
-
-  revalidatePath(`/programs/${session.programId}/manage`);
-  revalidatePath(`/programs/${session.programId}`);
-  revalidatePath("/dashboard");
-  return { ok: true, data: undefined };
 }
 
 export async function deleteNonArabicQuestionsAction(
