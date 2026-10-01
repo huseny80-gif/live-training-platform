@@ -136,6 +136,7 @@ model Instructor {
   sessions      LiveSession[]
   auditLogs     AuditLog[]
   platformSettings PlatformSettings?
+  adminProfile     AdminProfile?
 
   @@index([email])
   @@map("instructors")
@@ -577,4 +578,27 @@ model PlatformSettings {
   instructor Instructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
 
   @@map("platform_settings")
+}
+
+
+// ─────────────────────────────────────────────
+// ADMIN PUBLIC PROFILE / ABOUT US
+// ─────────────────────────────────────────────
+model AdminProfile {
+  id           String   @id @default(uuid())
+  instructorId String   @unique @map("instructor_id")
+  title        String?
+  organization String?
+  qualification String?
+  bio          String?
+  phone        String?
+  emailPublic  String?  @map("email_public")
+  website      String?
+  photoUrl     String?  @map("photo_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  instructor Instructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@map("admin_profiles")
 }
