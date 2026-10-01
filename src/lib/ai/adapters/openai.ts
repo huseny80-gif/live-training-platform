@@ -15,7 +15,7 @@ import {
   isPredominantlyArabic,
 } from "@/lib/language";
 
-const MODEL_ID = process.env.OPENAI_MODEL || "gpt-5.6-luna";
+const MODEL_ID = process.env.OPENAI_MODEL || "gpt-6-luna";
 const MAX_GENERATION_ATTEMPTS = 2;
 
 type OpenAIResponse = {
