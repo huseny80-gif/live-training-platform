@@ -116,7 +116,45 @@ export class ContentGenerationService {
       const adapter = getAdapter();
       const result = await adapter.generate(req);
 
-      // Idempotent: delete existing days (cascade removes topics + questions + options)
+      // Validate the full AI result BEFORE mutating existing program content.
+      // A partial/invalid generation must never destroy a previously working bank.
+      const expectedTotal = TOTAL_DAYS * QUESTIONS_PER_DAY;
+      const generatedCounts = new Map<number, number>();
+      for (const question of result.questions) {
+        generatedCounts.set(
+          question.dayNumber,
+          (generatedCounts.get(question.dayNumber) ?? 0) + 1
+        );
+      }
+      const invalidQuotaDays = result.days
+        .filter((day) => (generatedCounts.get(day.dayNumber) ?? 0) !== QUESTIONS_PER_DAY)
+        .map(
+          (day) =>
+            `day ${day.dayNumber}: got ${generatedCounts.get(day.dayNumber) ?? 0}, want ${QUESTIONS_PER_DAY}`
+        );
+
+      if (
+        result.days.length !== TOTAL_DAYS ||
+        result.questions.length !== expectedTotal ||
+        invalidQuotaDays.length > 0
+      ) {
+        return {
+          programId,
+          documentId,
+          status: "FAILED",
+          daysGenerated: result.days.length,
+          questionsGenerated: result.questions.length,
+          errorMessage: [
+            `Expected ${TOTAL_DAYS} days × ${QUESTIONS_PER_DAY} q/day = ${expectedTotal} total.`,
+            `Got ${result.days.length} days, ${result.questions.length} questions.`,
+            ...(invalidQuotaDays.length > 0
+              ? [`Per-day shortfalls: ${invalidQuotaDays.join("; ")}`]
+              : []),
+          ].join(" "),
+        };
+      }
+
+      // Only now is it safe to replace the old content.
       await prisma.trainingDay.deleteMany({ where: { programId } });
 
       // Build pageId lookup

@@ -33,6 +33,7 @@ interface SessionState {
   myAnswer: string | null;
   isCorrect: boolean | null;
   scoreAwarded: number | null;
+  legacyQuestionBlocked?: boolean;
 }
 
 function StateCard({
@@ -192,7 +193,9 @@ export default function ParticipantSessionPage() {
           <h1>{brand.nameAr}</h1>
           <strong>{sessionTitle ?? `اليوم ${dayNumber}`}</strong>
           <p>
-            {sessionStatus === "PAUSED"
+            {state.legacyQuestionBlocked
+              ? "تم حجب سؤال قديم غير عربي من هذه الجلسة. احذف الجلسة القديمة من إدارة المحتوى وأنشئ جلسة جديدة لاستخدام بنك الأسئلة العربي."
+              : sessionStatus === "PAUSED"
               ? "الاختبار موقوف مؤقتاً. انتظر استئناف المدرب."
               : "في انتظار المدرب لعرض السؤال التالي."}
           </p>

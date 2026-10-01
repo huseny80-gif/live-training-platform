@@ -35,46 +35,57 @@ export async function createSession(
   });
   if (!day || day.questions.length === 0) throw new Error("NO_QUESTIONS_FOR_DAY");
 
-  if (program.language === "AR") {
-    const invalidQuestions = day.questions.filter(
-      (question) =>
-        !isArabicQuestionContent(
-          question.questionText,
-          question.options.map((option) => ({ text: option.optionText }))
+  const eligibleQuestions =
+    program.language === "AR"
+      ? day.questions.filter((question) =>
+          isArabicQuestionContent(
+            question.questionText,
+            question.options.map((option) => ({ text: option.optionText }))
+          )
         )
+      : day.questions;
+
+  if (eligibleQuestions.length === 0) {
+    throw new Error(
+      program.language === "AR"
+        ? "NO_ARABIC_QUESTIONS_FOR_DAY"
+        : "NO_QUESTIONS_FOR_DAY"
     );
-    if (invalidQuestions.length > 0) {
-      throw new Error(`NON_ARABIC_QUESTIONS_IN_ARABIC_PROGRAM:${invalidQuestions.length}`);
-    }
   }
 
   // Generate unique session code
   const sessionCode = await generateUniqueCode();
 
-  const session = await prisma.liveSession.create({
-    data: {
-      programId,
-      instructorId,
-      sessionCode,
-      dayNumber,
-      title: title ?? `${program.title} — Day ${dayNumber}`,
-      status: "DRAFT",
-    },
-  });
+  const orderedQuestions = [...eligibleQuestions].sort(
+    (a, b) => a.questionOrder - b.questionOrder
+  );
 
-  // Create SessionQuestion rows (ordered)
-  for (const q of day.questions.sort((a, b) => a.questionOrder - b.questionOrder)) {
-    await prisma.sessionQuestion.create({
+  // Create the session and its question snapshot atomically.
+  // If any row fails, Prisma rolls the entire transaction back so we never
+  // leave an orphan/partial LiveSession behind.
+  return prisma.$transaction(async (tx) => {
+    const session = await tx.liveSession.create({
       data: {
-        sessionId: session.id,
-        questionId: q.id,
-        questionOrder: q.questionOrder,
+        programId,
+        instructorId,
+        sessionCode,
+        dayNumber,
+        title: title ?? `${program.title} — Day ${dayNumber}`,
         status: "DRAFT",
       },
     });
-  }
 
-  return session;
+    await tx.sessionQuestion.createMany({
+      data: orderedQuestions.map((q) => ({
+        sessionId: session.id,
+        questionId: q.id,
+        questionOrder: q.questionOrder,
+        status: "DRAFT" as const,
+      })),
+    });
+
+    return session;
+  });
 }
 
 async function generateUniqueCode(): Promise<string> {
@@ -168,9 +179,22 @@ export async function showQuestion(sessionId: string, sessionQuestionId: string,
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { id: sessionQuestionId, sessionId },
+    include: {
+      session: { select: { program: { select: { language: true } } } },
+      question: { include: { options: { orderBy: { displayOrder: "asc" } } } },
+    },
   });
   if (!sq) throw new Error("QUESTION_NOT_IN_SESSION");
   if (sq.status !== "DRAFT" && sq.status !== "READY") throw new Error("INVALID_QUESTION_STATE");
+  if (
+    sq.session.program.language === "AR" &&
+    !isArabicQuestionContent(
+      sq.question.questionText,
+      sq.question.options.map((option) => ({ text: option.optionText }))
+    )
+  ) {
+    throw new Error("NON_ARABIC_SESSION_QUESTION");
+  }
 
   const updated = await prisma.sessionQuestion.update({
     where: { id: sessionQuestionId },
@@ -215,8 +239,21 @@ export async function gotoQuestion(sessionId: string, questionOrder: number, ins
 
   const sq = await prisma.sessionQuestion.findFirst({
     where: { sessionId, questionOrder },
+    include: {
+      session: { select: { program: { select: { language: true } } } },
+      question: { include: { options: { orderBy: { displayOrder: "asc" } } } },
+    },
   });
   if (!sq) throw new Error("QUESTION_NOT_FOUND");
+  if (
+    sq.session.program.language === "AR" &&
+    !isArabicQuestionContent(
+      sq.question.questionText,
+      sq.question.options.map((option) => ({ text: option.optionText }))
+    )
+  ) {
+    throw new Error("NON_ARABIC_SESSION_QUESTION");
+  }
 
   const updated = await prisma.sessionQuestion.update({
     where: { id: sq.id },
@@ -362,6 +399,7 @@ export async function getLiveQuestionPayload(sessionQuestionId: string) {
   const sq = await prisma.sessionQuestion.findUnique({
     where: { id: sessionQuestionId },
     include: {
+      session: { select: { program: { select: { language: true } } } },
       question: {
         include: {
           options: { orderBy: { displayOrder: "asc" } },
@@ -370,6 +408,15 @@ export async function getLiveQuestionPayload(sessionQuestionId: string) {
     },
   });
   if (!sq) throw new Error("NOT_FOUND");
+  if (
+    sq.session.program.language === "AR" &&
+    !isArabicQuestionContent(
+      sq.question.questionText,
+      sq.question.options.map((option) => ({ text: option.optionText }))
+    )
+  ) {
+    throw new Error("NON_ARABIC_SESSION_QUESTION");
+  }
 
   return {
     sessionQuestionId: sq.id,

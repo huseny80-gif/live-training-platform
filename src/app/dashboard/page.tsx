@@ -12,11 +12,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 const navItems = [
   { label: "الرئيسية", icon: "⌂", href: "/dashboard", active: true },
-  { label: "البرامج التدريبية", icon: "▣", href: "/dashboard" },
-  { label: "الجلسات المباشرة", icon: "◉", href: "/dashboard" },
-  { label: "المشاركون", icon: "♙", href: "/dashboard" },
-  { label: "الاختبارات", icon: "✓", href: "/dashboard" },
-  { label: "النتائج والتحليلات", icon: "⌁", href: "/dashboard" },
+  { label: "البرامج التدريبية", icon: "▣", href: "/dashboard#programs" },
+  { label: "من نحن", icon: "ⓘ", href: "/about" },
 ];
 
 export default async function DashboardPage() {
@@ -105,7 +102,7 @@ export default async function DashboardPage() {
             <StatCard label="الجلسات" value={totalSessions} icon="◉" />
           </div>
 
-          <div className="dlp-section-head">
+          <div id="programs" className="dlp-section-head">
             <div>
               <h2>البرامج التدريبية</h2>
               <p>اختر برنامجاً لإدارة المحتوى والجلسات والأسئلة.</p>
@@ -154,9 +151,9 @@ export default async function DashboardPage() {
 
           <nav className="dlp-mobile-nav" aria-label="التنقل الرئيسي">
             <Link href="/dashboard" className="active">⌂<span>الرئيسية</span></Link>
-            <Link href="/dashboard">▣<span>البرامج</span></Link>
-            <Link href="/dashboard">◉<span>الجلسات</span></Link>
-            <Link href="/dashboard">⌁<span>النتائج</span></Link>
+            <Link href="/dashboard#programs">▣<span>البرامج</span></Link>
+            <Link href="/about">ⓘ<span>من نحن</span></Link>
+            <Link href="/programs/new">＋<span>برنامج جديد</span></Link>
           </nav>
           <div className="dlp-mobile-spacer" />
         </section>

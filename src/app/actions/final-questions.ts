@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isArabicQuestionContent, isPredominantlyArabic } from "@/lib/language";
 
 export type FinalQuestion = {
   type: "MCQ" | "TF";
@@ -72,6 +73,23 @@ SOURCE END`;
     const mcq = parsed.questions.filter(q => q.type === "MCQ");
     const tf = parsed.questions.filter(q => q.type === "TF");
     if (mcq.length !== 10 || tf.length !== 20) return { ok: false, error: `فشل التحقق: تم إنشاء ${mcq.length} MCQ و${tf.length} T/F بدلاً من 10 و20. أعد المحاولة.` };
+
+    if (program.language === "AR") {
+      const invalidArabic = parsed.questions.some((q) => {
+        if (!isPredominantlyArabic(q.text) || !isPredominantlyArabic(q.explanation)) return true;
+        if (q.type === "MCQ") {
+          return !isArabicQuestionContent(
+            q.text,
+            (q.options ?? []).map((text) => ({ text }))
+          );
+        }
+        return false;
+      });
+      if (!isPredominantlyArabic(parsed.summary) || invalidArabic) {
+        return { ok: false, error: "تم رفض المخرجات لأن بعض الأسئلة أو الشروحات ليست عربية. أعد المحاولة." };
+      }
+    }
+
     const validPages = new Set(usable.map(p => p.pageNumber));
     if (parsed.questions.some(q => !validPages.has(q.sourcePage))) return { ok: false, error: "فشل التحقق من مراجع الصفحات. لم يتم اعتماد الأسئلة." };
     return { ok: true, summary: parsed.summary, questions: parsed.questions, googleAppsScript: buildGoogleAppsScript(program.title, parsed.questions) };

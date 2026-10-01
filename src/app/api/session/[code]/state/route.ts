@@ -88,8 +88,25 @@ export async function GET(
   let scoreAwarded: number | null = null; // converted from Decimal below
 
   if (sq.status === "LIVE" || sq.status === "CLOSED" || sq.status === "RESULTS") {
-    questionPayload = await getLiveQuestionPayload(session.currentQuestionId);
-    questionPayload = { ...questionPayload, questionStatus: sq.status };
+    try {
+      questionPayload = await getLiveQuestionPayload(session.currentQuestionId);
+      questionPayload = { ...questionPayload, questionStatus: sq.status };
+    } catch (error) {
+      if (error instanceof Error && error.message === "NON_ARABIC_SESSION_QUESTION") {
+        return NextResponse.json({
+          sessionStatus: session.status,
+          sessionTitle: session.title,
+          dayNumber: session.dayNumber,
+          participantCount: session._count.participants,
+          totalQuestions,
+          currentQuestionIndex: sq.questionOrder,
+          currentQuestion: null,
+          hasAnswered: false,
+          legacyQuestionBlocked: true,
+        });
+      }
+      throw error;
+    }
 
     if (participantId) {
       const answer = await prisma.participantAnswer.findFirst({
