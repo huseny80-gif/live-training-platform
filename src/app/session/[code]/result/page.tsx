@@ -81,16 +81,16 @@ export default async function ParticipantResultPage({
     : "text-red-500";
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <main dir="rtl" lang="ar" className="dlp-participant-page">
       <div className="w-full max-w-sm space-y-4">
         {/* Result card */}
-        <div className="bg-white rounded-3xl shadow-lg p-8 text-center space-y-5">
+        <div className="brand-card dlp-join-card text-center space-y-5">
           {/* Emoji / rank */}
           <div className="text-5xl">{medalEmoji ?? "🎯"}</div>
 
           <div>
             <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">
-              القيادة الرقمية
+              الحقيبة التدريبية
             </p>
             <p className="text-sm text-gray-500 mb-0.5">{session.title ?? `الجلسة ${session.sessionCode}`}</p>
             <h1 className="text-xl font-bold text-gray-900">{participant.displayName}</h1>
