@@ -159,11 +159,15 @@ ${source}
 SOURCE END`;
 }
 
-async function requestFinalExam(
-  apiKey: string,
-  model: string,
+async function requestFinalExamOpenAI(
   prompt: string,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return { ok: false, error: "OPENAI_API_KEY غير مضبوط." };
+  }
+
+  const model = process.env.OPENAI_MODEL || "gpt-6-luna";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -199,10 +203,88 @@ async function requestFinalExam(
     "";
 
   if (!text.trim()) {
-    return { ok: false, error: "أعاد نموذج الذكاء الاصطناعي استجابة فارغة." };
+    return { ok: false, error: "أعاد OpenAI استجابة فارغة." };
   }
 
   return { ok: true, text };
+}
+
+async function requestFinalExamAnthropic(
+  prompt: string,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { ok: false, error: "ANTHROPIC_API_KEY غير مضبوط." };
+  }
+
+  const model =
+    process.env.ANTHROPIC_FINAL_MODEL ||
+    process.env.ANTHROPIC_MODEL ||
+    "claude-sonnet-5-5";
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 24000,
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+    }),
+  });
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: `تعذر إنشاء الأسئلة النهائية عبر Anthropic (${response.status}).`,
+    };
+  }
+
+  const data = await response.json() as {
+    content?: Array<{ type?: string; text?: string }>;
+  };
+
+  const text = (data.content ?? [])
+    .filter((item) => item.type === "text")
+    .map((item) => item.text ?? "")
+    .join("");
+
+  if (!text.trim()) {
+    return { ok: false, error: "أعاد Anthropic استجابة فارغة." };
+  }
+
+  return { ok: true, text };
+}
+
+async function requestFinalExam(
+  prompt: string,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  const explicit = process.env.AI_PROVIDER?.trim().toLowerCase();
+
+  if (explicit === "openai") return requestFinalExamOpenAI(prompt);
+  if (explicit === "anthropic" || explicit === "claude") {
+    return requestFinalExamAnthropic(prompt);
+  }
+
+  if (process.env.OPENAI_API_KEY) {
+    const openai = await requestFinalExamOpenAI(prompt);
+    if (openai.ok) return openai;
+
+    if (!process.env.ANTHROPIC_API_KEY) return openai;
+  }
+
+  if (process.env.ANTHROPIC_API_KEY) {
+    return requestFinalExamAnthropic(prompt);
+  }
+
+  return {
+    ok: false,
+    error:
+      "لا يوجد مزود ذكاء اصطناعي مفعّل للأسئلة النهائية. اضبط OPENAI_API_KEY أو ANTHROPIC_API_KEY في Vercel.",
+  };
 }
 
 export async function generateFinalQuestions(
@@ -274,10 +356,6 @@ export async function generateFinalQuestions(
     })
     .join("\n\n");
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { ok: false, error: "OPENAI_API_KEY غير مضبوط." };
-
-  const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
   const requireArabic = program.language === "AR";
   const validPages = new Set(usable.map((page) => page.pageNumber));
 
@@ -287,7 +365,7 @@ export async function generateFinalQuestions(
   // exact validation failure from the first response.
   for (let attempt = 1; attempt <= 2; attempt++) {
     const prompt = buildPrompt(source, program.title, requireArabic, previousFailure);
-    const response = await requestFinalExam(apiKey, model, prompt);
+    const response = await requestFinalExam(prompt);
 
     if (!response.ok) {
       return { ok: false, error: response.error };
