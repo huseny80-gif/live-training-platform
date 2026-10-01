@@ -14,6 +14,7 @@ import { OpenAIPdfExtractionAdapter } from "./adapters/openai-pdf";
 import { AnthropicPdfExtractionAdapter } from "./adapters/anthropic-pdf";
 import { MockExtractionAdapter } from "./adapters/mock";
 import { NativeTextExtractionAdapter } from "./adapters/native-text";
+import { requiredReadablePages } from "./coverage";
 
 export type DocumentProcessingStatus =
   | "PENDING"
@@ -37,13 +38,6 @@ export interface ProcessingProgress {
 // only in tests/dev when explicitly enabled.
 const PDF_BATCH_SIZE = 15;
 const PDF_BATCH_CONCURRENCY = 2;
-const MIN_REAL_SOURCE_COVERAGE = 0.7;
-
-function requiredReadablePages(totalPages: number): number {
-  if (totalPages <= 0) return 1;
-  return Math.max(1, Math.ceil(totalPages * MIN_REAL_SOURCE_COVERAGE));
-}
-
 function chunkPageNumbers(values: number[], size: number): number[][] {
   const chunks: number[][] = [];
   for (let i = 0; i < values.length; i += size) {
