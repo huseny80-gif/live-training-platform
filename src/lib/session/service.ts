@@ -35,17 +35,22 @@ export async function createSession(
   });
   if (!day || day.questions.length === 0) throw new Error("NO_QUESTIONS_FOR_DAY");
 
-  if (program.language === "AR") {
-    const invalidQuestions = day.questions.filter(
-      (question) =>
-        !isArabicQuestionContent(
-          question.questionText,
-          question.options.map((option) => ({ text: option.optionText }))
+  const eligibleQuestions =
+    program.language === "AR"
+      ? day.questions.filter((question) =>
+          isArabicQuestionContent(
+            question.questionText,
+            question.options.map((option) => ({ text: option.optionText }))
+          )
         )
+      : day.questions;
+
+  if (eligibleQuestions.length === 0) {
+    throw new Error(
+      program.language === "AR"
+        ? "NO_ARABIC_QUESTIONS_FOR_DAY"
+        : "NO_QUESTIONS_FOR_DAY"
     );
-    if (invalidQuestions.length > 0) {
-      throw new Error(`NON_ARABIC_QUESTIONS_IN_ARABIC_PROGRAM:${invalidQuestions.length}`);
-    }
   }
 
   // Generate unique session code
@@ -63,7 +68,7 @@ export async function createSession(
   });
 
   // Create SessionQuestion rows (ordered)
-  for (const q of day.questions.sort((a, b) => a.questionOrder - b.questionOrder)) {
+  for (const q of eligibleQuestions.sort((a, b) => a.questionOrder - b.questionOrder)) {
     await prisma.sessionQuestion.create({
       data: {
         sessionId: session.id,
