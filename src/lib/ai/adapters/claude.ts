@@ -79,6 +79,18 @@ export class ClaudeAIAdapter implements AIAdapter {
       allQuestions.push(...dayQuestions);
     }
 
+    if (req.language === "AR") {
+      const arabicPattern = /[\u0600-\u06FF]/;
+      const invalidQuestion = allQuestions.find(
+        (q) =>
+          !arabicPattern.test(q.questionText) ||
+          q.options.some((opt) => !arabicPattern.test(opt.text))
+      );
+      if (invalidQuestion) {
+        throw new Error("AI_LANGUAGE_MISMATCH_AR");
+      }
+    }
+
     return {
       days,
       questions: allQuestions,
