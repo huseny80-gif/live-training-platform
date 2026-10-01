@@ -111,10 +111,11 @@ async function runTests() {
   await setup();
   let passed = 0;
   let failed = 0;
+  let skipped = 0;
 
-  async function test(name: string, fn: () => Promise<void>) {
+  async function test(name: string, fn: () => Promise<void | "SKIP">) {
     try {
-      await fn();
+      if (await fn() === "SKIP") { skipped++; console.log(`  ↷ ${name}`); return; }
       console.log(`  ✓ ${name}`);
       passed++;
     } catch (err) {
@@ -205,7 +206,7 @@ async function runTests() {
     const service = new ContentGenerationService();
     const result = await service.generateForProgram(programId, documentId, instructorId);
     assert.strictEqual(result.status, "FAILED");
-    assert.ok(result.errorMessage?.includes("MOCK_ONLY_CONTENT"), `Expected MOCK_ONLY_CONTENT error, got: ${result.errorMessage}`);
+    assert.ok(/MOCK_ONLY_CONTENT|NO_EXTRACTED_PAGES/.test(result.errorMessage ?? ""), `Expected MOCK_ONLY_CONTENT error, got: ${result.errorMessage}`);
 
     // Clean up pages
     await prisma.documentPage.deleteMany({ where: { documentId } });
@@ -328,7 +329,7 @@ async function runTests() {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       console.log("    → ANTHROPIC_API_KEY not set — skipping live generation test");
-      return; // pass (skip)
+      return "SKIP";
     }
     // Even with API key, if no real (non-MOCK) pages exist → service returns FAILED
     const service = new ContentGenerationService();
@@ -340,8 +341,8 @@ async function runTests() {
     );
   });
 
-  // GEN-15: Idempotency — generating twice deletes and recreates, no duplication
-  await test("GEN-15: DB upsert is idempotent — re-generation replaces, not duplicates", async () => {
+  // GEN-15: Failed regeneration preserves instructor-created days
+  await test("GEN-15: failed regeneration preserves existing days", async () => {
     // Create some days manually
     await prisma.trainingDay.create({
       data: { programId, dayNumber: 1, title: "Day 1", objectives: [], status: "DRAFT" },
@@ -353,15 +354,16 @@ async function runTests() {
     const beforeCount = await prisma.trainingDay.count({ where: { programId } });
     assert.strictEqual(beforeCount, 2);
 
-    // Simulate the idempotent delete
-    await prisma.trainingDay.deleteMany({ where: { programId } });
-    const afterCount = await prisma.trainingDay.count({ where: { programId } });
-    assert.strictEqual(afterCount, 0, "Delete should clear all days before regeneration");
+    const before = await prisma.trainingDay.findMany({ where: { programId }, orderBy: { dayNumber: "asc" } });
+    const result = await new ContentGenerationService().generateForProgram(programId, documentId, instructorId);
+    assert.strictEqual(result.status, "FAILED");
+    const after = await prisma.trainingDay.findMany({ where: { programId }, orderBy: { dayNumber: "asc" } });
+    assert.deepStrictEqual(after.map(day => day.id), before.map(day => day.id), "Failed generation must preserve existing days");
   });
 
   await cleanup();
 
-  console.log(`\nResults: ${passed} passed, ${failed} failed`);
+  console.log(`\nResults: ${passed} passed, ${failed} failed, ${skipped} skipped`);
   if (failed > 0) process.exit(1);
 }
 

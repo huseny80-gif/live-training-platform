@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { getProgram, deleteProgram } from "@/app/actions/programs";
 import Link from "next/link";
+import DocumentProcessing from "./DocumentProcessing";
 import DocumentUpload from "./DocumentUpload";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -103,24 +104,14 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
             <h2 className="tp-text-base tp-font-semibold">المستندات التدريبية</h2>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {program.documents.map((doc: any) => (
-              <div key={doc.id} className="tp-flex tp-items-center tp-justify-between tp-text-sm tp-border tp-rounded-lg tp-px-3 tp-py-2">
+              <div key={doc.id} className="tp-text-sm tp-border tp-rounded-lg tp-px-3 tp-py-2 tp-space-y-2">
                 <div>
-                  <span className="tp-font-medium">{doc.fileName}</span>
+                  <span className="tp-font-medium" style={{ overflowWrap: "anywhere" }}>{doc.fileName}</span>
                   {doc.pageCount != null && (
                     <span className="tp-ml-2 tp-text-gray-400 tp-text-xs">{doc.pageCount} صفحة</span>
                   )}
                 </div>
-                <span
-                  className={`tp-text-xs tp-px-2 tp-py-0-5 tp-rounded-full ${
-                    doc.extractionStatus === "COMPLETED"
-                      ? "tp-bg-green-100 tp-text-green-700"
-                      : doc.extractionStatus === "FAILED"
-                      ? "tp-bg-red-100 tp-text-red-700"
-                      : "tp-bg-yellow-100 tp-text-yellow-700"
-                  }`}
-                >
-                  {statusLabel(doc.extractionStatus)}
-                </span>
+                <DocumentProcessing documentId={doc.id} programId={id} status={doc.extractionStatus} notes={doc.extractionNotes} />
               </div>
             ))}
           </div>

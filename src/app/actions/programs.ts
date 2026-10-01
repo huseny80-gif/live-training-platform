@@ -103,6 +103,7 @@ export async function getProgram(programId: string) {
           pageCount: true,
           contentType: true,
           extractionStatus: true,
+          extractionNotes: true,
           createdAt: true,
         },
         orderBy: { createdAt: "desc" },

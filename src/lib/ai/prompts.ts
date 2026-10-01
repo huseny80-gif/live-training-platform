@@ -56,6 +56,7 @@ export function buildQuestionsPrompt(
   existingQuestionTexts: string[] = []
 ): string {
   const dayPages = pages.filter((p) => dayPlan.sourcePages.includes(p.pageNumber));
+  if (!dayPages.some(p => p.extractedText.trim())) throw new Error("NO_EXTRACTED_PAGES");
   const pageContent = dayPages
     .map((p) => `[صفحة ${p.pageNumber}${p.title ? ` — ${p.title}` : ""}]\n${p.extractedText.slice(0, 1000)}`)
     .join("\n\n---\n\n");
@@ -71,7 +72,7 @@ export function buildQuestionsPrompt(
 اللغة: ${language === "AR" ? "العربية" : "الإنجليزية"}
 ${avoidBlock}
 محتوى الصفحات:
-${pageContent || "محتوى غير متوفر — استخدم موضوع اليوم كمرجع"}
+${pageContent}
 
 المطلوب: أنشئ ${questionsPerDay} أسئلة. أعد JSON صارم فقط:
 

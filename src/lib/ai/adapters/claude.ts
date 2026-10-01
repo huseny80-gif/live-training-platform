@@ -32,7 +32,7 @@ export class ClaudeAIAdapter implements AIAdapter {
 
     const dayPlanResponse = await client.messages.create({
       model: MODEL_ID,
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [{ role: "user", content: dayPlanPrompt }],
     });
 
@@ -63,7 +63,7 @@ export class ClaudeAIAdapter implements AIAdapter {
 
       const qResponse = await client.messages.create({
         model: MODEL_ID,
-        max_tokens: 3072,
+        max_tokens: 4096,
         messages: [{ role: "user", content: qPrompt }],
       });
 
@@ -125,12 +125,11 @@ function parseDayPlans(
   try {
     parsed = extractJson(text);
   } catch {
-    // Fallback: distribute pages evenly across days
-    return fallbackDayPlans(totalDays, pages);
+    throw new Error("AI_INVALID_CONTENT");
   }
 
   const raw = parsed as { days?: unknown[] };
-  if (!Array.isArray(raw?.days)) return fallbackDayPlans(totalDays, pages);
+  if (!Array.isArray(raw?.days) || raw.days.length !== totalDays) throw new Error("AI_INCOMPLETE_CONTENT");
 
   const days: GeneratedDayPlan[] = raw.days.slice(0, totalDays).map((d: unknown, i) => {
     const day = d as Record<string, unknown>;
@@ -146,14 +145,6 @@ function parseDayPlans(
     };
   });
 
-  // If fewer than totalDays returned, pad with fallback days
-  if (days.length < totalDays) {
-    const fallback = fallbackDayPlans(totalDays, pages);
-    for (let i = days.length; i < totalDays; i++) {
-      days.push(fallback[i]);
-    }
-  }
-
   return days;
 }
 
@@ -166,11 +157,11 @@ function parseQuestions(
   try {
     parsed = extractJson(text);
   } catch {
-    return [];
+    throw new Error("AI_INVALID_CONTENT");
   }
 
   const raw = parsed as { questions?: unknown[] };
-  if (!Array.isArray(raw?.questions)) return [];
+  if (!Array.isArray(raw?.questions) || raw.questions.length !== questionsPerDay) throw new Error("AI_INCOMPLETE_CONTENT");
 
   const validLabels = new Set(["A", "B", "C", "D"]);
   const validDifficulties = new Set(["EASY", "MEDIUM", "HARD"]);
@@ -180,15 +171,18 @@ function parseQuestions(
     .map((q: unknown, i) => {
       const item = q as Record<string, unknown>;
       const options = Array.isArray(item.options) ? item.options as Array<Record<string, string>> : [];
-      const correctLabel = validLabels.has(item.correctLabel as string)
-        ? (item.correctLabel as "A" | "B" | "C" | "D")
-        : "A";
+      if (options.length !== 4 || new Set(options.map(o => o.label)).size !== 4 ||
+          options.some(o => !validLabels.has(o.label) || typeof o.text !== "string" || !o.text.trim()) ||
+          !validLabels.has(item.correctLabel as string) || typeof item.sourcePageNumber !== "number") {
+        throw new Error("AI_INVALID_CONTENT");
+      }
+      const correctLabel = item.correctLabel as "A" | "B" | "C" | "D";
 
       return {
         questionText: typeof item.questionText === "string" ? item.questionText : "",
         options: ["A", "B", "C", "D"].map((label) => {
           const opt = options.find((o) => o.label === label);
-          return { label: label as "A" | "B" | "C" | "D", text: opt?.text ?? `خيار ${label}` };
+          return { label: label as "A" | "B" | "C" | "D", text: typeof opt?.text === "string" ? opt.text : "" };
         }),
         correctLabel,
         explanation: typeof item.explanation === "string" ? item.explanation : "",
@@ -202,23 +196,4 @@ function parseQuestions(
       } satisfies GeneratedQuestion;
     })
     .filter((q) => q.questionText.length > 0);
-}
-
-function fallbackDayPlans(totalDays: number, pages: Array<{ pageNumber: number }>): GeneratedDayPlan[] {
-  const perDay = Math.ceil(pages.length / totalDays);
-  return Array.from({ length: totalDays }, (_, i) => {
-    const start = i * perDay;
-    const end = Math.min(start + perDay, pages.length);
-    const slice = pages.slice(start, end);
-    return {
-      dayNumber: i + 1,
-      title: `اليوم ${i + 1}`,
-      objectives: [],
-      contentSummary: "",
-      topics: [],
-      pageRangeStart: slice[0]?.pageNumber ?? 1,
-      pageRangeEnd: slice[slice.length - 1]?.pageNumber ?? 1,
-      sourcePages: slice.map((p) => p.pageNumber),
-    };
-  });
 }

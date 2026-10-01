@@ -21,8 +21,8 @@ const LLAMA_API_URL = "https://api.cloud.llamaindex.ai/api/parsing";
 export class LlamaParseAdapter implements ExtractionAdapter {
   readonly name = "LLAMAPARSE" as const;
 
-  supports(contentType: PdfContentType): boolean {
-    return contentType === "IMAGE_BASED" || contentType === "MIXED" || contentType === "UNKNOWN";
+  supports(_contentType: PdfContentType): boolean {
+    return true;
   }
 
   async extract(req: ExtractionRequest): Promise<ExtractionResult> {
@@ -33,7 +33,7 @@ export class LlamaParseAdapter implements ExtractionAdapter {
 
     // Step 1: Upload file
     const form = new FormData();
-    const blob = new Blob([req.fileBuffer.buffer as ArrayBuffer], { type: req.mimeType });
+    const blob = new Blob([new Uint8Array(req.fileBuffer)], { type: req.mimeType });
     form.append("file", blob, req.fileName);
 
     const uploadRes = await fetch(`${LLAMA_API_URL}/upload`, {
@@ -54,6 +54,7 @@ export class LlamaParseAdapter implements ExtractionAdapter {
       const statusRes = await fetch(`${LLAMA_API_URL}/job/${jobId}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
+      if (!statusRes.ok) throw new Error(`LlamaParse status fetch failed: ${statusRes.status}`);
       const body = (await statusRes.json()) as { status: string };
       status = body.status;
       attempts++;

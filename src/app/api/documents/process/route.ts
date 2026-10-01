@@ -34,29 +34,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
 
-  // Idempotency: skip if already past PENDING
-  if (doc.extractionStatus !== "PENDING") {
-    return NextResponse.json({ status: doc.extractionStatus, documentId }, { status: 200 });
-  }
-
-  // Mark PROCESSING synchronously so the client sees immediate progress
-  await prisma.trainingDocument.update({
-    where: { id: documentId },
+  // Claim atomically: a failed document can retry, concurrent requests cannot run twice.
+  const claimed = await prisma.trainingDocument.updateMany({
+    where: { id: documentId, extractionStatus: { in: ["PENDING", "FAILED", "OCR_REQUIRED"] } },
     data: { extractionStatus: "PROCESSING", extractionNotes: null },
   });
+  if (claimed.count === 0) {
+    const current = await prisma.trainingDocument.findUnique({ where: { id: documentId }, select: { extractionStatus: true } });
+    return NextResponse.json({ status: current?.extractionStatus, documentId }, { status: 200 });
+  }
 
   // Register background work with Next.js/Vercel lifecycle via after().
   // after() passes the promise to Vercel's waitUntil, keeping the invocation
   // alive until the pipeline completes or maxDuration is reached.
   after(async () => {
     try {
-      const extraction = await extractionService.processDocument(documentId, instructorId);
+      const extraction = await extractionService.processDocument(documentId, instructorId, undefined, { keepProcessing: true });
 
       if (extraction.status !== "COMPLETED") {
         await prisma.trainingDocument.update({
           where: { id: documentId },
           data: {
-            extractionStatus: "FAILED",
+            extractionStatus: extraction.status === "OCR_REQUIRED" ? "OCR_REQUIRED" : "FAILED",
             extractionNotes: extraction.errorMessage ?? "Extraction returned non-COMPLETED status",
           },
         });

@@ -21,7 +21,7 @@ async function run() {
     const document = await prisma.trainingDocument.create({ data: { programId, fileName: "source.pdf", storagePath: key, fileSizeBytes: 45, mimeType: "application/pdf" } });
     const extraction = await new DocumentExtractionService().processDocument(document.id, instructor.id);
     assert.equal(extraction.status, "FAILED");
-    assert.equal(extraction.errorMessage, "NO_ADAPTER_AVAILABLE");
+    assert.equal(extraction.errorMessage, "INVALID_PDF");
     assert.equal(await prisma.documentPage.count({ where: { documentId: document.id } }), 0);
     console.log("PASS: production extraction never falls back to synthetic content");
 

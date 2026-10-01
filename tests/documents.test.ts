@@ -206,10 +206,10 @@ async function runTests() {
     }
   });
 
-  // DOC-08: LlamaParseAdapter only supports IMAGE_BASED, MIXED, UNKNOWN
-  await test("DOC-08: LlamaParseAdapter.supports() rejects TEXT_BASED", async () => {
+  // DOC-08: LlamaParse can retry any PDF when native extraction is insufficient
+  await test("DOC-08: LlamaParseAdapter.supports() accepts TEXT_BASED fallback", async () => {
     const adapter = new LlamaParseAdapter();
-    assert.ok(!adapter.supports("TEXT_BASED"), "should not support TEXT_BASED");
+    assert.ok(adapter.supports("TEXT_BASED"), "should support TEXT_BASED as a fallback");
     assert.ok(adapter.supports("IMAGE_BASED"), "should support IMAGE_BASED");
     assert.ok(adapter.supports("MIXED"), "should support MIXED");
     assert.ok(adapter.supports("UNKNOWN"), "should support UNKNOWN");

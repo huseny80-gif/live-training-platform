@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorLabel } from "@/lib/labels";
+import { documentErrorLabel } from "@/lib/document-errors";
 import { completeBlobUpload } from "@/app/actions/documents";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -57,9 +58,10 @@ export default function DocumentUpload({ programId }: { programId: string }) {
         return;
       }
 
-      if (s === "FAILED") {
+      if (s === "FAILED" || s === "OCR_REQUIRED") {
         const notes = (data.extractionNotes as string) ?? "تعذّر تجهيز المستند";
-        throw new Error(notes);
+        router.refresh();
+        throw new Error(documentErrorLabel(notes));
       }
 
       if (s === "PROCESSING") {

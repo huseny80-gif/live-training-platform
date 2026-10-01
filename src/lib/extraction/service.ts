@@ -8,8 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { storage } from "@/lib/storage";
 import { inspectPdf } from "./pdf-inspector";
-import type { ExtractionAdapter, PdfInspectionResult, ExtractedPage } from "./types";
+import type { ExtractionAdapter, PdfInspectionResult, ExtractedPage, ExtractionRequest, ExtractionResult } from "./types";
 import { LlamaParseAdapter } from "./adapters/llamaparse";
+import { NativeTextAdapter } from "./adapters/native-text";
 import { MockExtractionAdapter } from "./adapters/mock";
 
 export type DocumentProcessingStatus =
@@ -31,7 +32,7 @@ export interface ProcessingProgress {
 
 // Adapter registry — ordered by preference
 function getAdapters(): ExtractionAdapter[] {
-  const adapters: ExtractionAdapter[] = [];
+  const adapters: ExtractionAdapter[] = [new NativeTextAdapter()];
   if (process.env.LLAMA_CLOUD_API_KEY) {
     adapters.push(new LlamaParseAdapter());
   }
@@ -47,7 +48,8 @@ export class DocumentExtractionService {
   async processDocument(
     documentId: string,
     instructorId: string,
-    pageNumbers?: number[]
+    pageNumbers?: number[],
+    options: { keepProcessing?: boolean } = {}
   ): Promise<ProcessingProgress> {
     // Load document and verify ownership
     const doc = await prisma.trainingDocument.findFirst({
@@ -87,17 +89,11 @@ export class DocumentExtractionService {
         data: { contentType: contentTypeMap[inspection.contentType] as "TEXT_BASED" | "IMAGE_BASED" | "MIXED" | "UNKNOWN" },
       });
 
-      // Select adapter
-      const adapters = getAdapters();
-      const adapter = adapters.find((a) => a.supports(inspection.contentType));
-      if (!adapter) throw new Error("NO_ADAPTER_AVAILABLE");
-
-      // Extract pages
-      const result = await adapter.extract({
-        fileBuffer: buffer,
-        fileName: doc.fileName,
-        mimeType: "application/pdf",
-        pageNumbers,
+      const result = await this.extract(inspection, {
+        fileBuffer: buffer, fileName: doc.fileName, mimeType: "application/pdf", pageNumbers,
+      });
+      await prisma.trainingDocument.update({
+        where: { id: documentId }, data: { pageCount: result.totalPages },
       });
 
       // Persist each extracted page
@@ -105,12 +101,11 @@ export class DocumentExtractionService {
         await this.persistPage(documentId, page);
       }
 
-      // Partial success is still usable — treat as COMPLETED so content
-      // generation can proceed with the pages that did extract.
-      const finalStatus: DocumentProcessingStatus =
-        result.successCount > 0 ? "COMPLETED" : "FAILED";
+      const finalStatus: DocumentProcessingStatus = result.failureCount > 0
+        ? (result.pages.some(p => p.extractionStatus === "OCR_REQUIRED") ? "OCR_REQUIRED" : "FAILED")
+        : result.successCount > 0 ? "COMPLETED" : "OCR_REQUIRED";
 
-      await this.updateDocumentStatus(documentId, finalStatus);
+      await this.updateDocumentStatus(documentId, options.keepProcessing ? "PROCESSING" : finalStatus);
 
       return {
         documentId,
@@ -119,9 +114,10 @@ export class DocumentExtractionService {
         completedPages: result.successCount,
         failedPages: result.failureCount,
         inspection,
+        errorMessage: finalStatus === "COMPLETED" ? undefined : finalStatus === "OCR_REQUIRED" ? "OCR_REQUIRED" : "EXTRACTION_INCOMPLETE",
       };
     } catch (err) {
-      await this.updateDocumentStatus(documentId, "FAILED");
+      await this.updateDocumentStatus(documentId, options.keepProcessing ? "PROCESSING" : "FAILED");
       const msg = err instanceof Error ? err.message : "Unknown error";
       return {
         documentId,
@@ -147,15 +143,8 @@ export class DocumentExtractionService {
 
     const buffer = await storage.read(doc.storagePath);
     const inspection = inspectPdf(buffer);
-    const adapters = getAdapters();
-    const adapter = adapters.find((a) => a.supports(inspection.contentType));
-    if (!adapter) return null;
-
-    const result = await adapter.extract({
-      fileBuffer: buffer,
-      fileName: doc.fileName,
-      mimeType: "application/pdf",
-      pageNumbers: [pageNumber],
+    const result = await this.extract(inspection, {
+      fileBuffer: buffer, fileName: doc.fileName, mimeType: "application/pdf", pageNumbers: [pageNumber],
     });
 
     if (result.pages.length > 0) {
@@ -163,6 +152,21 @@ export class DocumentExtractionService {
       return result.pages[0];
     }
     return null;
+  }
+
+  private async extract(inspection: PdfInspectionResult, request: ExtractionRequest): Promise<ExtractionResult> {
+    let result: ExtractionResult | undefined;
+    let lastError: unknown;
+    for (const adapter of getAdapters()) {
+      if (!adapter.supports(inspection.contentType)) continue;
+      try {
+        result = await adapter.extract(request);
+        if (result.successCount > 0 && result.failureCount === 0) return result;
+      } catch (error) { lastError = error; }
+    }
+    // Preserve real partial extraction and report OCR requirements. Never fabricate production text.
+    if (result) return result;
+    throw lastError ?? new Error("NO_ADAPTER_AVAILABLE");
   }
 
   private async persistPage(documentId: string, page: ExtractedPage): Promise<void> {
