@@ -181,114 +181,128 @@ export class ContentGenerationService {
         };
       }
 
-      // Only now is it safe to replace the old content.
-      await prisma.trainingDay.deleteMany({ where: { programId } });
+      // Only now is it safe to replace the old content. Perform the entire
+      // replacement atomically so a database error can never leave 10 days
+      // with zero/partial questions.
+      const pageIdByNumber = new Map(
+        realPages.map((page) => [page.pageNumber, page.id])
+      );
 
-      // Build pageId lookup
-      const pageIdByNumber = new Map(realPages.map((page) => [page.pageNumber, page.id]));
+      const totalQuestions = await prisma.$transaction(
+        async (tx) => {
+          await tx.trainingDay.deleteMany({ where: { programId } });
 
-      let totalQuestions = 0;
-      const questionsPerDayMap = new Map<number, number>();
+          let persistedQuestions = 0;
 
-      // Persist days → topics → questions → options
-      for (const day of result.days) {
-        const dbDay = await prisma.trainingDay.create({
-          data: {
-            programId,
-            documentId,
-            dayNumber: day.dayNumber,
-            title: day.title,
-            objectives: day.objectives,
-            contentSummary: day.contentSummary,
-            pageRangeStart: day.pageRangeStart,
-            pageRangeEnd: day.pageRangeEnd,
-            status: "DRAFT",
-          },
-        });
-
-        // Topics
-        for (let ti = 0; ti < day.topics.length; ti++) {
-          await prisma.trainingTopic.create({
-            data: { dayId: dbDay.id, title: day.topics[ti], topicOrder: ti + 1 },
-          });
-        }
-
-        // Questions for this day
-        const dayQuestions = result.questions.filter((q) => q.dayNumber === day.dayNumber);
-        let dayQuestionCount = 0;
-
-        for (const q of dayQuestions) {
-          const sourcePageId = pageIdByNumber.get(q.sourcePageNumber) ?? null;
-
-          // Create question WITHOUT correctOptionId first (circular FK: question → option)
-          const dbQuestion = await prisma.question.create({
-            data: {
-              dayId: dbDay.id,
-              programId,
-              questionText: q.questionText,
-              questionOrder: q.questionOrder,
-              questionType: "MULTIPLE_CHOICE",
-              difficulty: q.difficulty ?? "MEDIUM",
-              explanation: q.explanation,
-              sourcePageId,
-              sourcePageStart: q.sourcePageNumber,
-              topic: q.topic,
-              language: languageOverride ?? (program.language as "AR" | "EN"),
-              status: "DRAFT",
-              generatedBy: "AI",
-              aiModel: result.modelUsed,
-              aiPromptVersion: result.promptVersion,
-            },
-          });
-
-          // Create options
-          const optionIds: Record<string, string> = {};
-          for (const opt of q.options) {
-            const dbOpt = await prisma.questionOption.create({
+          for (const day of result.days) {
+            const dbDay = await tx.trainingDay.create({
               data: {
-                questionId: dbQuestion.id,
-                optionLabel: opt.label,
-                optionText: opt.text,
-                displayOrder: ["A", "B", "C", "D"].indexOf(opt.label) + 1,
+                programId,
+                documentId,
+                dayNumber: day.dayNumber,
+                title: day.title,
+                objectives: day.objectives,
+                contentSummary: day.contentSummary,
+                pageRangeStart: day.pageRangeStart,
+                pageRangeEnd: day.pageRangeEnd,
+                status: "DRAFT",
+                topics: {
+                  create: day.topics.map((title, index) => ({
+                    title,
+                    topicOrder: index + 1,
+                  })),
+                },
               },
             });
-            optionIds[opt.label] = dbOpt.id;
+
+            const dayQuestions = result.questions
+              .filter((question) => question.dayNumber === day.dayNumber)
+              .sort((a, b) => a.questionOrder - b.questionOrder);
+
+            if (dayQuestions.length !== QUESTIONS_PER_DAY) {
+              throw new Error(
+                `PERSISTENCE_QUOTA_MISMATCH_DAY_${day.dayNumber}: ${dayQuestions.length}`
+              );
+            }
+
+            for (const question of dayQuestions) {
+              const sourcePageId =
+                pageIdByNumber.get(question.sourcePageNumber) ?? null;
+
+              if (!sourcePageId) {
+                throw new Error(
+                  `SOURCE_PAGE_NOT_FOUND: day ${day.dayNumber}, question ${question.questionOrder}, page ${question.sourcePageNumber}`
+                );
+              }
+
+              const dbQuestion = await tx.question.create({
+                data: {
+                  dayId: dbDay.id,
+                  programId,
+                  questionText: question.questionText,
+                  questionOrder: question.questionOrder,
+                  questionType: "MULTIPLE_CHOICE",
+                  difficulty: question.difficulty ?? "MEDIUM",
+                  explanation: question.explanation,
+                  sourcePageId,
+                  sourcePageStart: question.sourcePageNumber,
+                  topic: question.topic,
+                  language:
+                    languageOverride ??
+                    (program.language as "AR" | "EN"),
+                  status: "DRAFT",
+                  generatedBy: "AI",
+                  aiModel: result.modelUsed,
+                  aiPromptVersion: result.promptVersion,
+                  options: {
+                    create: question.options.map((option) => ({
+                      optionLabel: option.label,
+                      optionText: option.text,
+                      displayOrder:
+                        ["A", "B", "C", "D"].indexOf(option.label) + 1,
+                    })),
+                  },
+                },
+                include: {
+                  options: true,
+                },
+              });
+
+              const correctOption = dbQuestion.options.find(
+                (option) => option.optionLabel === question.correctLabel
+              );
+              if (!correctOption) {
+                throw new Error(
+                  `CORRECT_OPTION_NOT_FOUND: day ${day.dayNumber}, question ${question.questionOrder}`
+                );
+              }
+
+              await tx.question.update({
+                where: { id: dbQuestion.id },
+                data: { correctOptionId: correctOption.id },
+              });
+
+              persistedQuestions++;
+            }
           }
 
-          // Set correctOptionId — stored in DB, never returned to participants
-          await prisma.question.update({
-            where: { id: dbQuestion.id },
-            data: { correctOptionId: optionIds[q.correctLabel] },
-          });
+          if (persistedQuestions !== TOTAL_DAYS * QUESTIONS_PER_DAY) {
+            throw new Error(
+              `PERSISTED_QUESTION_TOTAL_MISMATCH: ${persistedQuestions}`
+            );
+          }
 
-          totalQuestions++;
-          dayQuestionCount++;
+          return persistedQuestions;
+        },
+        {
+          maxWait: 10000,
+          timeout: 120000,
         }
-
-        questionsPerDayMap.set(day.dayNumber, dayQuestionCount);
-      }
-
-      const EXPECTED_TOTAL = TOTAL_DAYS * QUESTIONS_PER_DAY;
-      const underQuotaDays = result.days
-        .filter((d) => (questionsPerDayMap.get(d.dayNumber) ?? 0) !== QUESTIONS_PER_DAY)
-        .map((d) => `day ${d.dayNumber}: got ${questionsPerDayMap.get(d.dayNumber) ?? 0}, want ${QUESTIONS_PER_DAY}`);
-
-      if (result.days.length !== TOTAL_DAYS || totalQuestions !== EXPECTED_TOTAL || underQuotaDays.length > 0) {
-        return {
-          programId, documentId,
-          status: "FAILED",
-          daysGenerated: result.days.length,
-          questionsGenerated: totalQuestions,
-          errorMessage: [
-            `Expected ${TOTAL_DAYS} days × ${QUESTIONS_PER_DAY} q/day = ${EXPECTED_TOTAL} total.`,
-            `Got ${result.days.length} days, ${totalQuestions} questions.`,
-            ...(underQuotaDays.length > 0 ? [`Per-day shortfalls: ${underQuotaDays.join("; ")}`] : []),
-          ].join(" "),
-        };
-      }
+      );
 
       return {
-        programId, documentId,
+        programId,
+        documentId,
         status: "COMPLETED",
         daysGenerated: result.days.length,
         questionsGenerated: totalQuestions,
