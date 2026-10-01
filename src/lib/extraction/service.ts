@@ -10,6 +10,7 @@ import { storage } from "@/lib/storage";
 import { inspectPdf } from "./pdf-inspector";
 import type { ExtractionAdapter, PdfInspectionResult, ExtractedPage } from "./types";
 import { LlamaParseAdapter } from "./adapters/llamaparse";
+import { OpenAIPdfExtractionAdapter } from "./adapters/openai-pdf";
 import { MockExtractionAdapter } from "./adapters/mock";
 
 export type DocumentProcessingStatus =
@@ -29,14 +30,30 @@ export interface ProcessingProgress {
   errorMessage?: string;
 }
 
-// Adapter registry — ordered by preference
+// Adapter registry — ordered by production preference.
+// IMPORTANT: Mock extraction is never a production fallback. It is available
+// only in tests/dev when explicitly enabled.
 function getAdapters(): ExtractionAdapter[] {
   const adapters: ExtractionAdapter[] = [];
+
+  // Reuse the platform's existing OpenAI key for real PDF/OCR extraction.
+  if (process.env.OPENAI_API_KEY) {
+    adapters.push(new OpenAIPdfExtractionAdapter());
+  }
+
+  // Optional secondary provider.
   if (process.env.LLAMA_CLOUD_API_KEY) {
     adapters.push(new LlamaParseAdapter());
   }
-  // MockAdapter as final fallback — always available, used in test/dev
-  adapters.push(new MockExtractionAdapter());
+
+  const allowMock =
+    process.env.ALLOW_MOCK_EXTRACTION === "true" ||
+    process.env.NODE_ENV === "test";
+
+  if (allowMock) {
+    adapters.push(new MockExtractionAdapter());
+  }
+
   return adapters;
 }
 
@@ -85,18 +102,48 @@ export class DocumentExtractionService {
         data: { contentType: contentTypeMap[inspection.contentType] as "TEXT_BASED" | "IMAGE_BASED" | "MIXED" | "UNKNOWN" },
       });
 
-      // Select adapter
-      const adapters = getAdapters();
-      const adapter = adapters.find((a) => a.supports(inspection.contentType));
-      if (!adapter) throw new Error("NO_ADAPTER_AVAILABLE");
+      // Select a real adapter and fall back only between real providers.
+      const adapters = getAdapters().filter((adapter) =>
+        adapter.supports(inspection.contentType)
+      );
+      if (adapters.length === 0) {
+        throw new Error(
+          "NO_REAL_EXTRACTION_ADAPTER — configure OPENAI_API_KEY or LLAMA_CLOUD_API_KEY"
+        );
+      }
 
-      // Extract pages
-      const result = await adapter.extract({
-        fileBuffer: buffer,
-        fileName: doc.fileName,
-        mimeType: "application/pdf",
-        pageNumbers,
-      });
+      let result: Awaited<ReturnType<ExtractionAdapter["extract"]>> | null = null;
+      const adapterErrors: string[] = [];
+
+      for (const adapter of adapters) {
+        try {
+          const candidate = await adapter.extract({
+            fileBuffer: buffer,
+            fileName: doc.fileName,
+            mimeType: "application/pdf",
+            pageNumbers,
+          });
+
+          if (candidate.successCount > 0 && candidate.method !== "MOCK") {
+            result = candidate;
+            break;
+          }
+
+          adapterErrors.push(
+            `${adapter.name}: no real extracted pages were returned`
+          );
+        } catch (error) {
+          adapterErrors.push(
+            `${adapter.name}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+
+      if (!result) {
+        throw new Error(
+          `REAL_EXTRACTION_FAILED — ${adapterErrors.join(" | ")}`
+        );
+      }
 
       // Persist each extracted page
       for (const page of result.pages) {
@@ -132,6 +179,40 @@ export class DocumentExtractionService {
     }
   }
 
+  /**
+   * Ensure the document has real, non-MOCK extracted source pages.
+   * Existing MOCK pages are replaced in-place via persistPage upserts.
+   */
+  async ensureRealExtraction(
+    documentId: string,
+    instructorId: string
+  ): Promise<ProcessingProgress | null> {
+    const pages = await prisma.documentPage.findMany({
+      where: { documentId },
+      select: {
+        extractionMethod: true,
+        extractionStatus: true,
+        extractedText: true,
+      },
+    });
+
+    const hasMockPages = pages.some(
+      (page) => page.extractionMethod === "MOCK"
+    );
+    const hasRealReadablePages = pages.some(
+      (page) =>
+        page.extractionMethod !== "MOCK" &&
+        page.extractionStatus === "COMPLETED" &&
+        (page.extractedText?.trim().length ?? 0) > 50
+    );
+
+    if (hasRealReadablePages && !hasMockPages) {
+      return null;
+    }
+
+    return this.processDocument(documentId, instructorId);
+  }
+
   /** Retry a single failed page without reprocessing the whole document */
   async retryPage(
     documentId: string,
@@ -145,21 +226,32 @@ export class DocumentExtractionService {
 
     const buffer = await storage.read(doc.storagePath);
     const inspection = inspectPdf(buffer);
-    const adapters = getAdapters();
-    const adapter = adapters.find((a) => a.supports(inspection.contentType));
-    if (!adapter) return null;
+    const adapters = getAdapters().filter((adapter) =>
+      adapter.supports(inspection.contentType)
+    );
 
-    const result = await adapter.extract({
-      fileBuffer: buffer,
-      fileName: doc.fileName,
-      mimeType: "application/pdf",
-      pageNumbers: [pageNumber],
-    });
+    for (const adapter of adapters) {
+      if (adapter.name === "MOCK") continue;
+      try {
+        const result = await adapter.extract({
+          fileBuffer: buffer,
+          fileName: doc.fileName,
+          mimeType: "application/pdf",
+          pageNumbers: [pageNumber],
+        });
 
-    if (result.pages.length > 0) {
-      await this.persistPage(documentId, result.pages[0]);
-      return result.pages[0];
+        const page = result.pages.find(
+          (candidate) => candidate.pageNumber === pageNumber
+        );
+        if (page && page.extractionStatus === "COMPLETED") {
+          await this.persistPage(documentId, page);
+          return page;
+        }
+      } catch {
+        // Try the next real provider.
+      }
     }
+
     return null;
   }
 
