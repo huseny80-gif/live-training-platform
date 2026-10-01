@@ -47,8 +47,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Synchronize dependency lock
-        run: npm install --package-lock-only --ignore-scripts
+      - name: Verify dependency lock is synchronized
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          git diff --exit-code -- package-lock.json
 
       - name: Clean install from generated lock
         run: npm ci
