@@ -9,7 +9,7 @@ import type {
 const MODEL_ID =
   process.env.OPENAI_EXTRACTION_MODEL ||
   process.env.OPENAI_MODEL ||
-  "gpt-5.6-luna";
+  "gpt-6-luna";
 
 type OpenAIResponse = {
   output_text?: string;
