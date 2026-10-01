@@ -97,9 +97,9 @@ export default async function DashboardPage() {
 
         <section className="dlp-content">
           <div className="dlp-hero">
-            <p className="dlp-hero-eyebrow">مرحباً بك في منصة</p>
+            <p className="dlp-hero-eyebrow">الحقيبة التدريبية الرقمية</p>
             <h2 >{brand.nameAr}</h2>
-            <p className="dlp-hero-desc">{settings.taglineAr}</p>
+            <p className="dlp-hero-desc">{settings.taglineAr}</p><div className="dlp-hero-features"><span>محتوى تدريبي</span><span>جلسات تفاعلية</span><span>تقييم ونتائج</span></div>
             <Link href="/programs/new" className="dlp-hero-action">
               + إنشاء برنامج تدريبي
             </Link>
