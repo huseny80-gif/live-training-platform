@@ -4,6 +4,7 @@ import { getProgram, deleteProgram } from "@/app/actions/programs";
 import Link from "next/link";
 import DocumentUpload from "./DocumentUpload";
 import DeleteDocumentButton from "./DeleteDocumentButton";
+import ReprocessDocumentButton from "./ReprocessDocumentButton";
 import { brand } from "@/lib/brand";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -83,11 +84,20 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
                   <strong>{doc.fileName}</strong>
                   <span>{doc.pageCount != null ? `${doc.pageCount} صفحة` : "عدد الصفحات غير محدد"}</span>
                   <span>{EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}</span>
+                  <ReprocessDocumentButton
+                    programId={id}
+                    documentId={doc.id}
+                    status={doc.extractionStatus}
+                    totalQuestions={totalQuestions}
+                  />
                   <DeleteDocumentButton
                     documentId={doc.id}
                     fileName={doc.fileName}
                     status={doc.extractionStatus}
                   />
+                  {doc.extractionNotes ? (
+                    <small className="dlp-doc-note">{doc.extractionNotes}</small>
+                  ) : null}
                 </div>
               ))}
             </div>
