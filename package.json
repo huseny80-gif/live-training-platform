@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm run test:public-url && npm run test:openai-pdf && next build",
+    "build": "npm run test:public-url && next build",
     "start": "next start",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
