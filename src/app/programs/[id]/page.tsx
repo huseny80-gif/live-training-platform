@@ -7,6 +7,8 @@ import LanguageToggle from "@/components/LanguageToggle";
 import { brand } from "@/lib/brand";
 import { deleteDocument, renameDocument } from "@/app/actions/documents";
 import { deleteLiveSession, deleteAllProgramSessions } from "@/app/actions/sessions";
+import RefreshButton from "@/components/RefreshButton";
+import ShareSession from "@/components/ShareSession";
 
 const STATUS_AR: Record<string,string> = { DRAFT:"مسودة", ACTIVE:"نشط", ARCHIVED:"مؤرشف" };
 const EXTRACTION_AR: Record<string,string> = { PENDING:"بانتظار المعالجة", PROCESSING:"جارٍ التحليل", COMPLETED:"تم تحليل المحتوى", OCR_REQUIRED:"يحتاج معالجة صور", FAILED:"فشل التحليل" };
@@ -24,7 +26,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
   return <main className="dlp-simple-page">
     <header className="dlp-program-header">
       <div><Link href="/dashboard">← الرئيسية</Link><strong>{brand.nameAr}</strong></div>
-      <LanguageToggle/>
+      <div className="dlp-header-tools"><RefreshButton/><LanguageToggle/></div>
     </header>
     <div className="dlp-program-container">
       <section className="dlp-program-titlebar">
@@ -37,7 +39,6 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         <a href="#days">الأيام التدريبية</a>
         <Link href={`/programs/${id}/final-questions`}>الأسئلة النهائية</Link>
         <a href="#sessions">الجلسات</a>
-        <Link href="/about">من نحن</Link>
       </nav>
       <section className="dlp-stats">
         <div className="brand-card dlp-stat"><p className="dlp-stat-value">{program._count.days}</p><p className="dlp-stat-label">أيام تدريبية</p></div>
@@ -53,7 +54,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         <div className="dlp-days-list">{program.days.map((day:any)=><Link key={day.id} href={`/programs/${id}/days/${day.id}`} className="dlp-day-row"><span>اليوم {day.dayNumber}</span><strong>{day.title}</strong><em>{day._count.questions} / 5 أسئلة</em></Link>)}</div>
       </section>
       <section className="brand-card dlp-final-cta"><div><h2>الأسئلة النهائية</h2><p>ملخص شامل + 10 MCQ + 20 صح/خطأ + Google Apps Script.</p></div><Link className="brand-button-primary dlp-new-button" href={`/programs/${id}/final-questions`}>فتح الأسئلة النهائية</Link></section>
-      <section id="sessions" className="brand-card dlp-program-section"><div className="dlp-section-head"><div><h2>إدارة الجلسات</h2><p>يمكن حذف الجلسات المنتهية أو المسودات. يجب إنهاء الجلسة النشطة قبل حذفها.</p></div>{program.sessions.length>0&&<form action={async()=>{"use server";await deleteAllProgramSessions(id);}}><button className="dlp-danger-button" type="submit">حذف جميع الجلسات</button></form>}</div>{program.sessions.length===0?<p>لا توجد جلسات بعد.</p>:program.sessions.map((s:any)=><div className="dlp-doc-row" key={s.id}><strong>{s.sessionCode}</strong><span>{s.status}</span><form action={async()=>{"use server";await deleteLiveSession(s.id);}}><button className="dlp-danger-button" type="submit">حذف</button></form></div>)}</section>
+      <section id="sessions" className="brand-card dlp-program-section"><div className="dlp-section-head"><div><h2>إدارة الجلسات</h2><p>يمكن حذف الجلسات المنتهية أو المسودات. يجب إنهاء الجلسة النشطة قبل حذفها.</p></div>{program.sessions.length>0&&<form action={async()=>{"use server";await deleteAllProgramSessions(id);}}><button className="dlp-danger-button" type="submit">حذف جميع الجلسات</button></form>}</div>{program.sessions.length===0?<p>لا توجد جلسات بعد.</p>:program.sessions.map((s:any)=><div className="dlp-doc-row" key={s.id}><strong>{s.sessionCode}</strong><span>{s.status}</span><ShareSession code={s.sessionCode}/><form action={async()=>{"use server";await deleteLiveSession(s.id);}}><button className="dlp-danger-button" type="submit">حذف</button></form></div>)}</section>
       <form action={async()=>{"use server";const r=await deleteProgram(id);if(!r.ok)throw new Error(r.error);redirect("/dashboard");}}><button className="dlp-danger-button">حذف البرنامج</button></form>
     </div>
     <nav className="dlp-mobile-nav"><Link href="/dashboard" className="active">⌂<span>الرئيسية</span></Link><Link href={`/programs/${id}`}>▣<span>البرنامج</span></Link><Link href={`/programs/${id}/final-questions`}>✓<span>النهائي</span></Link><Link href="/settings">⚙<span>الإعدادات</span></Link></nav><div className="dlp-mobile-spacer"/>
