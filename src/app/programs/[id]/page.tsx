@@ -3,11 +3,23 @@ import { redirect, notFound } from "next/navigation";
 import { getProgram, deleteProgram } from "@/app/actions/programs";
 import Link from "next/link";
 import DocumentUpload from "./DocumentUpload";
+import { brand } from "@/lib/brand";
 
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: "bg-yellow-100 text-yellow-800",
-  ACTIVE: "bg-green-100 text-green-800",
-  ARCHIVED: "bg-gray-100 text-gray-600",
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: "مسودة",
+  ACTIVE: "نشط",
+  ARCHIVED: "مؤرشف",
+  APPROVED: "معتمد",
+  PAUSED: "موقوف مؤقتًا",
+  ENDED: "منتهي",
+};
+
+const EXTRACTION_LABEL: Record<string, string> = {
+  PENDING: "بانتظار المعالجة",
+  PROCESSING: "جارٍ التحليل",
+  COMPLETED: "تم التحليل",
+  OCR_REQUIRED: "يحتاج OCR",
+  FAILED: "فشل التحليل",
 };
 
 export default async function ProgramPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,155 +27,107 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let program: any;
+  let program;
   try {
     program = await getProgram(id);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg === "NOT_FOUND" || msg === "FORBIDDEN") notFound();
-    throw e;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "NOT_FOUND" || message === "FORBIDDEN") notFound();
+    throw error;
   }
   if (!program) notFound();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalQuestions = program.days.reduce((s: number, d: any) => s + d._count.questions, 0);
+  const totalQuestions = program.days.reduce((sum, day) => sum + day._count.questions, 0);
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800">
-            ← Dashboard
-          </Link>
-          <span className="text-gray-300">/</span>
-          <h1 className="font-bold">{program.title}</h1>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLOR[program.status]}`}>
-            {program.status}
-          </span>
+    <main dir="rtl" lang="ar" className="dlp-simple-page">
+      <header className="dlp-program-header">
+        <div>
+          <Link href="/dashboard">← الرئيسية</Link>
+          <span>/</span>
+          <strong>{brand.nameAr}</strong>
         </div>
-        <div className="flex gap-2">
-          <Link
-            href={`/programs/${id}/manage`}
-            className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100"
-          >
-            📋 إدارة المحتوى
-          </Link>
-          <Link
-            href={`/programs/${id}/edit`}
-            className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50"
-          >
-            Edit
-          </Link>
-          <form
-            action={async () => {
-              "use server";
-              const result = await deleteProgram(id);
-              if (!result.ok) throw new Error(result.error);
-              redirect("/dashboard");
-            }}
-          >
-            <button
-              type="submit"
-              className="px-3 py-1.5 text-sm bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100"
-            >
-              Delete
-            </button>
-          </form>
+        <div className="dlp-program-actions">
+          <Link href={`/programs/${id}/manage`}>إدارة المحتوى</Link>
+          <Link href={`/programs/${id}/edit`}>تعديل البرنامج</Link>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl border p-4">
-            <p className="text-sm text-gray-500">Days</p>
-            <p className="text-3xl font-bold">{program._count.days}</p>
+      <div className="dlp-program-container">
+        <section className="dlp-program-titlebar">
+          <div>
+            <span className={`dlp-badge ${program.status === "ACTIVE" ? "active" : program.status === "DRAFT" ? "draft" : "archived"}`}>
+              {STATUS_LABEL[program.status] ?? program.status}
+            </span>
+            <h1>{program.title}</h1>
+            {program.description ? <p>{program.description}</p> : null}
           </div>
-          <div className="bg-white rounded-xl border p-4">
-            <p className="text-sm text-gray-500">Questions</p>
-            <p className="text-3xl font-bold">{totalQuestions}</p>
-          </div>
-          <div className="bg-white rounded-xl border p-4">
-            <p className="text-sm text-gray-500">Sessions</p>
-            <p className="text-3xl font-bold">{program._count.sessions}</p>
-          </div>
-        </div>
+        </section>
 
-        {program.description && (
-          <div className="bg-white rounded-xl border p-4 text-sm text-gray-600">
-            {program.description}
-          </div>
-                )}
+        <section className="dlp-stats">
+          <div className="brand-card dlp-stat"><p className="dlp-stat-value">{program._count.days}</p><p className="dlp-stat-label">الأيام التدريبية</p></div>
+          <div className="brand-card dlp-stat"><p className="dlp-stat-value">{totalQuestions}</p><p className="dlp-stat-label">الأسئلة</p></div>
+          <div className="brand-card dlp-stat"><p className="dlp-stat-value">{program._count.sessions}</p><p className="dlp-stat-label">الجلسات</p></div>
+          <div className="brand-card dlp-stat"><p className="dlp-stat-value">{program.language === "AR" ? "AR" : "EN"}</p><p className="dlp-stat-label">لغة البرنامج</p></div>
+        </section>
 
-        {/* Uploaded Documents */}
-        {program.documents && program.documents.length > 0 && (
-          <div className="bg-white rounded-xl border p-4 space-y-2">
-            <h2 className="text-base font-semibold">Training Documents</h2>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {program.documents.map((doc: any) => (
-              <div key={doc.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                <div>
-                  <span className="font-medium">{doc.fileName}</span>
-                  {doc.pageCount != null && (
-                    <span className="ml-2 text-gray-400 text-xs">{doc.pageCount} pages</span>
-                  )}
-                </div>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full ${
-                    doc.extractionStatus === "COMPLETED"
-                      ? "bg-green-100 text-green-700"
-                      : doc.extractionStatus === "FAILED"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}
-                >
-                  {doc.extractionStatus}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <DocumentUpload programId={id} />
-
-        {/* Training Days */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Training Days</h2>
-          <Link
-            href={`/programs/${id}/days`}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            + Add Day
-          </Link>
-        </div>
-
-        {program.days.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-            No days yet.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {program.days.map((day: any) => (<Link key={day.id} href={`/programs/${id}/days/${day.id}`} className="bg-white rounded-xl border p-4 flex items-center justify-between hover:bg-gray-50"><div><span className="text-xs font-mono text-gray-400 mr-2">Day {day.dayNumber}</span><span className="font-medium">{day.title}</span><span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${day.status === "APPROVED" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{day.status}</span></div><span className="text-sm text-gray-500">{day._count.questions} Q</span></Link>))}
-          </div>
-                )}
-
-        {/* Sessions */}
-        {program.sessions.length > 0 && (
-          <>
-            <h2 className="text-lg font-semibold">Sessions</h2>
-            <div className="space-y-2">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {program.sessions.map((s: any) => (
-                <div key={s.id} className="bg-white rounded-xl border p-4 flex justify-between text-sm">
-                  <span className="font-mono font-bold">{s.sessionCode}</span>
-                  <span className="text-gray-500">{s.status}</span>
+        <section className="brand-card dlp-program-section">
+          <div className="dlp-section-head"><div><h2>المادة التدريبية</h2><p>ارفع المادة التي ستُبنى عليها الأيام والأسئلة.</p></div></div>
+          {program.documents?.length ? (
+            <div className="dlp-doc-list">
+              {program.documents.map((doc) => (
+                <div key={doc.id} className="dlp-doc-row">
+                  <strong>{doc.fileName}</strong>
+                  <span>{doc.pageCount != null ? `${doc.pageCount} صفحة` : "عدد الصفحات غير محدد"}</span>
+                  <span>{EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}</span>
                 </div>
               ))}
             </div>
-          </>
-        )}
+          ) : <p>لا توجد مادة مرفوعة بعد.</p>}
+          <div className="dlp-upload-wrap"><DocumentUpload programId={id} /></div>
+        </section>
+
+        <section className="brand-card dlp-program-section">
+          <div className="dlp-section-head">
+            <div><h2>الأيام التدريبية</h2><p>إدارة تقسيم البرنامج والأسئلة الخاصة بكل يوم.</p></div>
+            <Link href={`/programs/${id}/days`} className="brand-button-primary dlp-new-button">+ إضافة يوم</Link>
+          </div>
+          {program.days.length === 0 ? <div className="dlp-empty">لا توجد أيام تدريبية حتى الآن.</div> : (
+            <div className="dlp-days-list">
+              {program.days.map((day) => (
+                <Link key={day.id} href={`/programs/${id}/days/${day.id}`} className="dlp-day-row">
+                  <span>اليوم {day.dayNumber}</span>
+                  <strong>{day.title}</strong>
+                  <em>{day._count.questions} سؤال · {STATUS_LABEL[day.status] ?? day.status}</em>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="brand-card dlp-program-section">
+          <div className="dlp-section-head"><div><h2>الجلسات المباشرة</h2><p>افتح جلسة لمتابعة المشاركين والأسئلة والنتائج المباشرة.</p></div></div>
+          {program.sessions.length === 0 ? <div className="dlp-empty">لا توجد جلسات لهذا البرنامج بعد.</div> : (
+            <div className="dlp-session-list">
+              {program.sessions.map((item) => (
+                <Link key={item.id} href={`/programs/${id}/sessions/${item.id}`} className="dlp-doc-row">
+                  <strong dir="ltr">{item.sessionCode}</strong>
+                  <span>{STATUS_LABEL[item.status] ?? item.status}</span>
+                  <span>فتح الجلسة ←</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <form action={async () => {
+          "use server";
+          const result = await deleteProgram(id);
+          if (!result.ok) throw new Error(result.error);
+          redirect("/dashboard");
+        }}>
+          <button type="submit" className="dlp-danger-button">حذف البرنامج</button>
+        </form>
       </div>
     </main>
   );
