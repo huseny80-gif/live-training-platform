@@ -19,7 +19,8 @@
     "test:auth": "npx tsx tests/auth.test.ts",
     "test:live": "npx tsx tests/live-session.test.ts",
     "server": "npx tsx server.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:safety": "npx tsx tests/safety.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -49,6 +50,9 @@
     "dotenv": "18.0.3",
     "ts-node": "10.9.2",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@tailwindcss/postcss": "4.3.3",
+    "postcss": "8.5.28",
+    "tailwindcss": "4.3.3"
   }
 }

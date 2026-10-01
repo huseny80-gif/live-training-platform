@@ -50,22 +50,22 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       const s = data.extractionStatus as string;
 
       if (s === "COMPLETED") {
-        setMessage("Generation completed successfully.");
+        setMessage("اكتمل تحليل المادة وإنشاء المحتوى بنجاح.");
         setStatus("success");
         router.refresh();
         return;
       }
 
       if (s === "FAILED") {
-        const notes = (data.extractionNotes as string) ?? "Pipeline failed";
+        const notes = (data.extractionNotes as string) ?? "فشلت معالجة المادة";
         throw new Error(notes);
       }
 
       if (s === "PROCESSING") {
-        setMessage("Processing document… (this may take a few minutes)");
+        setMessage("جارٍ تحليل المادة… قد يستغرق ذلك بضع دقائق.");
       }
     }
-    throw new Error("Timed out waiting for document processing. Check back later.");
+    throw new Error("استغرقت معالجة المادة وقتًا أطول من المتوقع. حدّث الصفحة بعد قليل للتحقق من الحالة.");
   }
 
   /** Fire-and-forget: start the pipeline, then poll for completion */
@@ -73,8 +73,8 @@ export default function DocumentUpload({ programId }: { programId: string }) {
     setDocumentId(docId);
     setMessage(
       pageCount != null
-        ? `Uploaded: ${fileName} (${pageCount} pages). Starting processing...`
-        : `Uploaded: ${fileName}. Starting processing...`
+        ? `تم رفع ${fileName} (${pageCount} صفحة). جارٍ بدء التحليل…`
+        : `تم رفع ${fileName}. جارٍ بدء التحليل…`
     );
 
     const res = await fetch("/api/documents/process", {
@@ -86,8 +86,8 @@ export default function DocumentUpload({ programId }: { programId: string }) {
     if (!res.ok && res.status !== 202) {
       const parsed = await safeJson(res);
       const errMsg = parsed.ok
-        ? ((parsed.data as Record<string, unknown>).error as string) ?? "Failed to start processing"
-        : `Processing start failed (${res.status})`;
+        ? ((parsed.data as Record<string, unknown>).error as string) ?? "تعذر بدء معالجة المادة"
+        : `فشل بدء المعالجة (${res.status})`;
       throw new Error(errMsg);
     }
 
@@ -98,30 +98,30 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
     if (pipelineStatus === "COMPLETED") {
       // Document was already processed (idempotent path)
-      setMessage("Document already processed.");
+      setMessage("تمت معالجة هذه المادة مسبقًا.");
       setStatus("success");
       router.refresh();
       return;
     }
 
-    setMessage("Processing document… (this may take a few minutes)");
+    setMessage("جارٍ تحليل المادة… قد يستغرق ذلك بضع دقائق.");
     await pollUntilDone(docId);
   }
 
   async function handleFile(file: File) {
     if (file.type !== "application/pdf") {
       setStatus("error");
-      setMessage("Only PDF files are accepted.");
+      setMessage("يُسمح بملفات PDF فقط.");
       return;
     }
     if (file.size > MAX_SIZE) {
       setStatus("error");
-      setMessage("File exceeds the 50 MB limit.");
+      setMessage("حجم الملف يتجاوز الحد الأقصى 50 ميغابايت.");
       return;
     }
 
     setStatus("busy");
-    setMessage("Preparing upload...");
+    setMessage("جارٍ تجهيز الرفع…");
 
     try {
       // Ask server which upload mode to use
@@ -139,12 +139,12 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       }
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Operation failed");
+      setMessage(error instanceof Error ? error.message : "تعذر تنفيذ العملية");
     }
   }
 
   async function directUpload(file: File) {
-    setMessage("Uploading PDF...");
+    setMessage("جارٍ رفع ملف PDF…");
     const formData = new FormData();
     formData.append("programId", programId);
     formData.append("file", file);
@@ -154,8 +154,8 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
     if (!res.ok) {
       const errMsg = parsed.ok
-        ? ((parsed.data as Record<string, unknown>).error as string) ?? "Upload failed."
-        : `Server error (${res.status}). Try a smaller file or contact support.`;
+        ? ((parsed.data as Record<string, unknown>).error as string) ?? "فشل رفع الملف."
+        : `خطأ من الخادم (${res.status}). جرّب ملفًا أصغر أو أعد المحاولة.`;
       throw new Error(errMsg);
     }
 
@@ -172,7 +172,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       return directUpload(file);
     }
 
-    setMessage("Uploading to storage...");
+    setMessage("جارٍ رفع الملف إلى التخزين…");
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const pathname = `uploads/${programId}/${Date.now()}-${safeName}`;
@@ -182,11 +182,11 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       handleUploadUrl: "/api/documents/upload-url",
       clientPayload: JSON.stringify({ programId }),
       onUploadProgress: ({ percentage }) => {
-        setMessage(`Uploading... ${Math.round(percentage)}%`);
+        setMessage(`جارٍ الرفع… ${Math.round(percentage)}%`);
       },
     });
 
-    setMessage("Finalizing upload...");
+    setMessage("جارٍ إنهاء عملية الرفع…");
 
     const doc = await completeBlobUpload(programId, blob.url, safeName);
 
@@ -211,10 +211,9 @@ export default function DocumentUpload({ programId }: { programId: string }) {
   return (
     <section className="bg-white rounded-xl border p-6 space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Training Document</h2>
+        <h2 className="text-lg font-semibold">المادة التدريبية</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Upload a PDF to extract content and generate training days, topics,
-          and questions.
+          ارفع ملف PDF لتحليل المحتوى وإنشاء الأيام والمواضيع والأسئلة التدريبية.
         </p>
       </div>
 
@@ -224,14 +223,14 @@ export default function DocumentUpload({ programId }: { programId: string }) {
         onClick={() => !busy && inputRef.current?.click()}
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           busy
-            ? "border-blue-300 bg-blue-50 cursor-wait"
-            : "border-gray-200 cursor-pointer hover:border-blue-400 hover:bg-blue-50"
+            ? "border-teal-300 bg-teal-50 cursor-wait"
+            : "border-gray-200 cursor-pointer hover:border-teal-400 hover:bg-teal-50"
         }`}
       >
         <p className="text-sm text-gray-500">
-          {busy ? "Processing..." : "Drag & drop a PDF here, or click to select"}
+          {busy ? "جارٍ المعالجة…" : "اسحب ملف PDF إلى هنا أو اضغط لاختياره"}
         </p>
-        <p className="text-xs text-gray-400 mt-1">PDF only · max 50 MB</p>
+        <p className="text-xs text-gray-400 mt-1">PDF فقط · الحد الأقصى 50 MB</p>
         <input
           ref={inputRef}
           type="file"
@@ -244,7 +243,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
       {documentId && (
         <p className="text-xs text-gray-500">
-          Document ID: {documentId}
+          معرّف المادة: {documentId}
         </p>
       )}
 

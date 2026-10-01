@@ -81,19 +81,18 @@ export class ContentGenerationService {
       };
     }
 
-    // Allow Mock content when LLAMA_CLOUD_API_KEY is absent (dev/staging without
-    // LlamaParse configured). When the key IS present, still require real content
-    // so we don't silently generate from placeholder text in production.
+    // Fail closed on placeholder/mock-only content in every environment.
+    // AI generation must always be grounded in real extracted training material;
+    // missing provider credentials must never mask a source-content problem.
     const hasRealContent = pages.some(
       (p) => p.extractionMethod !== "MOCK" && (p.extractedText?.trim().length ?? 0) > 50
     );
-    const llamaConfigured = !!process.env.LLAMA_CLOUD_API_KEY;
-    if (llamaConfigured && !hasRealContent) {
+    if (!hasRealContent) {
       return {
         programId, documentId,
         status: "FAILED",
         daysGenerated: 0, questionsGenerated: 0,
-        errorMessage: "MOCK_ONLY_CONTENT — real extraction (LlamaParse) required before generating questions",
+        errorMessage: "MOCK_ONLY_CONTENT — real extracted source content is required before generating questions",
       };
     }
 

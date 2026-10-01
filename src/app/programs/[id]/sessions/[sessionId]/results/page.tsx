@@ -80,7 +80,7 @@ export default function SessionResultsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "Digital_Leadership_Test_Results.xlsx";
+      a.download = "Training_Portfolio_Results.xlsx";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -140,7 +140,7 @@ export default function SessionResultsPage() {
       : 0;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-6">
+    <main dir="rtl" lang="ar" className="dlp-simple-page p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -294,7 +294,7 @@ export default function SessionResultsPage() {
                   {p.percentage}%
                 </span>
                 <span className="font-bold text-blue-700 min-w-[52px] text-right">
-                  {p.totalScore} pts
+                  {p.totalScore} نقطة
                 </span>
               </div>
             ))}

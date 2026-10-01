@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "./programs";
+import { isArabicQuestionContent } from "@/lib/language";
 
 async function requireInstructor(): Promise<string> {
   const session = await auth();
@@ -205,6 +206,30 @@ export async function createQuestionAction(
     topic: formData.get("topic") || undefined,
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+
+  const program = await prisma.trainingProgram.findUnique({
+    where: { id: programId },
+    select: { language: true },
+  });
+  if (!program) return { ok: false, error: "NOT_FOUND" };
+
+  if (program.language === "AR") {
+    const optionTexts = [
+      parsed.data.optionA,
+      parsed.data.optionB,
+      parsed.data.optionC,
+      parsed.data.optionD,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .map((text) => ({ text }));
+
+    if (!isArabicQuestionContent(parsed.data.questionText, optionTexts)) {
+      return {
+        ok: false,
+        error: "البرنامج عربي؛ يجب أن يكون نص السؤال عربيًا، وتكون الخيارات عربية أو مصطلحات تقنية قصيرة فقط.",
+      };
+    }
+  }
 
   const count = await prisma.question.count({ where: { dayId } });
 

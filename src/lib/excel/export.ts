@@ -47,7 +47,7 @@ export function buildSessionExcel(
 
   // ── Sheet 1: ملخص الاختبار ──────────────────────────────
   const summaryData = [
-    ["ملخص الاختبار — القيادة الرقمية"],
+    ["ملخص الاختبار — الحقيبة التدريبية"],
     [],
     ["اسم الجلسة", summary.title ?? `جلسة ${summary.sessionCode}`],
     ["المدرب", summary.instructorName ?? ""],

@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { useParams } from "next/navigation";
 import { joinSessionAction } from "@/app/actions/sessions";
+import { brand } from "@/lib/brand";
 
 const ERROR_MESSAGES: Record<string, string> = {
   SESSION_NOT_FOUND:    "رمز الجلسة غير موجود. تحقق من الرمز وحاول مجدداً.",
@@ -37,11 +38,11 @@ export default function JoinWithCodePage() {
     : null;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl border shadow-sm p-8 space-y-6">
+    <main dir="rtl" lang="ar" className="dlp-participant-page">
+      <div className="brand-card dlp-join-card space-y-6">
         <div className="text-center space-y-1">
           <div className="text-4xl mb-2">🎓</div>
-          <h1 className="text-2xl font-bold text-gray-900">القيادة الرقمية</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{brand.nameAr}</h1>
           <p className="text-sm text-gray-500">أدخل اسمك للانضمام إلى الاختبار</p>
         </div>
 
@@ -84,7 +85,7 @@ export default function JoinWithCodePage() {
             type="submit"
             disabled={isPending}
             aria-disabled={isPending}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="w-full py-2.5 text-white rounded-lg font-medium disabled:opacity-50 transition-colors"
           >
             {isPending ? "جاري الانضمام…" : "انضمام للاختبار"}
           </button>

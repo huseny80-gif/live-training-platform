@@ -1,5 +1,6 @@
 import type { AIAdapter, ContentGenerationRequest, ContentGenerationResult, GeneratedDayPlan, GeneratedQuestion } from "../types";
 import { buildDayPlanPrompt, buildQuestionsPrompt, PROMPT_VERSION } from "../prompts";
+import { isArabicQuestionContent } from "@/lib/language";
 
 const MODEL_ID = process.env.OPENAI_MODEL || "gpt-5.6-luna";
 
@@ -42,6 +43,14 @@ export class OpenAIAdapter implements AIAdapter {
       const q = await respond(buildQuestionsPrompt(day, req.pages, req.language, req.questionsPerDay, questions.map(x => x.questionText)));
       inputTokens += q.inputTokens; outputTokens += q.outputTokens;
       questions.push(...parseQuestions(q.text, day.dayNumber, req.questionsPerDay));
+    }
+    if (req.language === "AR") {
+      const invalid = questions.filter(
+        (question) => !isArabicQuestionContent(question.questionText, question.options)
+      );
+      if (invalid.length > 0) {
+        throw new Error(`AI_LANGUAGE_MISMATCH_AR:${invalid.length}`);
+      }
     }
     return { days, questions, modelUsed: MODEL_ID, promptVersion: PROMPT_VERSION, inputTokens, outputTokens, generatedAt: new Date() };
   }

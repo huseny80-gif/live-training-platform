@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { getParticipantResult } from "@/app/actions/sessions";
+import { brand } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export default async function ParticipantResultPage({
   // No token — show Arabic error page instead of redirect
   if (!token) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl">🔒</div>
           <h1 className="text-lg font-bold text-gray-800">لم يتم التعرف عليك</h1>
@@ -40,7 +41,7 @@ export default async function ParticipantResultPage({
     const msg = err instanceof Error ? err.message : "ERROR";
     const isEnded = msg === "SESSION_NOT_FOUND";
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl">⚠️</div>
           <h1 className="text-lg font-bold text-gray-800">
@@ -81,7 +82,7 @@ export default async function ParticipantResultPage({
     : "text-red-500";
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <main dir="rtl" lang="ar" className="dlp-participant-page">
       <div className="w-full max-w-sm space-y-4">
         {/* Result card */}
         <div className="bg-white rounded-3xl shadow-lg p-8 text-center space-y-5">
@@ -90,7 +91,7 @@ export default async function ParticipantResultPage({
 
           <div>
             <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">
-              القيادة الرقمية
+              {brand.nameAr}
             </p>
             <p className="text-sm text-gray-500 mb-0.5">{session.title ?? `الجلسة ${session.sessionCode}`}</p>
             <h1 className="text-xl font-bold text-gray-900">{participant.displayName}</h1>

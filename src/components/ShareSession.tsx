@@ -7,7 +7,7 @@ export default function ShareSession({ code }: { code: string }) {
   const [open,setOpen]=useState(false);
   const [copied,setCopied]=useState(false);
   const publicOrigin=(process.env.NEXT_PUBLIC_PARTICIPANT_URL || DEFAULT_PUBLIC_PARTICIPANT_ORIGIN).replace(/\/$/,"");
-  const url=useMemo(()=>`${publicOrigin}/join?code=${encodeURIComponent(code)}`,[code,publicOrigin]);
+  const url=useMemo(()=>`${publicOrigin}/join/${encodeURIComponent(code)}`,[code,publicOrigin]);
   async function copy(){await navigator.clipboard.writeText(url);setCopied(true);setTimeout(()=>setCopied(false),1500)}
   return <span className="dlp-share-wrap">
     <a className="dlp-session-button" href={url} target="_blank" rel="noreferrer">معاينة كمتدرب</a>

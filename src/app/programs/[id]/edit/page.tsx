@@ -22,43 +22,43 @@ export default function EditProgramPage() {
   }, [state, router, params.id]);
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-xl mx-auto bg-white rounded-2xl border p-8">
-        <h1 className="text-xl font-bold mb-6">Edit Program</h1>
+    <main dir="rtl" lang="ar" className="dlp-simple-page p-6">
+      <div className="brand-card max-w-xl mx-auto p-8">
+        <h1 className="text-xl font-bold mb-6">تعديل البرنامج</h1>
         <form action={dispatch} className="space-y-4">
-          <Field label="Title" name="title" id="edit-title" />
+          <Field label="العنوان" name="title" id="edit-title" />
           <div>
-            <label htmlFor="edit-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label htmlFor="edit-description" className="block text-sm font-medium text-gray-700 mb-1">الوصف</label>
             <textarea
               id="edit-description"
               name="description"
               rows={3}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <div>
-            <label htmlFor="edit-language" className="block text-sm font-medium text-gray-700 mb-1">Language</label>
+            <label htmlFor="edit-language" className="block text-sm font-medium text-gray-700 mb-1">اللغة</label>
             <select
               id="edit-language"
               name="language"
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
-              <option value="">— no change —</option>
-              <option value="AR">Arabic</option>
-              <option value="EN">English</option>
+              <option value="">— بدون تغيير —</option>
+              <option value="AR">العربية</option>
+              <option value="EN">الإنجليزية</option>
             </select>
           </div>
           <div>
-            <label htmlFor="edit-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label htmlFor="edit-status" className="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
             <select
               id="edit-status"
               name="status"
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
-              <option value="">— no change —</option>
-              <option value="DRAFT">Draft</option>
-              <option value="ACTIVE">Active</option>
-              <option value="ARCHIVED">Archived</option>
+              <option value="">— بدون تغيير —</option>
+              <option value="DRAFT">مسودة</option>
+              <option value="ACTIVE">نشط</option>
+              <option value="ARCHIVED">مؤرشف</option>
             </select>
           </div>
           {state && !state.ok && (
@@ -70,14 +70,14 @@ export default function EditProgramPage() {
               onClick={() => router.back()}
               className="flex-1 py-2 rounded-lg border text-sm hover:bg-gray-50"
             >
-              Cancel
+              إلغاء
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg bg-teal-700 text-white text-sm hover:bg-teal-800 disabled:opacity-50"
             >
-              {isPending ? "Saving…" : "Save Changes"}
+              {isPending ? "جارٍ الحفظ…" : "حفظ التغييرات"}
             </button>
           </div>
         </form>
@@ -93,7 +93,7 @@ function Field({ label, name, id }: { label: string; name: string; id: string })
       <input
         id={id}
         name={name}
-        className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
       />
     </div>
   );

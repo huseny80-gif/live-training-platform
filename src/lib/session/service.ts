@@ -5,6 +5,7 @@
 import { prisma } from "@/lib/prisma";
 import { issueGuestToken, verifyGuestToken, hashToken } from "./guest-token";
 import { randomBytes } from "crypto";
+import { isArabicQuestionContent } from "@/lib/language";
 
 const SCORE_CORRECT = 10;
 
@@ -25,9 +26,27 @@ export async function createSession(
   // Verify questions exist for the day
   const day = await prisma.trainingDay.findFirst({
     where: { programId, dayNumber },
-    include: { questions: { where: { status: { in: ["APPROVED", "DRAFT"] } } } },
+    include: {
+      questions: {
+        where: { status: { in: ["APPROVED", "DRAFT"] } },
+        include: { options: { orderBy: { displayOrder: "asc" } } },
+      },
+    },
   });
   if (!day || day.questions.length === 0) throw new Error("NO_QUESTIONS_FOR_DAY");
+
+  if (program.language === "AR") {
+    const invalidQuestions = day.questions.filter(
+      (question) =>
+        !isArabicQuestionContent(
+          question.questionText,
+          question.options.map((option) => ({ text: option.optionText }))
+        )
+    );
+    if (invalidQuestions.length > 0) {
+      throw new Error(`NON_ARABIC_QUESTIONS_IN_ARABIC_PROGRAM:${invalidQuestions.length}`);
+    }
+  }
 
   // Generate unique session code
   const sessionCode = await generateUniqueCode();
