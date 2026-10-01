@@ -115,6 +115,33 @@ Rules:
       body: JSON.stringify({
         model: MODEL_ID,
         max_output_tokens: maxOutputTokens,
+        text: {
+          format: {
+            type: "json_schema",
+            name: "pdf_page_extraction",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                pages: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      pageNumber: { type: "integer", minimum: 1 },
+                      title: { type: "string" },
+                      text: { type: "string" }
+                    },
+                    required: ["pageNumber", "title", "text"]
+                  }
+                }
+              },
+              required: ["pages"]
+            }
+          }
+        },
         input: [
           {
             role: "user",
