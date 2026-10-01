@@ -51,7 +51,17 @@ export default function ReprocessDocumentButton({
         });
 
         setMessage(
-          `تم اعتماد الملف كمصدر مرجعي بنجاح: ${result.completedPages} صفحة حقيقية.`
+          `تم اعتماد الملف كمصدر مرجعي: ${result.completedPages} صفحة حقيقية. جارٍ الآن توليد 10 أيام و50 سؤالًا بالعربية…`
+        );
+
+        const rebuild = await runProgramRebuild({
+          programId,
+          documentId,
+          onProgress: (text) => setMessage(text),
+        });
+
+        setMessage(
+          `اكتمل بنجاح: ${rebuild.daysGenerated} أيام و${rebuild.questionsGenerated} سؤالًا بالعربية.`
         );
         router.refresh();
         return;
