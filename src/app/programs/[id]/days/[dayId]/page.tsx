@@ -54,13 +54,18 @@ export default async function DayDetailsPage({
               {query.sessionError === "arabic-questions"
                 ? `يوجد ${Number.isFinite(invalidCount) ? invalidCount : 0} سؤال غير مطابق للغة العربية في هذا اليوم. صحّح بنك الأسئلة أولًا ثم أعد إنشاء الجلسة.`
                 : query.sessionError === "no-arabic-questions"
-                ? "لا توجد أسئلة عربية صالحة لهذا اليوم. راجع بنك الأسئلة والخيارات أولًا."
+                ? "لا توجد أسئلة عربية صالحة لهذا اليوم. أعد توليد محتوى البرنامج بالعربية من الملف التدريبي الأصلي."
                 : query.sessionError === "no-questions"
                 ? "لا توجد أسئلة صالحة لهذا اليوم. أضف أو اعتمد الأسئلة أولًا."
                 : query.sessionError === "program"
                 ? "تعذر العثور على البرنامج أو لا تملك صلاحية إنشاء جلسة له."
                 : "حدث خطأ أثناء إنشاء الجلسة. لم يتم إنشاء جلسة ناقصة؛ حاول مرة أخرى بعد مراجعة المحتوى."}
             </p>
+            {(query.sessionError === "arabic-questions" || query.sessionError === "no-arabic-questions") ? (
+              <Link href={`/programs/${id}/manage`} className="dlp-control-button primary dlp-session-error-action">
+                إدارة المحتوى وإعادة التوليد بالعربية
+              </Link>
+            ) : null}
           </div>
         ) : null}
 
