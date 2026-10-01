@@ -87,7 +87,7 @@ export default async function InstructorSessionPage({
   const prevQ = questions.find((q) => q.questionOrder === currentOrder - 1) ?? null;
   const nextQ = questions.find((q) => q.questionOrder === currentOrder + 1) ?? null;
 
-  const publicOrigin = (process.env.NEXT_PUBLIC_PARTICIPANT_URL ?? "https://live-training-platform.vercel.app").replace(/\\\/$/, "");
+  const publicOrigin = (process.env.NEXT_PUBLIC_PARTICIPANT_URL ?? "https://live-training-platform.vercel.app").replace(/\/$/, "");
   const joinUrl = `${publicOrigin}/join/${encodeURIComponent(session.sessionCode)}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}&bgcolor=ffffff&color=0f766e&margin=10`;
 
@@ -108,7 +108,7 @@ export default async function InstructorSessionPage({
         <SessionLiveStats sessionId={sessionId} />
 
         {/* Live participants list */}
-        <SessionParticipantsList sessionId={sessionId} sessionCode={session.sessionCode} />
+        <SessionParticipantsList sessionId={sessionId} />
 
         {/* Analytics dashboard */}
         <SessionAnalyticsDashboard
