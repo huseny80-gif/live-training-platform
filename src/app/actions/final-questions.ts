@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isArabicQuestionContent, isPredominantlyArabic } from "@/lib/language";
 import { extractionService } from "@/lib/extraction/service";
+import { extractionErrorToArabic } from "@/lib/extraction/errors";
 
 export type FinalQuestion = {
   type: "MCQ" | "TF";
@@ -225,8 +226,7 @@ export async function generateFinalQuestions(
     return {
       ok: false,
       error:
-        "تعذر استخراج المحتوى الحقيقي من الملف قبل إنشاء الأسئلة النهائية. " +
-        (extraction.errorMessage ?? "تحقق من مزود الاستخراج ثم أعد المحاولة."),
+        extractionErrorToArabic(extraction.errorMessage),
     };
   }
 
