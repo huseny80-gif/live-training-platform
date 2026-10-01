@@ -243,6 +243,7 @@ export async function deleteDocument(documentId: string) {
 
   const doc = await prisma.trainingDocument.findFirst({
     where: { id: documentId, program: { instructorId } },
+    select: { id: true, storagePath: true, programId: true },
   });
   if (!doc) throw new Error("NOT_FOUND");
 
@@ -254,5 +255,7 @@ export async function deleteDocument(documentId: string) {
   }
 
   await prisma.trainingDocument.delete({ where: { id: documentId } });
+  revalidatePath(`/programs/${doc.programId}`);
+  revalidatePath(`/programs/${doc.programId}/manage`);
   return { success: true };
 }
