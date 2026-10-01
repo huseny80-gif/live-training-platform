@@ -1,14 +1,18 @@
 // Guest JWT for participants — issued on join, verified on answer submission.
 // Payload contains participantId and sessionId.
-// Secret: SESSION_SECRET env var (required) — never hardcoded.
+// Secret: SESSION_SECRET env var — required in ALL environments.
+// Must be independent from AUTH_SECRET so a crafted NextAuth token cannot be
+// accepted as a guest token or vice versa.
 
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
 function getSecret(): string {
-  const s = process.env.SESSION_SECRET ?? process.env.AUTH_SECRET;
-  if (!s) throw new Error("SESSION_SECRET env var not set");
-  return s;
+  const secret = process.env.SESSION_SECRET;
+  if (secret) return secret;
+  throw new Error(
+    "SESSION_SECRET is required for guest tokens. Set it in your environment variables."
+  );
 }
 
 export interface GuestTokenPayload {

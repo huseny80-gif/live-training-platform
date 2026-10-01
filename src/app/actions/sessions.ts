@@ -192,7 +192,8 @@ export async function getSessionResults(sessionId: string) {
           totalQuestions: sr.totalQuestions,
           totalAnswers: sr.totalAnswers,
           totalCorrect: sr.totalCorrect,
-          correctRate: Number(sr.correctRate),
+          // correctRate stored as 0..1 ratio; convert to 0..100 for display
+          correctRate: Math.round(Number(sr.correctRate) * 100),
           averageScore: Number(sr.averageScore),
           highestScore: Number(sr.highestScore),
         }

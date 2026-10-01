@@ -2,18 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildSessionExcel } from "@/lib/excel/export";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   const authSession = await auth();
   const userId = authSession?.user?.id ?? null;
   const { code: sessionId } = await params;
-
-  console.log({ exportParam: sessionId, userId, authed: !!userId });
+  const requestId = req.headers.get("x-request-id") ?? undefined;
 
   if (!userId) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
@@ -24,10 +24,9 @@ export async function GET(
   try {
     found = await prisma.liveSession.findUnique({ where: { id: sessionId }, select: { id: true, instructorId: true } });
   } catch (e) {
-    console.error({ exportDbError: String(e), sessionId });
-    return NextResponse.json({ error: "DB_ERROR" }, { status: 500 });
+    logger.error("export: DB lookup failed", { sessionId, requestId, err: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-  console.log({ sessionFound: !!found, dbInstructorId: found?.instructorId, requestUserId: userId, ownershipMatch: found?.instructorId === userId });
 
   if (!found || found.instructorId !== userId) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
+  const requestId = req.headers.get("x-request-id") ?? undefined;
+  try {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
@@ -28,4 +31,8 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(doc);
+  } catch (e) {
+    logger.error("documents/status: unhandled error", { requestId, err: e instanceof Error ? e.message : String(e) });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

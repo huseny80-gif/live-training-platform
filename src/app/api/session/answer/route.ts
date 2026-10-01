@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { submitAnswer } from "@/lib/session/service";
+import { checkAnswerRateLimit } from "@/lib/rate-limit";
+import { hashToken } from "@/lib/session/guest-token";
 
 export async function POST(req: NextRequest) {
   const cookieStore = await cookies();
@@ -25,6 +27,18 @@ export async function POST(req: NextRequest) {
   const { sessionQuestionId, selectedOptionId, timeTakenSeconds } = body;
   if (!sessionQuestionId || !selectedOptionId) {
     return NextResponse.json({ error: "MISSING_PARAMS" }, { status: 400 });
+  }
+
+  // Rate limit: keyed by sessionQuestionId + token hash — scoped to participant+question.
+  // Prevents rapid-fire abuse without blocking legitimate single submissions or retries.
+  const rlKey = `${sessionQuestionId}:${hashToken(token)}`;
+  const rl = await checkAnswerRateLimit(rlKey);
+  if (!rl.allowed) {
+    const retryAfterSec = Math.ceil(rl.retryAfterMs / 1000);
+    return NextResponse.json(
+      { error: "TOO_MANY_REQUESTS" },
+      { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
+    );
   }
 
   try {

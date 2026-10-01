@@ -44,6 +44,63 @@ function instructorRoom(sessionId: string) {
   return `instructor:${sessionId}`;
 }
 
+// ── Participant join deps — exported for testing ───────────────────────────────
+// Production code passes the real service functions; tests pass mocks.
+
+export interface ParticipantJoinDeps {
+  participantJoin: (sessionCode: string, displayName: string) => Promise<{
+    participantId: string;
+    token: string;
+    sessionId: string;
+  }>;
+  getSessionByCode: (code: string) => Promise<{ id: string } | null>;
+}
+
+export async function handleParticipantJoin(
+  io: Server,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  socket: any,
+  payload: ParticipantJoinPayload,
+  deps: ParticipantJoinDeps,
+): Promise<void> {
+  try {
+    const result = await deps.participantJoin(payload.sessionCode, payload.displayName);
+    socket.data.participantId = result.participantId;
+    socket.data.participantToken = result.token;
+    socket.data.sessionId = result.sessionId;
+
+    // Join session:<CODE> room — NOT session:<UUID>.
+    // session:<UUID> receives EVENTS.QUESTION_RESULTS which contains correctOptionId.
+    // Participant sockets must never be in that room.
+    await socket.join(`session:${payload.sessionCode}`);
+
+    // Confirm join to participant
+    socket.emit(EVENTS.PARTICIPANT_JOINED, {
+      participantId: result.participantId,
+      token: result.token,
+      sessionId: result.sessionId,
+    });
+
+    // Count for instructor
+    const session = await deps.getSessionByCode(payload.sessionCode);
+    if (session) {
+      const { prisma } = await import("@/lib/prisma");
+      const totalParticipants = await prisma.sessionParticipant.count({
+        where: { sessionId: result.sessionId },
+      });
+      io.to(instructorRoom(result.sessionId)).emit(EVENTS.PARTICIPANT_JOINED, {
+        participantId: result.participantId,
+        displayName: payload.displayName,
+        joinedAt: new Date().toISOString(),
+        totalParticipants,
+      });
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    socket.emit(EVENTS.ERROR, { code: msg });
+  }
+}
+
 export function registerSessionHandlers(io: Server) {
   io.on("connection", (socket: Socket) => {
     // ── Instructor authentication ──────────────────────────────────────────────
@@ -195,40 +252,78 @@ export function registerSessionHandlers(io: Server) {
       }
     });
 
+    // ── Generic room join (participant page and dashboard components) ───────────
+    // The participant page and instructor React components (SessionLiveStats,
+    // SessionLeaderboard, etc.) emit "participant:join_room" with
+    // { room: "session:<CODE>" } to subscribe to REALTIME_EVENTS broadcasts.
+    //
+    // Room naming — TWO completely separate namespaces:
+    //   session:<CODE>   — 6-char session code — used by REALTIME_EVENTS path
+    //                       (service.ts → socket-server.ts → participants)
+    //   session:<UUID>   — 36-char session ID  — used by EVENTS path
+    //                       (handler.ts → instructor control socket)
+    //
+    // SECURITY: QUESTION_RESULTS (which contains correctOptionId) is broadcast
+    // via the EVENTS path to session:<UUID>. Participants join session:<CODE>
+    // only. These rooms NEVER overlap, so participants can never receive
+    // correctOptionId before SHOW_RESULTS.
+    //
+    // Authorization: sessionCode is the credential — a valid code confirms
+    // the session exists. No guest_token is required here because this handler
+    // only admits the socket to a broadcast-only room; no sensitive data is
+    // emitted to session:<CODE> beyond what the REST API already exposes.
+    socket.on("participant:join_room", async (payload: { room?: string }) => {
+      try {
+        if (typeof payload?.room !== "string") return;
+
+        // Only allow joining "session:<code>" rooms via this shortcut.
+        const match = payload.room.match(/^session:([A-Z0-9]{4,12})$/);
+        if (!match) {
+          socket.emit(EVENTS.ERROR, { code: "INVALID_ROOM" });
+          return;
+        }
+
+        const sessionCode = match[1];
+        const session = await getSessionByCode(sessionCode);
+        if (!session) {
+          socket.emit(EVENTS.ERROR, { code: "SESSION_NOT_FOUND" });
+          return;
+        }
+
+        await socket.join(`session:${sessionCode}`);
+
+        // Stamp lastSeenAt if this socket already has a participant identity
+        const participantId = socket.data.participantId as string | undefined;
+        if (participantId) {
+          const { prisma } = await import("@/lib/prisma");
+          await prisma.sessionParticipant
+            .update({ where: { id: participantId }, data: { lastSeenAt: new Date() } })
+            .catch(() => {}); // Non-critical
+        }
+      } catch {
+        // Non-critical — ignore silently
+      }
+    });
+
     // ── Participant join ───────────────────────────────────────────────────────
     socket.on(EVENTS.PARTICIPANT_JOIN, async (payload: ParticipantJoinPayload) => {
+      await handleParticipantJoin(io, socket, payload, { participantJoin, getSessionByCode });
+    });
+
+    // ── Disconnect ─────────────────────────────────────────────────────────────
+    // Marks participant OFFLINE and stamps lastSeenAt.
+    // Instructor sockets have no participantId — they're silently skipped.
+    socket.on("disconnect", async () => {
+      const participantId = socket.data.participantId as string | undefined;
+      if (!participantId) return;
       try {
-        const result = await participantJoin(payload.sessionCode, payload.displayName);
-        socket.data.participantId = result.participantId;
-        socket.data.participantToken = result.token;
-        socket.data.sessionId = result.sessionId;
-
-        await socket.join(roomId(result.sessionId));
-
-        // Confirm join to participant
-        socket.emit(EVENTS.PARTICIPANT_JOINED, {
-          participantId: result.participantId,
-          token: result.token,
-          sessionId: result.sessionId,
+        const { prisma } = await import("@/lib/prisma");
+        await prisma.sessionParticipant.update({
+          where: { id: participantId },
+          data: { status: "OFFLINE", lastSeenAt: new Date() },
         });
-
-        // Count for instructor
-        const session = await getSessionByCode(payload.sessionCode);
-        if (session) {
-          const { prisma } = await import("@/lib/prisma");
-          const totalParticipants = await prisma.sessionParticipant.count({
-            where: { sessionId: result.sessionId },
-          });
-          io.to(instructorRoom(result.sessionId)).emit(EVENTS.PARTICIPANT_JOINED, {
-            participantId: result.participantId,
-            displayName: payload.displayName,
-            joinedAt: new Date().toISOString(),
-            totalParticipants,
-          });
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        socket.emit(EVENTS.ERROR, { code: msg });
+      } catch {
+        // Non-critical — participant record may not exist (e.g. join failed mid-flight)
       }
     });
 

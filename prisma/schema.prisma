@@ -31,17 +31,17 @@ enum ProgramStatus {
 }
 
 enum DocumentContentType {
-  TEXT_BASED    // pdfjs-dist can extract directly
-  IMAGE_BASED   // PowerPoint-exported or scanned — needs Vision LLM
-  MIXED         // some text, some images
-  UNKNOWN       // not yet analyzed
+  TEXT_BASED // pdfjs-dist can extract directly
+  IMAGE_BASED // PowerPoint-exported or scanned — needs Vision LLM
+  MIXED // some text, some images
+  UNKNOWN // not yet analyzed
 }
 
 enum DocumentExtractionStatus {
   PENDING
   PROCESSING
   COMPLETED
-  OCR_REQUIRED  // image-based, awaiting user confirmation to proceed with Vision LLM
+  OCR_REQUIRED // image-based, awaiting user confirmation to proceed with Vision LLM
   FAILED
 }
 
@@ -117,26 +117,33 @@ enum ActorType {
   SYSTEM
 }
 
+enum CertificateStatus {
+  ISSUED
+  REVOKED
+}
+
 // ─────────────────────────────────────────────
 // INSTRUCTORS
 // ─────────────────────────────────────────────
 
 model Instructor {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  passwordHash  String         @map("password_hash")
-  name          String
-  role          InstructorRole @default(INSTRUCTOR)
-  isActive      Boolean        @default(true) @map("is_active")
-  lastLoginAt   DateTime?      @map("last_login_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  id                String         @id @default(uuid())
+  email             String         @unique
+  passwordHash      String         @map("password_hash")
+  name              String
+  role              InstructorRole @default(INSTRUCTOR)
+  isActive          Boolean        @default(true) @map("is_active")
+  mustResetPassword Boolean        @default(false) @map("must_reset_password")
+  lastLoginAt       DateTime?      @map("last_login_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  programs      TrainingProgram[]
-  sessions      LiveSession[]
-  auditLogs     AuditLog[]
+  programs  TrainingProgram[]
+  sessions  LiveSession[]
+  auditLogs AuditLog[]
 
   @@index([email])
+  @@index([isActive])
   @@map("instructors")
 }
 
@@ -154,10 +161,11 @@ model TrainingProgram {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
-  instructor   Instructor          @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  instructor   Instructor         @relation(fields: [instructorId], references: [id], onDelete: Restrict)
   documents    TrainingDocument[]
   days         TrainingDay[]
   sessions     LiveSession[]
+  certificates Certificate[]
 
   @@index([instructorId])
   @@index([status])
@@ -169,23 +177,23 @@ model TrainingProgram {
 // ─────────────────────────────────────────────
 
 model TrainingDocument {
-  id                String                    @id @default(uuid())
-  programId         String                    @map("program_id")
-  fileName          String                    @map("file_name")
-  storagePath       String                    @map("storage_path")
-  fileSizeBytes     Int                       @map("file_size_bytes")
-  pageCount         Int?                      @map("page_count")
-  mimeType          String                    @default("application/pdf") @map("mime_type")
-  contentType       DocumentContentType       @default(UNKNOWN) @map("content_type")
-  extractionStatus  DocumentExtractionStatus  @default(PENDING) @map("extraction_status")
-  extractionNotes   String?                   @map("extraction_notes")
-  extractedAt       DateTime?                 @map("extracted_at")
-  createdAt         DateTime                  @default(now()) @map("created_at")
-  updatedAt         DateTime                  @updatedAt @map("updated_at")
+  id               String                   @id @default(uuid())
+  programId        String                   @map("program_id")
+  fileName         String                   @map("file_name")
+  storagePath      String                   @map("storage_path")
+  fileSizeBytes    Int                      @map("file_size_bytes")
+  pageCount        Int?                     @map("page_count")
+  mimeType         String                   @default("application/pdf") @map("mime_type")
+  contentType      DocumentContentType      @default(UNKNOWN) @map("content_type")
+  extractionStatus DocumentExtractionStatus @default(PENDING) @map("extraction_status")
+  extractionNotes  String?                  @map("extraction_notes")
+  extractedAt      DateTime?                @map("extracted_at")
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
 
-  program           TrainingProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  days              TrainingDay[]
-  pages             DocumentPage[]
+  program TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  days    TrainingDay[]
+  pages   DocumentPage[]
 
   @@index([programId])
   @@index([extractionStatus])
@@ -199,22 +207,22 @@ model TrainingDocument {
 // ─────────────────────────────────────────────
 
 model DocumentPage {
-  id              String               @id @default(uuid())
-  documentId      String               @map("document_id")
-  pageNumber      Int                  @map("page_number")      // 1-based (1–147 for GIS PDF)
-  title           String?                                        // slide title if detectable
-  extractedText   String?              @map("extracted_text")   // raw extracted text
-  extractedJson   Json?                @map("extracted_json")   // structured: {title, bullets[], keywords[]}
-  imageStoragePath String?             @map("image_storage_path") // path to rendered slide image (for Vision LLM)
-  extractionMethod String?             @map("extraction_method") // NATIVE_TEXT | LLAMAPARSE | VISION_LLM | MOCK
+  id               String               @id @default(uuid())
+  documentId       String               @map("document_id")
+  pageNumber       Int                  @map("page_number") // 1-based (1–147 for GIS PDF)
+  title            String? // slide title if detectable
+  extractedText    String?              @map("extracted_text") // raw extracted text
+  extractedJson    Json?                @map("extracted_json") // structured: {title, bullets[], keywords[]}
+  imageStoragePath String?              @map("image_storage_path") // path to rendered slide image (for Vision LLM)
+  extractionMethod String?              @map("extraction_method") // NATIVE_TEXT | LLAMAPARSE | VISION_LLM | MOCK
   extractionStatus PageExtractionStatus @default(PENDING) @map("extraction_status")
-  errorMessage    String?              @map("error_message")
-  extractedAt     DateTime?            @map("extracted_at")
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
+  errorMessage     String?              @map("error_message")
+  extractedAt      DateTime?            @map("extracted_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
 
-  document        TrainingDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  questions       Question[]        @relation("QuestionSourcePage")
+  document  TrainingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  questions Question[]       @relation("QuestionSourcePage")
 
   @@unique([documentId, pageNumber])
   @@index([documentId])
@@ -240,10 +248,10 @@ model TrainingDay {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  program        TrainingProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  document       TrainingDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
-  questions      Question[]
-  topics         TrainingTopic[]
+  program   TrainingProgram   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  document  TrainingDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  questions Question[]
+  topics    TrainingTopic[]
 
   @@unique([programId, dayNumber])
   @@index([programId])
@@ -261,7 +269,7 @@ model TrainingTopic {
   topicOrder Int      @map("topic_order")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  day        TrainingDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  day TrainingDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
 
   @@index([dayId])
   @@map("training_topics")
@@ -298,6 +306,7 @@ model Question {
 
   day              TrainingDay       @relation(fields: [dayId], references: [id], onDelete: Cascade)
   sourcePage       DocumentPage?     @relation("QuestionSourcePage", fields: [sourcePageId], references: [id], onDelete: SetNull)
+  correctOption    QuestionOption?   @relation("CorrectOption", fields: [correctOptionId], references: [id], onDelete: Restrict)
   options          QuestionOption[]
   sessionQuestions SessionQuestion[]
 
@@ -321,8 +330,9 @@ model QuestionOption {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  question           Question            @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  participantAnswers ParticipantAnswer[]
+  question            Question            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  correctForQuestions Question[]          @relation("CorrectOption")
+  participantAnswers  ParticipantAnswer[]
 
   @@unique([questionId, optionLabel])
   @@index([questionId])
@@ -352,14 +362,15 @@ model LiveSession {
   createdAt         DateTime      @default(now()) @map("created_at")
   updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  program              TrainingProgram       @relation(fields: [programId], references: [id], onDelete: Restrict)
-  instructor           Instructor            @relation(fields: [instructorId], references: [id], onDelete: Restrict)
-  participants         SessionParticipant[]
-  sessionQuestions     SessionQuestion[]
-  answers              ParticipantAnswer[]
+  program               TrainingProgram        @relation(fields: [programId], references: [id], onDelete: Restrict)
+  instructor            Instructor             @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  participants          SessionParticipant[]
+  sessionQuestions      SessionQuestion[]
+  answers               ParticipantAnswer[]
   participantDayResults ParticipantDayResult[]
-  dailyResult          DailyResult?
-  sessionResult        SessionResult?
+  dailyResult           DailyResult?
+  sessionResult         SessionResult?
+  certificates          Certificate[]
 
   @@index([programId])
   @@index([instructorId])
@@ -388,13 +399,15 @@ model SessionParticipant {
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  session        LiveSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  answers        ParticipantAnswer[]
-  dayResults     ParticipantDayResult[]
+  session      LiveSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers      ParticipantAnswer[]
+  dayResults   ParticipantDayResult[]
+  certificates Certificate[]
 
   @@index([sessionId])
   @@index([sessionId, status])
   @@index([externalUserId])
+  @@index([sessionId, totalScore(sort: Desc), correctCount(sort: Desc), updatedAt(sort: Asc)], map: "session_participants_leaderboard_idx")
   @@map("session_participants")
 }
 
@@ -415,9 +428,9 @@ model SessionQuestion {
   createdAt        DateTime              @default(now()) @map("created_at")
   updatedAt        DateTime              @updatedAt @map("updated_at")
 
-  session   LiveSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  question  Question            @relation(fields: [questionId], references: [id], onDelete: Restrict)
-  answers   ParticipantAnswer[]
+  session  LiveSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question Question            @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answers  ParticipantAnswer[]
 
   @@unique([sessionId, questionOrder])
   @@unique([sessionId, questionId])
@@ -453,6 +466,7 @@ model ParticipantAnswer {
   @@index([sessionQuestionId])
   @@index([participantId])
   @@index([sessionQuestionId, isFinal])
+  @@index([sessionId, sessionQuestionId, isFinal, isCorrect], map: "participant_answers_analytics_idx")
   @@map("participant_answers")
 }
 
@@ -499,7 +513,7 @@ model DailyResult {
   highestScore      Decimal  @map("highest_score")
   computedAt        DateTime @default(now()) @map("computed_at")
 
-  session           LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@map("daily_results")
@@ -521,9 +535,52 @@ model SessionResult {
   highestScore      Decimal  @map("highest_score")
   computedAt        DateTime @default(now()) @map("computed_at")
 
-  session           LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("session_results")
+}
+
+// ─────────────────────────────────────────────
+// CERTIFICATES
+// Issued server-side after session ends when passingScore threshold is met.
+// tokenHash removed — retrieval is authenticated via guest_token cookie.
+// ─────────────────────────────────────────────
+
+model Certificate {
+  id            String @id @default(uuid())
+  sessionId     String @map("session_id")
+  participantId String @map("participant_id")
+  programId     String @map("program_id")
+
+  // Human-readable unique identifier e.g. CERT-2026-000001
+  certificateNumber String @unique @map("certificate_number")
+  // Short uppercase alphanumeric code for future public verification
+  verificationCode  String @unique @map("verification_code")
+
+  // Snapshot fields — captured at issue time, self-contained
+  displayName    String  @map("display_name")
+  programTitle   String  @map("program_title")
+  dayNumber      Int     @map("day_number")
+  totalScore     Decimal @map("total_score")
+  correctCount   Int     @map("correct_count")
+  questionsTotal Int     @map("questions_total")
+  rank           Int?
+
+  status    CertificateStatus @default(ISSUED)
+  issuedAt  DateTime          @default(now()) @map("issued_at")
+  revokedAt DateTime?         @map("revoked_at")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  session     LiveSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  participant SessionParticipant @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  program     TrainingProgram    @relation(fields: [programId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, participantId])
+  @@index([sessionId])
+  @@index([participantId])
+  @@index([verificationCode])
+  @@map("certificates")
 }
 
 // ─────────────────────────────────────────────

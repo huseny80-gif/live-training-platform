@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { io } from "socket.io-client";
+import { REALTIME_EVENTS } from "@/lib/realtime/socket-events";
 
 interface QuestionOption {
   id: string;
@@ -81,6 +83,35 @@ export default function ParticipantSessionPage() {
     const id = setInterval(fetchState, 2000);
     return () => clearInterval(id);
   }, [fetchState]);
+
+  // Socket.IO realtime listener — fast path on session/question control events
+  useEffect(() => {
+    if (!code) return;
+
+    const socket = io({ path: "/api/socket", transports: ["websocket"] });
+    socket.emit("participant:join_room", { room: `session:${code}` });
+
+    const refresh = () => { fetchState(); };
+
+    socket.on(REALTIME_EVENTS.SESSION_STARTED, refresh);
+    socket.on(REALTIME_EVENTS.SESSION_PAUSED, refresh);
+    socket.on(REALTIME_EVENTS.SESSION_RESUMED, refresh);
+    socket.on(REALTIME_EVENTS.SESSION_ENDED, refresh);
+    socket.on(REALTIME_EVENTS.QUESTION_STARTED, refresh);
+    socket.on(REALTIME_EVENTS.QUESTION_CHANGED, refresh);
+    socket.on(REALTIME_EVENTS.QUESTION_LOCKED, refresh);
+
+    return () => {
+      socket.off(REALTIME_EVENTS.SESSION_STARTED, refresh);
+      socket.off(REALTIME_EVENTS.SESSION_PAUSED, refresh);
+      socket.off(REALTIME_EVENTS.SESSION_RESUMED, refresh);
+      socket.off(REALTIME_EVENTS.SESSION_ENDED, refresh);
+      socket.off(REALTIME_EVENTS.QUESTION_STARTED, refresh);
+      socket.off(REALTIME_EVENTS.QUESTION_CHANGED, refresh);
+      socket.off(REALTIME_EVENTS.QUESTION_LOCKED, refresh);
+      socket.disconnect();
+    };
+  }, [code, fetchState]);
 
   async function submitAnswer(optionId: string) {
     if (!state?.currentQuestion || submitting) return;
