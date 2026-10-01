@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { completeBlobUpload } from "@/app/actions/documents";
 import { runDocumentSourcePreparation } from "@/lib/client/document-source";
+import { runProgramRebuild } from "@/lib/client/program-rebuild";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 // Safe JSON parser — never throws on HTML error pages or empty bodies
@@ -39,7 +40,23 @@ export default function DocumentUpload({ programId }: { programId: string }) {
     });
 
     setMessage(
-      `تم اعتماد ${fileName} كمصدر مرجعي بنجاح: ${result.completedPages} صفحة حقيقية من أصل ${result.totalPages}.`
+      `تم اعتماد ${fileName} كمصدر مرجعي: ${result.completedPages} صفحة حقيقية. جارٍ توليد 10 أيام و50 سؤالًا بالعربية…`
+    );
+
+    const rebuild = await runProgramRebuild({
+      programId,
+      documentId: docId,
+      onProgress: (text) => setMessage(text),
+    });
+
+    if (rebuild.questionsGenerated !== 50 || rebuild.daysGenerated !== 10) {
+      throw new Error(
+        `اكتمل التوليد بعدد غير متوقع: ${rebuild.daysGenerated} أيام و${rebuild.questionsGenerated} سؤالًا.`
+      );
+    }
+
+    setMessage(
+      `اكتمل بنجاح: ${rebuild.daysGenerated} أيام و${rebuild.questionsGenerated} سؤالًا بالعربية.`
     );
     setStatus("success");
     router.refresh();
