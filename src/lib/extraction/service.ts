@@ -310,31 +310,33 @@ export class DocumentExtractionService {
     documentId: string,
     instructorId: string
   ): Promise<ProcessingProgress | null> {
-    const pages = await prisma.documentPage.findMany({
-      where: { documentId },
+    const document = await prisma.trainingDocument.findFirst({
+      where: { id: documentId, program: { instructorId } },
       select: {
-        extractionMethod: true,
-        extractionStatus: true,
-        extractedText: true,
+        pageCount: true,
+        pages: {
+          select: {
+            extractionMethod: true,
+            extractionStatus: true,
+            extractedText: true,
+          },
+        },
       },
     });
+    if (!document) throw new Error("NOT_FOUND");
 
-    const hasMockPages = pages.some(
-      (page) => page.extractionMethod === "MOCK"
-    );
-    const hasRealReadablePages = pages.some(
+    const realReadableCount = document.pages.filter(
       (page) =>
         page.extractionMethod !== null &&
         page.extractionMethod !== "MOCK" &&
         page.extractionStatus === "COMPLETED" &&
         (page.extractedText?.trim().length ?? 0) > 50
-    );
+    ).length;
 
-    const hasUnknownLegacyPages = pages.some(
-      (page) => page.extractionMethod === null
-    );
+    const expectedPages = document.pageCount ?? document.pages.length;
+    const requiredPages = requiredReadablePages(expectedPages);
 
-    if (hasRealReadablePages && !hasMockPages && !hasUnknownLegacyPages) {
+    if (realReadableCount >= requiredPages) {
       return null;
     }
 
@@ -384,6 +386,7 @@ export class DocumentExtractionService {
       select: {
         id: true,
         fileName: true,
+        pageCount: true,
         createdAt: true,
         pages: {
           where: { extractionStatus: "COMPLETED" },
@@ -418,7 +421,9 @@ export class DocumentExtractionService {
 
     const ready = documents
       .map(scoreDocument)
-      .filter((entry) => entry.realPageCount > 0)
+      .filter((entry) =>
+        entry.realPageCount >= requiredReadablePages(entry.doc.pageCount ?? entry.doc.pages.length)
+      )
       .sort((a, b) => {
         if (b.realPageCount !== a.realPageCount) {
           return b.realPageCount - a.realPageCount;
@@ -467,7 +472,11 @@ export class DocumentExtractionService {
           (page.extractedText?.trim().length ?? 0) > 20
       );
 
-      if (readable.length > 0) {
+      const requiredPages = requiredReadablePages(
+        doc.pageCount ?? readable.length
+      );
+
+      if (readable.length >= requiredPages) {
         return {
           ok: true,
           documentId: doc.id,
@@ -479,6 +488,9 @@ export class DocumentExtractionService {
           ),
         };
       }
+
+      lastError =
+        `INSUFFICIENT_REAL_EXTRACTION_COVERAGE — extracted ${readable.length}/${doc.pageCount ?? "unknown"}; require at least ${requiredPages}`;
     }
 
     return { ok: false, errorMessage: lastError };
