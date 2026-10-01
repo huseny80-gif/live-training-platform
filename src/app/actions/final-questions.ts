@@ -16,7 +16,7 @@ export type FinalQuestion = {
 };
 
 export type FinalQuestionsState =
-  | { ok: false; error: string; code?: "SOURCE_NOT_READY" | "GENERATION_FAILED" }
+  | { ok: false; error: string; code?: "SOURCE_NOT_READY" | "DAILY_BANK_NOT_READY" | "GENERATION_FAILED" }
   | {
       ok: true;
       summary: string;
@@ -322,6 +322,19 @@ export async function generateFinalQuestions(
   });
 
   if (!program) return { ok: false, error: "PROGRAM_NOT_FOUND" };
+
+  const dailyQuestionCount = await prisma.question.count({
+    where: { programId },
+  });
+
+  if (dailyQuestionCount !== 50) {
+    return {
+      ok: false,
+      code: "DAILY_BANK_NOT_READY",
+      error:
+        `بنك الأسئلة اليومية غير مكتمل: يوجد ${dailyQuestionCount} من أصل 50 سؤالًا. سيُعاد بناء المصدر والأسئلة اليومية أولًا قبل إنشاء الامتحان النهائي.`,
+    };
+  }
 
   const sourceDocument = await extractionService.selectBestRealSourceDocument(
     programId,

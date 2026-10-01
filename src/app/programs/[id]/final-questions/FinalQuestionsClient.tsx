@@ -25,9 +25,14 @@ export default function FinalQuestionsClient({ programId }: { programId: string 
     try {
       let result = await generateFinalQuestions(programId, null, new FormData());
 
-      if (!result.ok && result.code === "SOURCE_NOT_READY") {
+      if (
+        !result.ok &&
+        (result.code === "SOURCE_NOT_READY" || result.code === "DAILY_BANK_NOT_READY")
+      ) {
         setProgress(
-          "المصدر غير مكتمل. جارٍ إصلاح استخراج PDF ثم إنشاء 10 أيام و50 سؤالًا بالعربية قبل الامتحان النهائي…"
+          result.code === "DAILY_BANK_NOT_READY"
+            ? "بنك الأسئلة اليومية غير مكتمل. جارٍ إصلاح المصدر وإنشاء 10 أيام و50 سؤالًا بالعربية أولًا…"
+            : "المصدر غير مكتمل. جارٍ إصلاح استخراج PDF ثم إنشاء 10 أيام و50 سؤالًا بالعربية قبل الامتحان النهائي…"
         );
 
         await runProgramRebuild({
