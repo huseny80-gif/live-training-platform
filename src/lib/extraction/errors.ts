@@ -1,6 +1,13 @@
 export function extractionErrorToArabic(message?: string): string {
   const value = message ?? "";
 
+  if (
+    value.includes("MOCK_ONLY_CONTENT") ||
+    value.includes("REAL_SOURCE_REQUIRED")
+  ) {
+    return "المحتوى الحالي تجريبي أو مستخرج بطريقة قديمة غير موثوقة. يجب إعادة تحليل ملف PDF الحقيقي قبل توليد الأيام والأسئلة.";
+  }
+
   if (value.includes("NO_TRAINING_DOCUMENT")) {
     return "لا يوجد ملف تدريبي مرفوع لهذا البرنامج.";
   }
