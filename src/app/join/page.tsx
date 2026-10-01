@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { brand } from "@/lib/brand";
 import { joinSessionAction } from "@/app/actions/sessions";
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -49,7 +50,7 @@ export default function JoinPage() {
       <div className="brand-card dlp-join-card">
         <div className="text-center space-y-1">
           <div className="text-4xl mb-2">🎓</div>
-          <h1 className="text-2xl font-bold text-gray-900">الحقيبة التدريبية</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{brand.nameAr}</h1>
           <p className="text-sm text-gray-500">أدخل رمز الجلسة واسمك للانضمام</p>
         </div>
 
