@@ -36,6 +36,16 @@ async function documentCoverage(documentId: string) {
 
   if (!doc) return null;
 
+  const attemptedRealPageNumbers = new Set(
+    doc.pages
+      .filter(
+        (page) =>
+          page.extractionMethod !== null &&
+          page.extractionMethod !== "MOCK"
+      )
+      .map((page) => page.pageNumber)
+  );
+
   const readablePageNumbers = new Set(
     doc.pages
       .filter(
@@ -55,6 +65,7 @@ async function documentCoverage(documentId: string) {
     ...doc,
     totalPages,
     requiredPages,
+    attemptedRealPageNumbers,
     readablePageNumbers,
     completedPages: readablePageNumbers.size,
   };
@@ -159,9 +170,22 @@ export async function POST(
   // real source text. Each request processes a bounded chunk, so 147-page
   // PDFs survive serverless execution limits and preserve progress.
   if (selected.completedPages < selected.requiredPages) {
-    const missingPages = Array.from({ length: selected.totalPages }, (_, index) => index + 1)
-      .filter((pageNumber) => !selected!.readablePageNumbers.has(pageNumber))
-      .slice(0, EXTRACTION_BATCH_SIZE);
+    const allPageNumbers = Array.from(
+      { length: selected.totalPages },
+      (_, index) => index + 1
+    );
+    const unattemptedPages = allPageNumbers.filter(
+      (pageNumber) => !selected!.attemptedRealPageNumbers.has(pageNumber)
+    );
+    const attemptedButUnreadable = allPageNumbers.filter(
+      (pageNumber) =>
+        selected!.attemptedRealPageNumbers.has(pageNumber) &&
+        !selected!.readablePageNumbers.has(pageNumber)
+    );
+    const missingPages = [...unattemptedPages, ...attemptedButUnreadable].slice(
+      0,
+      EXTRACTION_BATCH_SIZE
+    );
 
     if (missingPages.length === 0) {
       return NextResponse.json(
