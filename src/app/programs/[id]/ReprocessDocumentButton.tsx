@@ -3,48 +3,72 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { runProgramRebuild } from "@/lib/client/program-rebuild";
+import { runDocumentSourcePreparation } from "@/lib/client/document-source";
 
 export default function ReprocessDocumentButton({
   programId,
   documentId,
   status,
   totalQuestions,
+  sourceReady,
+  realPageCount,
+  requiredPageCount,
 }: {
   programId: string;
   documentId: string;
   status: string;
   totalQuestions: number;
+  sourceReady: boolean;
+  realPageCount: number;
+  requiredPageCount: number;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  const label =
-    status === "PENDING"
-      ? "بدء المعالجة"
-      : status === "PROCESSING"
-      ? "متابعة المعالجة"
+  const label = !sourceReady
+    ? status === "PROCESSING"
+      ? "متابعة اعتماد المصدر"
       : status === "FAILED" || status === "OCR_REQUIRED"
-      ? "إعادة المعالجة"
-      : totalQuestions === 0
-      ? "إنشاء 50 سؤالًا"
-      : "إعادة بناء المحتوى";
+      ? "إعادة اعتماد المصدر"
+      : "اعتماد الملف كمصدر"
+    : totalQuestions === 0
+    ? "إنشاء 50 سؤالًا"
+    : "إعادة بناء المحتوى";
 
   async function handleClick() {
-    const destructive = totalQuestions > 0;
-    if (
-      destructive &&
-      !confirm(
-        "سيُعاد بناء الأيام والأسئلة من ملف PDF الحقيقي. لن يُستبدل المحتوى الحالي إلا بعد نجاح التوليد الكامل. متابعة؟"
-      )
-    ) {
-      return;
-    }
-
     setBusy(true);
-    setMessage("جارٍ بدء المعالجة…");
 
     try {
+      if (!sourceReady) {
+        setMessage(
+          `جارٍ اعتماد المصدر… التغطية الحالية ${realPageCount}/${requiredPageCount} صفحة حقيقية.`
+        );
+
+        const result = await runDocumentSourcePreparation({
+          documentId,
+          onProgress: (text) => setMessage(text),
+        });
+
+        setMessage(
+          `تم اعتماد الملف كمصدر مرجعي بنجاح: ${result.completedPages} صفحة حقيقية.`
+        );
+        router.refresh();
+        return;
+      }
+
+      const destructive = totalQuestions > 0;
+      if (
+        destructive &&
+        !confirm(
+          "سيُعاد بناء الأيام والأسئلة من المصدر المعتمد. لن يُستبدل المحتوى الحالي إلا بعد نجاح التوليد الكامل. متابعة؟"
+        )
+      ) {
+        return;
+      }
+
+      setMessage("المصدر معتمد. جارٍ بدء توليد المحتوى والأسئلة…");
+
       const result = await runProgramRebuild({
         programId,
         documentId,
@@ -60,7 +84,7 @@ export default function ReprocessDocumentButton({
       );
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "تعذر إكمال المعالجة.");
+      setMessage(error instanceof Error ? error.message : "تعذر إكمال العملية.");
     } finally {
       setBusy(false);
     }

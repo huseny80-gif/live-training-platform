@@ -27,6 +27,21 @@ const EXTRACTION_LABEL: Record<string, string> = {
 function formatExtractionNote(note: string | null): string | null {
   if (!note) return null;
 
+  const ready = note.match(/SOURCE_READY\s+(\d+)\/(\d+)/);
+  if (ready) {
+    return `المصدر معتمد: ${ready[1]} صفحة حقيقية من أصل ${ready[2]} صفحة.`;
+  }
+
+  const preparing = note.match(/PREPARING_SOURCE\s+(\d+)\/(\d+)/);
+  if (preparing) {
+    return `جارٍ اعتماد المصدر: ${preparing[1]} صفحة حقيقية من أصل ${preparing[2]} مطلوبة.`;
+  }
+
+  const notReady = note.match(/SOURCE_NOT_READY\s+(\d+)\/(\d+)/);
+  if (notReady) {
+    return `المصدر غير مكتمل بعد: ${notReady[1]} صفحة حقيقية من أصل ${notReady[2]} مطلوبة.`;
+  }
+
   const progress = note.match(/EXTRACTING_REAL_SOURCE\s+(\d+)\/(\d+)/);
   if (progress) {
     return `تم استخراج ${progress[1]} صفحة حقيقية من أصل ${progress[2]} مطلوبة قبل توليد الأسئلة.`;
@@ -107,19 +122,29 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         </section>
 
         <section className="brand-card dlp-program-section">
-          <div className="dlp-section-head"><div><h2>المادة التدريبية</h2><p>ارفع المادة التي ستُبنى عليها الأيام والأسئلة.</p></div></div>
+          <div className="dlp-section-head"><div><h2>المادة التدريبية</h2><p>ارفع ملف PDF ليتم التحقق منه واعتماده أولًا كمصدر مرجعي حقيقي.</p></div></div>
           {program.documents?.length ? (
             <div className="dlp-doc-list">
               {program.documents.map((doc) => (
                 <div key={doc.id} className="dlp-doc-row">
                   <strong>{doc.fileName}</strong>
                   <span>{doc.pageCount != null ? `${doc.pageCount} صفحة` : "عدد الصفحات غير محدد"}</span>
-                  <span>{EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}</span>
+                  <span>
+                    {doc.sourceReady
+                      ? "مصدر معتمد"
+                      : EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}
+                  </span>
+                  <span>
+                    {doc.realPageCount}/{doc.requiredPageCount} صفحة حقيقية مطلوبة
+                  </span>
                   <ReprocessDocumentButton
                     programId={id}
                     documentId={doc.id}
                     status={doc.extractionStatus}
                     totalQuestions={totalQuestions}
+                    sourceReady={doc.sourceReady}
+                    realPageCount={doc.realPageCount}
+                    requiredPageCount={doc.requiredPageCount}
                   />
                   <DeleteDocumentButton
                     documentId={doc.id}

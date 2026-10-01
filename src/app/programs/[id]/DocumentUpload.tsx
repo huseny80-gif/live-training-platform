@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { completeBlobUpload } from "@/app/actions/documents";
-import { runProgramRebuild } from "@/lib/client/program-rebuild";
+import { runDocumentSourcePreparation } from "@/lib/client/document-source";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 // Safe JSON parser — never throws on HTML error pages or empty bodies
@@ -23,23 +23,23 @@ export default function DocumentUpload({ programId }: { programId: string }) {
   const [message, setMessage] = useState("");
   const [documentId, setDocumentId] = useState("");
 
-  /** Run the same resumable real-PDF pipeline used by manual reprocessing. */
+  /** Upload success and source adoption are a dedicated stage.
+   *  Do not generate or replace days/questions here. */
   async function startPipeline(docId: string, fileName: string, pageCount?: number) {
     setDocumentId(docId);
     setMessage(
       pageCount != null
-        ? `تم رفع ${fileName} (${pageCount} صفحة). جارٍ تحليل المصدر الحقيقي…`
-        : `تم رفع ${fileName}. جارٍ تحليل المصدر الحقيقي…`
+        ? `تم رفع ${fileName} بنجاح (${pageCount} صفحة). جارٍ اعتماده كمصدر حقيقي…`
+        : `تم رفع ${fileName} بنجاح. جارٍ اعتماده كمصدر حقيقي…`
     );
 
-    const result = await runProgramRebuild({
-      programId,
+    const result = await runDocumentSourcePreparation({
       documentId: docId,
       onProgress: (text) => setMessage(text),
     });
 
     setMessage(
-      `اكتملت المعالجة: ${result.daysGenerated} أيام و${result.questionsGenerated} سؤالًا.`
+      `تم اعتماد ${fileName} كمصدر مرجعي بنجاح: ${result.completedPages} صفحة حقيقية من أصل ${result.totalPages}.`
     );
     setStatus("success");
     router.refresh();
@@ -150,7 +150,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       <div>
         <h2 className="text-lg font-semibold">المادة التدريبية</h2>
         <p className="text-sm text-gray-500 mt-1">
-          ارفع ملف PDF لتحليل المحتوى وإنشاء الأيام والمواضيع والأسئلة التدريبية.
+          ارفع ملف PDF أولًا ليتم تحليله واعتماده كمصدر مرجعي. توليد الأيام والأسئلة يتم بعد اعتماد المصدر.
         </p>
       </div>
 
