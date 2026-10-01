@@ -90,7 +90,7 @@ export default async function ParticipantResultPage({
 
           <div>
             <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-1">
-              القيادة الرقمية
+              الحقيبة التدريبية
             </p>
             <p className="text-sm text-gray-500 mb-0.5">{session.title ?? `الجلسة ${session.sessionCode}`}</p>
             <h1 className="text-xl font-bold text-gray-900">{participant.displayName}</h1>
