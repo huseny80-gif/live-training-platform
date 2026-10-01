@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
+import { brandAssets } from "@/lib/brand-assets";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,7 @@ export default async function AboutPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const displayName = session.user.name ?? "مدير الحقيبة التدريبية";
+  const displayName = brand.instructorName;
   const email = session.user.email ?? null;
 
   return (
@@ -23,20 +24,33 @@ export default async function AboutPage() {
 
       <div className="dlp-program-container">
         <section className="brand-card dlp-program-section">
-          <h1>من نحن</h1>
-          <p>
-            {brand.nameAr} منصة مستقلة لإدارة التدريب المباشر والاختبارات التفاعلية،
-            من إعداد المحتوى إلى جلسات QR والنتائج والتحليلات.
-          </p>
+          <div className="dlp-about-heading">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={brandAssets.logoDataUri}
+              alt="شعار الحقيبة التدريبية"
+              className="dlp-about-logo"
+            />
+            <div>
+              <h1>من نحن</h1>
+              <p>
+                {brand.nameAr} منصة مستقلة لإدارة التدريب المباشر والاختبارات التفاعلية،
+                من إعداد المحتوى إلى جلسات QR والنتائج والتحليلات.
+              </p>
+            </div>
+          </div>
 
           <div className="dlp-about-preview">
-            <div className="dlp-about-avatar" aria-hidden>
-              {displayName.slice(0, 1)}
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={brandAssets.profileDataUri}
+              alt="الصورة الشخصية للمهندس حسين ياسين"
+              className="dlp-about-photo"
+            />
 
             <div>
               <h2>{displayName}</h2>
-              <strong>مدير الحقيبة التدريبية</strong>
+              <strong>{brand.instructorTitleAr}</strong>
               <p>
                 إدارة البرامج التدريبية، رفع وتحليل المادة، إنشاء بنك الأسئلة،
                 تشغيل الجلسات المباشرة ومتابعة نتائج المشاركين.

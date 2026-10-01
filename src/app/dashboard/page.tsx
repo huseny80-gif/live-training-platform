@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listOwnedPrograms } from "@/app/actions/programs";
 import Link from "next/link";
 import { brand } from "@/lib/brand";
+import { brandAssets } from "@/lib/brand-assets";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "مسودة",
@@ -27,14 +28,19 @@ export default async function DashboardPage() {
     0
   );
   const totalSessions = programs.reduce((s, p) => s + p._count.sessions, 0);
-  const displayName = session.user.name ?? session.user.email ?? "المدرب";
+  const displayName = brand.instructorName;
 
   return (
     <main className="dlp-shell">
       <header className="dlp-header">
         <div className="dlp-header-inner">
           <div className="dlp-brand">
-            <div className="dlp-logo">ح</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={brandAssets.logoDataUri}
+              alt="شعار الحقيبة التدريبية"
+              className="dlp-logo-image"
+            />
             <div>
               <h1>{brand.nameAr}</h1>
               <p>{brand.nameEn}</p>

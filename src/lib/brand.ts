@@ -3,6 +3,8 @@ export const brand = {
   nameEn: "Training Portfolio",
   taglineAr: "محتوى تدريبي ذكي من المصدر إلى التقييم",
   taglineEn: "Smart training content from source to assessment",
+  instructorName: "Eng.Husen yasen",
+  instructorTitleAr: "مدير ومطور الحقيبة التدريبية",
   colors: {
     primary: "#00A6A6", primaryDark: "#087F86", navy: "#0B1F3A",
     interactive: "#2563EB", accent: "#D4AF37", background: "#F8FAFC",
