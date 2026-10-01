@@ -13,7 +13,7 @@ export default function ShareLinkButton({ url }: Props) {
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({
-          title: "Live Training Session",
+          title: "الحقيبة التدريبية",
           text: "انضم إلى جلسة الاختبار",
           url,
         });
