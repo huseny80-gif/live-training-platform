@@ -1,0 +1,4 @@
+"use client";
+import { useEffect } from "react";
+type S={primaryColor:string;primaryDark:string;navyColor:string;accentColor:string;defaultLanguage:"AR"|"EN";defaultTheme:string;fontScale:string};
+export default function PlatformTheme({settings}:{settings:S}){useEffect(()=>{const r=document.documentElement;r.style.setProperty("--brand-primary",settings.primaryColor);r.style.setProperty("--brand-primary-dark",settings.primaryDark);r.style.setProperty("--brand-navy",settings.navyColor);r.style.setProperty("--brand-accent",settings.accentColor);if(!localStorage.getItem("portfolio-language")){r.lang=settings.defaultLanguage==="EN"?"en":"ar";r.dir=settings.defaultLanguage==="EN"?"ltr":"rtl"}if(!localStorage.getItem("portfolio-theme"))r.dataset.theme=settings.defaultTheme;if(!localStorage.getItem("portfolio-font-size"))r.dataset.fontSize=settings.fontScale},[settings]);return null}
