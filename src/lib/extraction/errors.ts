@@ -1,6 +1,12 @@
 export function extractionErrorToArabic(message?: string): string {
   const value = message ?? "";
 
+  if (value.includes("NO_TRAINING_DOCUMENT")) {
+    return "لا يوجد ملف تدريبي مرفوع لهذا البرنامج.";
+  }
+  if (value.includes("REAL_SOURCE_REQUIRED")) {
+    return "لم يتم العثور على مصدر حقيقي صالح بين الملفات المرفوعة. أعد تحليل أحد ملفات PDF ثم حاول مرة أخرى.";
+  }
   if (value.includes("NO_REAL_EXTRACTION_ADAPTER")) {
     return "لا يوجد مزود استخراج حقيقي مفعّل. يجب ضبط OPENAI_API_KEY أو LLAMA_CLOUD_API_KEY في بيئة الإنتاج.";
   }
