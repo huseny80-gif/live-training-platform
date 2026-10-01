@@ -7,6 +7,7 @@
 
 import { prisma } from "@/lib/prisma";
 import type { AIAdapter, ContentGenerationRequest, SourcePageRef } from "./types";
+import { isPredominantlyArabic } from "@/lib/language";
 import { ClaudeAIAdapter } from "./adapters/claude";
 import { OpenAIAdapter } from "./adapters/openai";
 
@@ -118,6 +119,28 @@ export class ContentGenerationService {
 
       // Validate the full AI result BEFORE mutating existing program content.
       // A partial/invalid generation must never destroy a previously working bank.
+      if (req.language === "AR") {
+        const invalidDay = result.days.find((day) => {
+          if (!isPredominantlyArabic(day.title)) return true;
+          if (!isPredominantlyArabic(day.contentSummary)) return true;
+          if (day.objectives.length === 0 || day.objectives.some((objective) => !isPredominantlyArabic(objective))) return true;
+          if (day.topics.length === 0 || day.topics.some((topic) => !isPredominantlyArabic(topic))) return true;
+          return false;
+        });
+
+        if (invalidDay) {
+          return {
+            programId,
+            documentId,
+            status: "FAILED",
+            daysGenerated: result.days.length,
+            questionsGenerated: result.questions.length,
+            errorMessage:
+              `ARABIC_DAY_CONTENT_MISMATCH — اليوم ${invalidDay.dayNumber} يحتوي عنوانًا أو أهدافًا أو ملخصًا أو مواضيع غير عربية. لم يتم استبدال المحتوى الحالي.`,
+          };
+        }
+      }
+
       const expectedTotal = TOTAL_DAYS * QUESTIONS_PER_DAY;
       const generatedCounts = new Map<number, number>();
       for (const question of result.questions) {
