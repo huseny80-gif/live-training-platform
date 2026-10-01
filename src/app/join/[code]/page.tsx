@@ -37,8 +37,8 @@ export default function JoinWithCodePage() {
     : null;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl border shadow-sm p-8 space-y-6">
+    <main dir="rtl" lang="ar" className="dlp-participant-page">
+      <div className="brand-card dlp-join-card">
         <div className="text-center space-y-1">
           <div className="text-4xl mb-2">🎓</div>
           <h1 className="text-2xl font-bold text-gray-900">الحقيبة التدريبية</h1>
