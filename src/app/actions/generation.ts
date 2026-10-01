@@ -143,6 +143,17 @@ export async function regenerateProgramInArabic(programId: string) {
     "AR"
   );
 
+  if (result.status === "FAILED" && result.errorMessage) {
+    const raw = result.errorMessage;
+    if (raw.includes("MOCK_ONLY_CONTENT") || raw.includes("REAL_SOURCE_REQUIRED")) {
+      result.errorMessage =
+        "المادة الحالية ليست مستخرجة من ملف PDF الحقيقي بشكل موثوق. سيحتاج الملف إلى إعادة تحليل حقيقي قبل إنشاء المحتوى والأسئلة.";
+    } else if (raw.includes("NO_EXTRACTED_PAGES")) {
+      result.errorMessage =
+        "لم يتم العثور على صفحات مستخرجة قابلة للاستخدام من ملف PDF. أعد تحليل الملف الحقيقي أولًا.";
+    }
+  }
+
   if (result.status === "COMPLETED") {
     await prisma.trainingProgram.update({
       where: { id: programId },
