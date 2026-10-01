@@ -181,3 +181,9 @@ html[data-theme="dark"] .dlp-settings-card,html[data-theme="dark"] .dlp-google-c
 /* Resumable document pipeline */
 .dlp-doc-process{display:grid;gap:5px;min-width:150px}.dlp-process-note,.dlp-doc-note{display:block;color:var(--brand-muted);font-size:11px;line-height:1.55}.dlp-process-note.busy{color:#0f766e;font-weight:700}.dlp-doc-row .dlp-doc-note{flex-basis:100%;padding-top:4px}.dlp-final-error-box{display:grid;gap:10px;justify-items:start;margin:14px 0}.dlp-final-error-box .dlp-error{margin:0}.dlp-final-error-box .dlp-control-button{width:max-content}
 @media(max-width:700px){.dlp-doc-process{width:100%}.dlp-doc-process .dlp-control-button{width:100%}.dlp-final-error-box .dlp-control-button{width:100%}}
+
+/* Automatic source/question-bank recovery */
+.dlp-auto-recovery{margin:18px 0 4px;padding:16px 18px;border-right:5px solid #0f766e;background:#edf7f4}
+.dlp-auto-recovery strong{display:block;color:#0f5e58;margin-bottom:5px}.dlp-auto-recovery p{margin:0;color:#476661;line-height:1.75}
+.dlp-auto-recovery.success{border-right-color:#16a34a;background:#ecfdf5}.dlp-auto-recovery.success strong{color:#047857}
+.dlp-auto-recovery.error{border-right-color:#dc2626;background:#fff1f2}.dlp-auto-recovery.error strong,.dlp-auto-recovery.error p{color:#991b1b}
