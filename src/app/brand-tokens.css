@@ -72,3 +72,5 @@ html[data-theme="dark"] .dlp-program-header{background:rgb(16 27 45 / .94)}
 .dlp-mobile-nav{background:#103f3c!important;border-color:#275b56!important;box-shadow:0 12px 32px rgb(18 60 58 / .24)!important}.dlp-mobile-nav a{color:#d8e8e5!important}.dlp-mobile-nav a.active{background:#c6a15b!important;color:#173b38!important}
 .dlp-about-preview{background:linear-gradient(135deg,#123c3a,#0f766e);color:#fff;border:0;border-bottom:4px solid #c6a15b}.dlp-about-preview h2,.dlp-about-preview strong{color:#fff}.dlp-about-preview p,.dlp-about-preview small{color:#d8e8e5}.dlp-about-avatar{background:rgb(255 255 255 / .12);color:#fff}.dlp-profile-form{background:#fff;border:1px solid #e9e3d6;border-radius:18px;padding:18px;margin-top:18px}
 @media(max-width:700px){.dlp-header-inner{min-height:64px}.dlp-hero{border-radius:22px}.dlp-hero:after{font-size:54px;left:18px}.dlp-mobile-nav{right:8px;left:8px;bottom:8px;border-radius:20px}}
+
+.dlp-hero-features{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.dlp-hero-features span{padding:6px 11px;border:1px solid rgb(255 255 255 / .24);border-radius:999px;background:rgb(255 255 255 / .08);font-size:12px;color:#f4f8f7}
