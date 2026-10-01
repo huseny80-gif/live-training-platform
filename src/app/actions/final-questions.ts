@@ -18,7 +18,8 @@ export type FinalQuestionsState =
 
 export async function generateFinalQuestions(
   programId: string,
-  _prev: FinalQuestionsState | null
+  _prev: FinalQuestionsState | null,
+  _formData: FormData
 ): Promise<FinalQuestionsState> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "UNAUTHENTICATED" };
