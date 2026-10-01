@@ -66,7 +66,7 @@ export async function verifyArabicProgramBank(programId: string): Promise<Progra
   for (const day of days) {
     if (
       !isPredominantlyArabic(day.title) ||
-      !isPredominantlyArabic(day.contentSummary) ||
+      !isPredominantlyArabic(day.contentSummary ?? "") ||
       day.objectives.length === 0 ||
       day.objectives.some((value) => !isPredominantlyArabic(value)) ||
       day.topics.length === 0 ||
