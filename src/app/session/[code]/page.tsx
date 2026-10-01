@@ -33,6 +33,7 @@ interface SessionState {
   myAnswer: string | null;
   isCorrect: boolean | null;
   scoreAwarded: number | null;
+  legacyQuestionBlocked?: boolean;
 }
 
 export default function ParticipantSessionPage() {
@@ -172,7 +173,9 @@ export default function ParticipantSessionPage() {
           <h1 className="text-xl font-bold text-gray-900">{brand.nameAr}</h1>
           <p className="text-gray-600 font-medium">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
           <p className="text-gray-500 text-sm">
-            {sessionStatus === "PAUSED"
+            {state.legacyQuestionBlocked
+              ? "تم حجب سؤال قديم غير عربي من هذه الجلسة. يرجى من المدرب حذف الجلسة القديمة وإنشاء جلسة عربية جديدة."
+              : sessionStatus === "PAUSED"
               ? "الاختبار موقوف مؤقتاً… انتظر."
               : "في انتظار المدرب لعرض السؤال التالي…"}
           </p>
