@@ -22,8 +22,7 @@
     "postinstall": "prisma generate",
     "test:safety": "npx tsx tests/safety.test.ts",
     "test:public-url": "npx tsx tests/public-participant-url.test.ts",
-    "test:native-pdf": "npx tsx tests/native-pdf-extraction.test.ts",
-    "test:openai-pdf": "npx tsx tests/openai-pdf-request.test.ts"
+    "test:native-pdf": "npx tsx tests/native-pdf-extraction.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
