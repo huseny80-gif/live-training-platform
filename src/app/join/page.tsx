@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState } from "react";
-import { useSearchParams } from "next/navigation";
 import { brand } from "@/lib/brand";
 import { joinSessionAction } from "@/app/actions/sessions";
 
@@ -17,8 +16,6 @@ const ERROR_MESSAGES: Record<string, string> = {
 type State = { error: string } | null;
 
 export default function JoinPage() {
-  const searchParams = useSearchParams();
-  const initialCode = (searchParams.get("code") ?? "").toUpperCase();
   const [state, action, isPending] = useActionState<State, FormData>(
     async (_prev: State, formData: FormData) => {
       try {
@@ -58,7 +55,6 @@ export default function JoinPage() {
               dir="ltr"
               className="w-full rounded-lg border px-3 py-2.5 text-center font-mono text-lg tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
               maxLength={6}
-              defaultValue={initialCode}
               aria-describedby={errorText ? "join-error" : undefined}
             />
           </div>
