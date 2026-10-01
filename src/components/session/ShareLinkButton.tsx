@@ -2,38 +2,30 @@
 
 import { useState } from "react";
 
-interface Props {
-  url: string;
-}
-
-export default function ShareLinkButton({ url }: Props) {
+export default function ShareLinkButton({ url }: { url: string }) {
   const [message, setMessage] = useState<string | null>(null);
 
-  const handleShare = async () => {
+  async function handleShare() {
     try {
-      if (typeof navigator !== "undefined" && navigator.share) {
+      if (navigator.share) {
         await navigator.share({
-          title: "Live Training Session",
+          title: "الحقيبة التدريبية",
           text: "انضم إلى جلسة الاختبار",
           url,
         });
         setMessage("تمت مشاركة الرابط بنجاح");
       } else {
         await navigator.clipboard.writeText(url);
-        setMessage("تم نسخ الرابط (المشاركة غير مدعومة)");
+        setMessage("تم نسخ الرابط");
       }
+      setTimeout(() => setMessage(null), 2000);
     } catch {
-      // user cancelled share or clipboard failed — do nothing
       return;
     }
-    setTimeout(() => setMessage(null), 2000);
-  };
+  }
 
   return (
-    <button
-      onClick={handleShare}
-      className="w-full mt-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors bg-white hover:bg-green-50 text-green-700 border-green-200"
-    >
+    <button type="button" onClick={handleShare} className="dlp-action-button share">
       {message ?? "مشاركة رابط الجلسة"}
     </button>
   );
