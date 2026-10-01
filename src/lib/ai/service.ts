@@ -14,34 +14,44 @@ import { OpenAIAdapter } from "./adapters/openai";
 const TOTAL_DAYS = 10;
 const QUESTIONS_PER_DAY = 5;
 
-// Provider registry. If AI_PROVIDER is explicit, honor it. Otherwise
-// choose a provider that is actually configured instead of failing on a
-// hard-coded default.
-function getAdapter(): AIAdapter {
+// Provider registry. The explicit provider is tried first, but when both
+// providers are configured the second provider is a production fallback.
+// This prevents a transient provider/model failure from leaving a 0-question bank.
+function getAdapters(): AIAdapter[] {
   const explicit = process.env.AI_PROVIDER?.trim().toLowerCase();
+  const adapters: AIAdapter[] = [];
 
-  if (explicit) {
-    if (explicit === "openai") {
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error("AI_PROVIDER_OPENAI_SELECTED_BUT_KEY_MISSING");
-      }
-      return new OpenAIAdapter();
+  const pushOpenAI = () => {
+    if (process.env.OPENAI_API_KEY && !adapters.some((item) => item.name === "OPENAI")) {
+      adapters.push(new OpenAIAdapter());
     }
-    if (explicit === "anthropic" || explicit === "claude") {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        throw new Error("AI_PROVIDER_ANTHROPIC_SELECTED_BUT_KEY_MISSING");
-      }
-      return new ClaudeAIAdapter();
+  };
+  const pushClaude = () => {
+    if (process.env.ANTHROPIC_API_KEY && !adapters.some((item) => item.name === "CLAUDE")) {
+      adapters.push(new ClaudeAIAdapter());
     }
+  };
+
+  if (explicit === "openai") {
+    pushOpenAI();
+    pushClaude();
+  } else if (explicit === "anthropic" || explicit === "claude") {
+    pushClaude();
+    pushOpenAI();
+  } else if (explicit) {
     throw new Error(`UNSUPPORTED_AI_PROVIDER: ${explicit}`);
+  } else {
+    pushOpenAI();
+    pushClaude();
   }
 
-  if (process.env.OPENAI_API_KEY) return new OpenAIAdapter();
-  if (process.env.ANTHROPIC_API_KEY) return new ClaudeAIAdapter();
+  if (adapters.length === 0) {
+    throw new Error(
+      "NO_AI_PROVIDER_CONFIGURED — set OPENAI_API_KEY or ANTHROPIC_API_KEY"
+    );
+  }
 
-  throw new Error(
-    "NO_AI_PROVIDER_CONFIGURED — set OPENAI_API_KEY or ANTHROPIC_API_KEY"
-  );
+  return adapters;
 }
 
 export interface GenerationProgress {
@@ -140,8 +150,26 @@ export class ContentGenerationService {
     };
 
     try {
-      const adapter = getAdapter();
-      const result = await adapter.generate(req);
+      const adapters = getAdapters();
+      let result: Awaited<ReturnType<AIAdapter["generate"]>> | null = null;
+      const providerErrors: string[] = [];
+
+      for (const adapter of adapters) {
+        try {
+          result = await adapter.generate(req);
+          break;
+        } catch (error) {
+          providerErrors.push(
+            `${adapter.name}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+
+      if (!result) {
+        throw new Error(
+          `AI_PROVIDERS_FAILED — ${providerErrors.join(" | ")}`
+        );
+      }
 
       // Validate the full AI result BEFORE mutating existing program content.
       // A partial/invalid generation must never destroy a previously working bank.
