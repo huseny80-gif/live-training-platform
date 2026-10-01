@@ -1,97 +1,376 @@
-// ClaudeAIAdapter — primary AI adapter using Anthropic Claude API.
-// API key is read from ANTHROPIC_API_KEY env at call time — never logged,
-// never sent to any endpoint other than api.anthropic.com.
-
 import Anthropic from "@anthropic-ai/sdk";
-import type { AIAdapter, ContentGenerationRequest, ContentGenerationResult, GeneratedDayPlan, GeneratedQuestion } from "../types";
-import { buildDayPlanPrompt, buildQuestionsPrompt, PROMPT_VERSION } from "../prompts";
-import { isArabicQuestionContent } from "@/lib/language";
+import type {
+  AIAdapter,
+  ContentGenerationRequest,
+  ContentGenerationResult,
+  GeneratedDayPlan,
+  GeneratedQuestion,
+} from "../types";
+import {
+  buildDayPlanPrompt,
+  buildQuestionsPrompt,
+  PROMPT_VERSION,
+} from "../prompts";
+import {
+  isArabicQuestionContent,
+  isPredominantlyArabic,
+} from "@/lib/language";
 
-const MODEL_ID = "claude-haiku-4-5-20251001";
+const MODEL_ID =
+  process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
+const MAX_GENERATION_ATTEMPTS = 4;
+
+function extractJson(text: string): unknown {
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = fenceMatch ? fenceMatch[1] : text;
+  const start = raw.search(/[{[]/);
+  const end = Math.max(raw.lastIndexOf("}"), raw.lastIndexOf("]"));
+  if (start === -1 || end === -1) throw new Error("NO_JSON_FOUND");
+  return JSON.parse(raw.slice(start, end + 1));
+}
+
+function parseDayPlans(text: string, totalDays: number): GeneratedDayPlan[] {
+  const parsed = extractJson(text) as { days?: unknown[] };
+  if (!Array.isArray(parsed.days)) throw new Error("INVALID_DAY_PLAN");
+
+  return parsed.days.slice(0, totalDays).map((day, index) => {
+    const value = day as Record<string, unknown>;
+    return {
+      dayNumber:
+        typeof value.dayNumber === "number" ? value.dayNumber : index + 1,
+      title: String(value.title ?? ""),
+      objectives: Array.isArray(value.objectives)
+        ? value.objectives.map(String)
+        : [],
+      contentSummary: String(value.contentSummary ?? ""),
+      topics: Array.isArray(value.topics) ? value.topics.map(String) : [],
+      pageRangeStart: Number(value.pageRangeStart),
+      pageRangeEnd: Number(value.pageRangeEnd),
+      sourcePages: Array.isArray(value.sourcePages)
+        ? value.sourcePages.map(Number).filter(Number.isFinite)
+        : [],
+    };
+  });
+}
+
+function parseQuestions(
+  text: string,
+  dayNumber: number,
+  limit: number,
+): GeneratedQuestion[] {
+  const parsed = extractJson(text) as { questions?: unknown[] };
+  if (!Array.isArray(parsed.questions)) throw new Error("INVALID_QUESTIONS");
+
+  return parsed.questions.slice(0, limit).map((question, index) => {
+    const value = question as Record<string, unknown>;
+    const rawOptions = Array.isArray(value.options)
+      ? (value.options as Array<Record<string, unknown>>)
+      : [];
+
+    const options = (["A", "B", "C", "D"] as const).map((label) => ({
+      label,
+      text: String(
+        rawOptions.find(
+          (option) => String(option.label).toUpperCase() === label,
+        )?.text ?? "",
+      ),
+    }));
+
+    const rawLabel = String(value.correctLabel ?? "").toUpperCase();
+    const correctLabel = (
+      ["A", "B", "C", "D"].includes(rawLabel) ? rawLabel : ""
+    ) as "A" | "B" | "C" | "D";
+
+    return {
+      questionText: String(value.questionText ?? ""),
+      options,
+      correctLabel,
+      explanation: String(value.explanation ?? ""),
+      dayNumber,
+      questionOrder:
+        typeof value.questionOrder === "number"
+          ? value.questionOrder
+          : index + 1,
+      sourcePageNumber: Number(value.sourcePageNumber),
+      topic: typeof value.topic === "string" ? value.topic : undefined,
+      difficulty: ["EASY", "MEDIUM", "HARD"].includes(
+        String(value.difficulty),
+      )
+        ? (value.difficulty as "EASY" | "MEDIUM" | "HARD")
+        : "MEDIUM",
+    };
+  });
+}
+
+function validateDayPlans(
+  days: GeneratedDayPlan[],
+  req: ContentGenerationRequest,
+  validPageNumbers: Set<number>,
+): string | null {
+  if (days.length !== req.totalDays) {
+    return `عدد الأيام ${days.length} وليس ${req.totalDays}`;
+  }
+
+  const seen = new Set<number>();
+  for (const day of days) {
+    if (
+      !Number.isInteger(day.dayNumber) ||
+      day.dayNumber < 1 ||
+      day.dayNumber > req.totalDays ||
+      seen.has(day.dayNumber)
+    ) {
+      return `رقم يوم غير صالح أو مكرر: ${day.dayNumber}`;
+    }
+    seen.add(day.dayNumber);
+
+    if (!day.title.trim() || !day.contentSummary.trim()) {
+      return `اليوم ${day.dayNumber} بلا عنوان أو ملخص`;
+    }
+    if (day.objectives.length < 2 || day.topics.length < 2) {
+      return `اليوم ${day.dayNumber} يحتاج هدفين وموضوعين على الأقل`;
+    }
+    if (
+      day.sourcePages.length === 0 ||
+      day.sourcePages.some((page) => !validPageNumbers.has(page))
+    ) {
+      return `اليوم ${day.dayNumber} يحتوي صفحات مصدر غير صالحة`;
+    }
+
+    if (
+      req.language === "AR" &&
+      (!isPredominantlyArabic(day.title) ||
+        !isPredominantlyArabic(day.contentSummary) ||
+        day.objectives.some((value) => !isPredominantlyArabic(value)) ||
+        day.topics.some((value) => !isPredominantlyArabic(value)))
+    ) {
+      return `اليوم ${day.dayNumber} لا يلتزم باللغة العربية`;
+    }
+  }
+
+  return null;
+}
+
+function validateSingleQuestion(
+  question: GeneratedQuestion,
+  day: GeneratedDayPlan,
+  req: ContentGenerationRequest,
+  validPageNumbers: Set<number>,
+): string | null {
+  if (!question.questionText.trim()) return "يوجد سؤال بلا نص";
+  if (!question.explanation.trim()) return "يوجد سؤال بلا تفسير";
+
+  const dayPages = new Set(day.sourcePages);
+  if (
+    !validPageNumbers.has(question.sourcePageNumber) ||
+    !dayPages.has(question.sourcePageNumber)
+  ) {
+    return `السؤال يشير إلى صفحة خارج مصادر اليوم: ${question.sourcePageNumber}`;
+  }
+
+  if (question.options.length !== 4) return "السؤال لا يحتوي أربعة خيارات";
+  if (question.options.some((option) => !option.text.trim())) {
+    return "السؤال يحتوي خيارًا فارغًا";
+  }
+  if (
+    !question.options.some(
+      (option) => option.label === question.correctLabel,
+    )
+  ) {
+    return "السؤال لا يحتوي الإجابة الصحيحة المحددة";
+  }
+
+  if (
+    req.language === "AR" &&
+    (!isArabicQuestionContent(question.questionText, question.options) ||
+      !isPredominantlyArabic(question.explanation))
+  ) {
+    return "السؤال أو خياراته/تفسيره ليس بالعربية";
+  }
+
+  return null;
+}
 
 export class ClaudeAIAdapter implements AIAdapter {
   readonly name = "CLAUDE";
   readonly modelId = MODEL_ID;
 
-  async generate(req: ContentGenerationRequest): Promise<ContentGenerationResult> {
+  async generate(
+    req: ContentGenerationRequest,
+  ): Promise<ContentGenerationResult> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY env var not set");
 
     const client = new Anthropic({ apiKey });
-    const start = Date.now();
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    const validPageNumbers = new Set(req.pages.map((page) => page.pageNumber));
 
-    // ── Step 1: Generate 10-day plan ─────────────────────────────────────────
-
-    const dayPlanPrompt = buildDayPlanPrompt(
-      req.pages,
-      req.programTitle,
-      req.language,
-      req.totalDays
-    );
-
-    const dayPlanResponse = await client.messages.create({
-      model: MODEL_ID,
-      max_tokens: 4096,
-      messages: [{ role: "user", content: dayPlanPrompt }],
-    });
-
-    totalInputTokens += dayPlanResponse.usage.input_tokens;
-    totalOutputTokens += dayPlanResponse.usage.output_tokens;
-
-    const dayPlanText = dayPlanResponse.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("");
-
-    const days = parseDayPlans(dayPlanText, req.totalDays, req.pages);
-
-    // ── Step 2: Generate questions for each day ───────────────────────────────
-
-    const allQuestions: GeneratedQuestion[] = [];
-
-    for (const day of days) {
-      const existingTexts = allQuestions.map((q) => q.questionText);
-
-      const qPrompt = buildQuestionsPrompt(
-        day,
-        req.pages,
-        req.language,
-        req.questionsPerDay,
-        existingTexts
-      );
-
-      const qResponse = await client.messages.create({
+    const respond = async (prompt: string, maxTokens: number) => {
+      const response = await client.messages.create({
         model: MODEL_ID,
-        max_tokens: 3072,
-        messages: [{ role: "user", content: qPrompt }],
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
       });
 
-      totalInputTokens += qResponse.usage.input_tokens;
-      totalOutputTokens += qResponse.usage.output_tokens;
+      totalInputTokens += response.usage.input_tokens;
+      totalOutputTokens += response.usage.output_tokens;
 
-      const qText = qResponse.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b as { type: "text"; text: string }).text)
+      const text = response.content
+        .filter((block) => block.type === "text")
+        .map((block) => (block as { type: "text"; text: string }).text)
         .join("");
 
-      const dayQuestions = parseQuestions(qText, day.dayNumber, req.questionsPerDay);
-      allQuestions.push(...dayQuestions);
+      if (!text.trim()) throw new Error("ANTHROPIC_EMPTY_RESPONSE");
+      return text;
+    };
+
+    let days: GeneratedDayPlan[] | null = null;
+    let dayPlanFailure = "";
+
+    for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
+      const repair =
+        attempt > 1
+          ? `\n\nتصحيح إلزامي للمحاولة السابقة: ${dayPlanFailure}. أعد الخطة كاملة: ${req.totalDays} أيام بالضبط وباللغة المطلوبة وصفحات مصدر صحيحة.`
+          : "";
+
+      try {
+        const text = await respond(
+          buildDayPlanPrompt(
+            req.pages,
+            req.programTitle,
+            req.language,
+            req.totalDays,
+          ) + repair,
+          7000,
+        );
+        const candidate = parseDayPlans(text, req.totalDays);
+        const validation = validateDayPlans(
+          candidate,
+          req,
+          validPageNumbers,
+        );
+        if (!validation) {
+          days = candidate;
+          break;
+        }
+        dayPlanFailure = validation;
+      } catch (error) {
+        dayPlanFailure =
+          error instanceof Error ? error.message : "INVALID_DAY_PLAN";
+      }
     }
 
-    if (req.language === "AR") {
-      const invalid = allQuestions.filter(
-        (question) => !isArabicQuestionContent(question.questionText, question.options)
+    if (!days) {
+      throw new Error(
+        `AI_DAY_PLAN_VALIDATION_FAILED: ${dayPlanFailure || "unknown"}`,
       );
-      if (invalid.length > 0) {
-        throw new Error(`AI_LANGUAGE_MISMATCH_AR:${invalid.length}`);
+    }
+
+    const questions: GeneratedQuestion[] = [];
+
+    for (const day of days) {
+      const acceptedByText = new Map<string, GeneratedQuestion>();
+      const candidateCount = Math.max(
+        req.questionsPerDay + 3,
+        req.questionsPerDay,
+      );
+      let failure = "";
+
+      for (
+        let attempt = 1;
+        attempt <= MAX_GENERATION_ATTEMPTS &&
+        acceptedByText.size < req.questionsPerDay;
+        attempt++
+      ) {
+        const missing = req.questionsPerDay - acceptedByText.size;
+        const repair =
+          attempt > 1
+            ? `\n\nتصحيح إلزامي: ${failure}. ما زلنا نحتاج ${missing} سؤال/أسئلة صالحة على الأقل. أعد مجموعة مرشحة جديدة بالعربية ومن صفحات هذا اليوم فقط.`
+            : "";
+
+        try {
+          const text = await respond(
+            buildQuestionsPrompt(
+              day,
+              req.pages,
+              req.language,
+              candidateCount,
+              [
+                ...questions.map((question) => question.questionText),
+                ...Array.from(acceptedByText.values()).map(
+                  (question) => question.questionText,
+                ),
+              ],
+            ) + repair,
+            7000,
+          );
+
+          const candidates = parseQuestions(
+            text,
+            day.dayNumber,
+            candidateCount,
+          );
+          const reasons: string[] = [];
+
+          for (const candidate of candidates) {
+            const validation = validateSingleQuestion(
+              candidate,
+              day,
+              req,
+              validPageNumbers,
+            );
+            if (validation) {
+              reasons.push(validation);
+              continue;
+            }
+
+            const key = candidate.questionText
+              .trim()
+              .toLocaleLowerCase("ar")
+              .replace(/\s+/g, " ");
+            if (!key || acceptedByText.has(key)) continue;
+
+            acceptedByText.set(key, candidate);
+            if (acceptedByText.size >= req.questionsPerDay) break;
+          }
+
+          if (acceptedByText.size < req.questionsPerDay) {
+            failure =
+              `تم قبول ${acceptedByText.size}/${req.questionsPerDay} فقط` +
+              (reasons.length ? `: ${reasons.slice(0, 3).join(" | ")}` : "");
+          }
+        } catch (error) {
+          failure =
+            error instanceof Error ? error.message : "INVALID_QUESTIONS";
+        }
       }
+
+      if (acceptedByText.size < req.questionsPerDay) {
+        throw new Error(
+          `AI_QUESTIONS_VALIDATION_FAILED_DAY_${day.dayNumber}: ${failure || "unknown"}`,
+        );
+      }
+
+      questions.push(
+        ...Array.from(acceptedByText.values())
+          .slice(0, req.questionsPerDay)
+          .map((question, index) => ({
+            ...question,
+            dayNumber: day.dayNumber,
+            questionOrder: index + 1,
+          })),
+      );
+    }
+
+    if (questions.length !== req.totalDays * req.questionsPerDay) {
+      throw new Error(
+        `AI_QUESTION_TOTAL_MISMATCH: got ${questions.length}, expected ${req.totalDays * req.questionsPerDay}`,
+      );
     }
 
     return {
       days,
-      questions: allQuestions,
+      questions,
       modelUsed: MODEL_ID,
       promptVersion: PROMPT_VERSION,
       inputTokens: totalInputTokens,
@@ -99,124 +378,4 @@ export class ClaudeAIAdapter implements AIAdapter {
       generatedAt: new Date(),
     };
   }
-}
-
-// ── JSON parsing helpers ──────────────────────────────────────────────────────
-
-function extractJson(text: string): unknown {
-  // Strip markdown code fences if present
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = fenceMatch ? fenceMatch[1] : text;
-  // Find first { or [ and last } or ]
-  const start = raw.search(/[{[]/);
-  const end = Math.max(raw.lastIndexOf("}"), raw.lastIndexOf("]"));
-  if (start === -1 || end === -1) throw new Error("No JSON found in AI response");
-  return JSON.parse(raw.slice(start, end + 1));
-}
-
-function parseDayPlans(
-  text: string,
-  totalDays: number,
-  pages: Array<{ pageNumber: number }>
-): GeneratedDayPlan[] {
-  let parsed: unknown;
-  try {
-    parsed = extractJson(text);
-  } catch {
-    // Fallback: distribute pages evenly across days
-    return fallbackDayPlans(totalDays, pages);
-  }
-
-  const raw = parsed as { days?: unknown[] };
-  if (!Array.isArray(raw?.days)) return fallbackDayPlans(totalDays, pages);
-
-  const days: GeneratedDayPlan[] = raw.days.slice(0, totalDays).map((d: unknown, i) => {
-    const day = d as Record<string, unknown>;
-    return {
-      dayNumber: typeof day.dayNumber === "number" ? day.dayNumber : i + 1,
-      title: typeof day.title === "string" ? day.title : `اليوم ${i + 1}`,
-      objectives: Array.isArray(day.objectives) ? (day.objectives as string[]) : [],
-      contentSummary: typeof day.contentSummary === "string" ? day.contentSummary : "",
-      topics: Array.isArray(day.topics) ? (day.topics as string[]) : [],
-      pageRangeStart: typeof day.pageRangeStart === "number" ? day.pageRangeStart : 1,
-      pageRangeEnd: typeof day.pageRangeEnd === "number" ? day.pageRangeEnd : pages.length,
-      sourcePages: Array.isArray(day.sourcePages) ? (day.sourcePages as number[]) : [],
-    };
-  });
-
-  // If fewer than totalDays returned, pad with fallback days
-  if (days.length < totalDays) {
-    const fallback = fallbackDayPlans(totalDays, pages);
-    for (let i = days.length; i < totalDays; i++) {
-      days.push(fallback[i]);
-    }
-  }
-
-  return days;
-}
-
-function parseQuestions(
-  text: string,
-  dayNumber: number,
-  questionsPerDay: number
-): GeneratedQuestion[] {
-  let parsed: unknown;
-  try {
-    parsed = extractJson(text);
-  } catch {
-    return [];
-  }
-
-  const raw = parsed as { questions?: unknown[] };
-  if (!Array.isArray(raw?.questions)) return [];
-
-  const validLabels = new Set(["A", "B", "C", "D"]);
-  const validDifficulties = new Set(["EASY", "MEDIUM", "HARD"]);
-
-  return raw.questions
-    .slice(0, questionsPerDay)
-    .map((q: unknown, i) => {
-      const item = q as Record<string, unknown>;
-      const options = Array.isArray(item.options) ? item.options as Array<Record<string, string>> : [];
-      const correctLabel = validLabels.has(item.correctLabel as string)
-        ? (item.correctLabel as "A" | "B" | "C" | "D")
-        : "A";
-
-      return {
-        questionText: typeof item.questionText === "string" ? item.questionText : "",
-        options: ["A", "B", "C", "D"].map((label) => {
-          const opt = options.find((o) => o.label === label);
-          return { label: label as "A" | "B" | "C" | "D", text: opt?.text ?? `خيار ${label}` };
-        }),
-        correctLabel,
-        explanation: typeof item.explanation === "string" ? item.explanation : "",
-        dayNumber,
-        questionOrder: typeof item.questionOrder === "number" ? item.questionOrder : i + 1,
-        sourcePageNumber: typeof item.sourcePageNumber === "number" ? item.sourcePageNumber : 1,
-        topic: typeof item.topic === "string" ? item.topic : undefined,
-        difficulty: validDifficulties.has(item.difficulty as string)
-          ? (item.difficulty as "EASY" | "MEDIUM" | "HARD")
-          : "MEDIUM",
-      } satisfies GeneratedQuestion;
-    })
-    .filter((q) => q.questionText.length > 0);
-}
-
-function fallbackDayPlans(totalDays: number, pages: Array<{ pageNumber: number }>): GeneratedDayPlan[] {
-  const perDay = Math.ceil(pages.length / totalDays);
-  return Array.from({ length: totalDays }, (_, i) => {
-    const start = i * perDay;
-    const end = Math.min(start + perDay, pages.length);
-    const slice = pages.slice(start, end);
-    return {
-      dayNumber: i + 1,
-      title: `اليوم ${i + 1}`,
-      objectives: [],
-      contentSummary: "",
-      topics: [],
-      pageRangeStart: slice[0]?.pageNumber ?? 1,
-      pageRangeEnd: slice[slice.length - 1]?.pageNumber ?? 1,
-      sourcePages: slice.map((p) => p.pageNumber),
-    };
-  });
 }
