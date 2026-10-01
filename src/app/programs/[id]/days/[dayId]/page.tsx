@@ -47,12 +47,19 @@ export default async function DayDetailsPage({
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-5">
-        {query.sessionError === "arabic-questions" ? (
-          <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
-            <strong>تعذر إنشاء جلسة عربية.</strong>
-            <p className="mt-1 text-sm">
-              يوجد {Number.isFinite(invalidCount) ? invalidCount : 0} سؤال غير مطابق للغة العربية في هذا اليوم.
-              صحّح بنك الأسئلة أولًا ثم أعد إنشاء الجلسة.
+        {query.sessionError ? (
+          <div role="alert" className="brand-card dlp-session-error">
+            <strong>تعذر إنشاء جلسة الاختبار.</strong>
+            <p>
+              {query.sessionError === "arabic-questions"
+                ? `يوجد ${Number.isFinite(invalidCount) ? invalidCount : 0} سؤال غير مطابق للغة العربية في هذا اليوم. صحّح بنك الأسئلة أولًا ثم أعد إنشاء الجلسة.`
+                : query.sessionError === "no-arabic-questions"
+                ? "لا توجد أسئلة عربية صالحة لهذا اليوم. راجع بنك الأسئلة والخيارات أولًا."
+                : query.sessionError === "no-questions"
+                ? "لا توجد أسئلة صالحة لهذا اليوم. أضف أو اعتمد الأسئلة أولًا."
+                : query.sessionError === "program"
+                ? "تعذر العثور على البرنامج أو لا تملك صلاحية إنشاء جلسة له."
+                : "حدث خطأ أثناء إنشاء الجلسة. لم يتم إنشاء جلسة ناقصة؛ حاول مرة أخرى بعد مراجعة المحتوى."}
             </p>
           </div>
         ) : null}
@@ -111,7 +118,16 @@ export default async function DayDetailsPage({
                     const count = message.split(":")[1] ?? "0";
                     redirect(`/programs/${id}/days/${dayId}?sessionError=arabic-questions&count=${encodeURIComponent(count)}`);
                   }
-                  throw error;
+                  if (message === "NO_ARABIC_QUESTIONS_FOR_DAY") {
+                    redirect(`/programs/${id}/days/${dayId}?sessionError=no-arabic-questions`);
+                  }
+                  if (message === "NO_QUESTIONS_FOR_DAY") {
+                    redirect(`/programs/${id}/days/${dayId}?sessionError=no-questions`);
+                  }
+                  if (message === "PROGRAM_NOT_FOUND") {
+                    redirect(`/programs/${id}/days/${dayId}?sessionError=program`);
+                  }
+                  redirect(`/programs/${id}/days/${dayId}?sessionError=unexpected`);
                 }
                 redirect(`/programs/${id}/sessions/${liveSession.id}`);
               }}
