@@ -168,7 +168,7 @@ export default function ParticipantSessionPage() {
       <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border shadow-sm p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl animate-bounce">⏳</div>
-          <h1 className="text-xl font-bold text-gray-900">القيادة الرقمية</h1>
+          <h1 className="text-xl font-bold text-gray-900">الحقيبة التدريبية</h1>
           <p className="text-gray-600 font-medium">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
           <p className="text-gray-500 text-sm">
             {sessionStatus === "PAUSED"
@@ -201,7 +201,7 @@ export default function ParticipantSessionPage() {
 
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-lg font-bold text-blue-800">القيادة الرقمية</h1>
+          <h1 className="text-lg font-bold text-blue-800">الحقيبة التدريبية</h1>
           <p className="text-xs text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
         </div>
 
