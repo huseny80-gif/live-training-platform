@@ -528,8 +528,14 @@ function pageContentRefs(pageBody: string): number[] {
 export class NativeTextExtractionAdapter implements ExtractionAdapter {
   readonly name = "NATIVE_TEXT" as const;
 
-  supports(contentType: PdfContentType): boolean {
-    return contentType !== "IMAGE_BASED";
+  supports(_contentType: PdfContentType): boolean {
+    // Always attempt native text extraction first.
+    // PDF structural inspection can classify slide-heavy / PowerPoint-exported
+    // documents as IMAGE_BASED even when they still contain embedded text in
+    // compressed content streams. The native extractor is cheap and fails
+    // closed with NATIVE_TEXT_NO_READABLE_CONTENT when no usable text exists,
+    // allowing the pipeline to fall back safely to OCR/AI providers.
+    return true;
   }
 
   async extract(req: ExtractionRequest): Promise<ExtractionResult> {
