@@ -4,7 +4,7 @@
 
 export type PdfContentType = "TEXT_BASED" | "IMAGE_BASED" | "MIXED" | "UNKNOWN";
 
-export type ExtractionMethod = "NATIVE_TEXT" | "LLAMAPARSE" | "VISION_LLM" | "MOCK";
+export type ExtractionMethod = "NATIVE_TEXT" | "LLAMAPARSE" | "VISION_LLM" | "OPENAI_PDF" | "MOCK";
 
 export type PageExtractionStatus =
   | "PENDING"
