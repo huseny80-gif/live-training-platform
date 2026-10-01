@@ -35,6 +35,28 @@ interface SessionState {
   scoreAwarded: number | null;
 }
 
+function StateCard({
+  icon,
+  title,
+  message,
+  code,
+}: {
+  icon: string;
+  title: string;
+  message: string;
+  code?: string;
+}) {
+  return (
+    <div className="dlp-participant-state-card">
+      <div className="dlp-state-icon" aria-hidden="true">{icon}</div>
+      <h1>{title}</h1>
+      <p>{message}</p>
+      {code ? <code dir="ltr">{code}</code> : null}
+      <a href="/join" className="dlp-participant-link">العودة للبداية</a>
+    </div>
+  );
+}
+
 export default function ParticipantSessionPage() {
   const { code } = useParams<{ code: string }>();
   const router = useRouter();
@@ -49,48 +71,48 @@ export default function ParticipantSessionPage() {
 
   const fetchState = useCallback(async () => {
     try {
-      const res = await fetch(`/api/session/${code}/state`, { cache: "no-store" });
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError("SESSION_NOT_FOUND");
-          return;
-        }
+      const response = await fetch(`/api/session/${code}/state`, { cache: "no-store" });
+      if (!response.ok) {
+        if (response.status === 404) setError("SESSION_NOT_FOUND");
         return;
       }
-      const data: SessionState = await res.json();
-      setState(data);
 
-      // Auto-redirect to result page when session ends
+      const data: SessionState = await response.json();
+      setState(data);
+      setError(null);
+
       if (data.sessionStatus === "ENDED" && !redirectedRef.current) {
         redirectedRef.current = true;
         setTimeout(() => router.push(`/session/${code}/result`), 1500);
       }
 
-      const newQId = data.currentQuestion?.sessionQuestionId ?? null;
-      if (newQId !== lastQuestionId.current) {
-        lastQuestionId.current = newQId;
+      const newQuestionId = data.currentQuestion?.sessionQuestionId ?? null;
+      if (newQuestionId !== lastQuestionId.current) {
+        lastQuestionId.current = newQuestionId;
         setSelectedOption(null);
         setSubmitResult(null);
+        setSubmitError(null);
       }
     } catch {
-      // network hiccup — ignore
+      // transient network interruption; polling retries automatically
     }
   }, [code, router]);
 
   useEffect(() => {
-    fetchState();
+    void fetchState();
     const id = setInterval(fetchState, 2000);
     return () => clearInterval(id);
   }, [fetchState]);
 
   async function submitAnswer(optionId: string) {
     if (!state?.currentQuestion || submitting) return;
+
     setSubmitting(true);
     setSelectedOption(optionId);
     setSubmitError(null);
 
     try {
-      const res = await fetch("/api/session/answer", {
+      const response = await fetch("/api/session/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,8 +120,9 @@ export default function ParticipantSessionPage() {
           selectedOptionId: optionId,
         }),
       });
-      const data = await res.json();
-      if (res.ok) {
+
+      const data = await response.json();
+      if (response.ok) {
         setSubmitResult({ isCorrect: data.isCorrect, scoreAwarded: data.scoreAwarded });
         await fetchState();
       } else {
@@ -112,190 +135,166 @@ export default function ParticipantSessionPage() {
     }
   }
 
-  // ── Error state ──────────────────────────────────────────────────────────
   if (error) {
-    const isNotFound = error === "SESSION_NOT_FOUND";
     return (
       <main dir="rtl" lang="ar" className="dlp-participant-page">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl">⚠️</div>
-          <h1 className="text-lg font-bold text-gray-800">
-            {isNotFound ? "الجلسة غير موجودة" : "حدث خطأ"}
-          </h1>
-          <p className="text-sm text-gray-500">
-            {isNotFound
-              ? "هذه الجلسة غير متاحة أو انتهت. تحقق من الرمز وحاول مجدداً."
-              : error}
-          </p>
-          <a
-            href="/join"
-            className="inline-block mt-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            العودة للبداية
-          </a>
-        </div>
+        <StateCard
+          icon="⚠️"
+          title="الجلسة غير متاحة"
+          message="هذه الجلسة غير متاحة أو انتهت. تحقق من الرابط أو رمز الجلسة."
+        />
       </main>
     );
   }
 
-  // ── Loading ──────────────────────────────────────────────────────────────
   if (!state) {
     return (
       <main dir="rtl" lang="ar" className="dlp-participant-page">
-        <p className="text-gray-500 animate-pulse">جاري الاتصال…</p>
+        <div className="dlp-participant-state-card">
+          <div className="dlp-state-spinner" aria-hidden="true" />
+          <h1>{brand.nameAr}</h1>
+          <p>جارٍ الاتصال بالجلسة…</p>
+        </div>
       </main>
     );
   }
 
-  const { sessionStatus, sessionTitle, dayNumber, totalQuestions, currentQuestionIndex, currentQuestion, hasAnswered, isCorrect, scoreAwarded } = state;
+  const {
+    sessionStatus,
+    sessionTitle,
+    dayNumber,
+    totalQuestions,
+    currentQuestionIndex,
+    currentQuestion,
+    hasAnswered,
+    isCorrect,
+    scoreAwarded,
+  } = state;
 
-  // ── Session ended — redirect soon, show brief message ────────────────────
   if (sessionStatus === "ENDED") {
     return (
       <main dir="rtl" lang="ar" className="dlp-participant-page">
-        <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl">🏁</div>
-          <h1 className="text-xl font-bold text-gray-900">انتهى الاختبار</h1>
-          <p className="text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
-          <p className="text-sm text-blue-600 animate-pulse">جاري الانتقال لعرض نتيجتك…</p>
-        </div>
+        <StateCard
+          icon="🏁"
+          title="انتهى الاختبار"
+          message="جارٍ الانتقال إلى نتيجتك…"
+          code={sessionTitle ?? `اليوم ${dayNumber}`}
+        />
       </main>
     );
   }
 
-  // ── Waiting / Paused ─────────────────────────────────────────────────────
   if (sessionStatus === "DRAFT" || sessionStatus === "PAUSED" || !currentQuestion) {
     return (
       <main dir="rtl" lang="ar" className="dlp-participant-page">
-        <div className="bg-white rounded-2xl border shadow-sm p-8 text-center max-w-sm space-y-4">
-          <div className="text-5xl animate-bounce">⏳</div>
-          <h1 className="text-xl font-bold text-gray-900">{brand.nameAr}</h1>
-          <p className="text-gray-600 font-medium">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
-          <p className="text-gray-500 text-sm">
+        <div className="dlp-participant-state-card">
+          <div className="dlp-state-icon" aria-hidden="true">⏳</div>
+          <h1>{brand.nameAr}</h1>
+          <strong>{sessionTitle ?? `اليوم ${dayNumber}`}</strong>
+          <p>
             {sessionStatus === "PAUSED"
-              ? "الاختبار موقوف مؤقتاً… انتظر."
-              : "في انتظار المدرب لعرض السؤال التالي…"}
+              ? "الاختبار موقوف مؤقتاً. انتظر استئناف المدرب."
+              : "في انتظار المدرب لعرض السؤال التالي."}
           </p>
-          <p className="text-xs text-gray-400 font-mono bg-gray-50 px-3 py-1 rounded-full inline-block">رمز: {code}</p>
-          <a href="/join" className="block text-xs text-gray-400 hover:text-gray-600 underline mt-2">
-            العودة للبداية
-          </a>
+          <code dir="ltr">رمز الجلسة: {code}</code>
+          <a href="/join" className="dlp-participant-link">العودة للبداية</a>
         </div>
       </main>
     );
   }
 
-  const q = currentQuestion;
-  const questionClosed = q.questionStatus === "CLOSED" || q.questionStatus === "RESULTS";
-  const canAnswer = q.questionStatus === "LIVE" && !hasAnswered && !submitResult;
-  const answered = hasAnswered || !!submitResult;
+  const question = currentQuestion;
+  const questionClosed = question.questionStatus === "CLOSED" || question.questionStatus === "RESULTS";
+  const canAnswer = question.questionStatus === "LIVE" && !hasAnswered && !submitResult;
+  const answered = hasAnswered || Boolean(submitResult);
   const answerIsCorrect = submitResult?.isCorrect ?? isCorrect;
   const answeredScore = submitResult?.scoreAwarded ?? scoreAwarded;
 
-  const progressPercent = totalQuestions > 0 && currentQuestionIndex != null
-    ? Math.round((currentQuestionIndex / totalQuestions) * 100)
-    : 0;
+  const progressPercent =
+    totalQuestions > 0 && currentQuestionIndex != null
+      ? Math.round((currentQuestionIndex / totalQuestions) * 100)
+      : 0;
 
   return (
     <main dir="rtl" lang="ar" className="dlp-participant-page dlp-participant-live">
       <div className="dlp-participant-wrap">
+        <header className="dlp-participant-head">
+          <span>{brand.nameAr}</span>
+          <h1>{sessionTitle ?? `اليوم ${dayNumber}`}</h1>
+          <small dir="ltr">رمز الجلسة: {code}</small>
+        </header>
 
-        {/* Header */}
-        <div className="dlp-participant-head">
-          <h1 className="text-lg font-bold text-blue-800">{brand.nameAr}</h1>
-          <p className="text-xs text-gray-500">{sessionTitle ?? `اليوم ${dayNumber}`}</p>
-        </div>
-
-        {/* Progress bar */}
-        {totalQuestions > 0 && currentQuestionIndex != null && (
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-gray-500">
+        {totalQuestions > 0 && currentQuestionIndex != null ? (
+          <section className="dlp-question-progress" aria-label="تقدم الاختبار">
+            <div>
               <span>السؤال {currentQuestionIndex} من {totalQuestions}</span>
-              <span>{progressPercent}%</span>
+              <strong>{progressPercent}%</strong>
             </div>
             <div
+              className="dlp-progress-track"
               role="progressbar"
               aria-valuenow={progressPercent}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label={`التقدم: ${progressPercent}%`}
-              className="h-2 bg-gray-200 rounded-full overflow-hidden"
             >
-              <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
+              <i style={{ width: `${progressPercent}%` }} />
             </div>
-          </div>
-        )}
+          </section>
+        ) : null}
 
-        {/* Question text */}
-        <div className="dlp-participant-question">
-          <p className="text-lg font-semibold leading-relaxed text-gray-800">{q.questionText}</p>
-        </div>
+        <section className="dlp-participant-question">
+          <span>السؤال Q{question.questionOrder}</span>
+          <p>{question.questionText}</p>
+        </section>
 
-        {/* Submit error banner */}
-        {submitError && (
-          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-            <span className="text-sm text-red-700">{submitError}</span>
-            <button
-              type="button"
-              onClick={() => { setSubmitError(null); setSelectedOption(null); }}
-              className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
-            >
+        {submitError ? (
+          <div className="dlp-participant-error" role="alert">
+            <span>{submitError}</span>
+            <button type="button" onClick={() => { setSubmitError(null); setSelectedOption(null); }}>
               إعادة المحاولة
             </button>
           </div>
-        )}
+        ) : null}
 
-        {/* Options */}
         <div className="dlp-participant-options" role="group" aria-label="خيارات الإجابة">
-          {q.options.map((opt) => {
-            const isSelected = (selectedOption ?? state.myAnswer) === opt.id;
-            let cls = "w-full text-right rounded-xl border p-4 flex items-center gap-3 transition-colors ";
-            if (canAnswer) {
-              cls += isSelected ? "border-blue-500 bg-blue-50 " : "hover:bg-gray-50 cursor-pointer ";
-            } else {
-              cls += isSelected ? "border-blue-400 bg-blue-50 " : "";
-            }
+          {question.options.map((option) => {
+            const isSelected = (selectedOption ?? state.myAnswer) === option.id;
             return (
               <button
-                key={opt.id}
-                className={cls}
+                key={option.id}
+                type="button"
                 disabled={!canAnswer || submitting}
                 aria-pressed={isSelected}
-                onClick={() => canAnswer && submitAnswer(opt.id)}
+                onClick={() => canAnswer && void submitAnswer(option.id)}
+                className={`dlp-option${isSelected ? " selected" : ""}`}
               >
-                {/* Label letter: dir="ltr" so A/B/C renders correctly inside RTL container */}
-                <span dir="ltr" className="w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold flex-shrink-0 bg-white">
-                  {opt.optionLabel}
-                </span>
-                <span className="text-sm text-gray-800 flex-1">{opt.optionText}</span>
+                <span dir="ltr">{option.optionLabel}</span>
+                <strong>{option.optionText}</strong>
               </button>
             );
           })}
         </div>
 
-        {/* Feedback */}
-        {answered && (
-          <div className={`rounded-xl p-4 text-center ${
-            answerIsCorrect === true ? "bg-green-50 border border-green-200" :
-            answerIsCorrect === false ? "bg-red-50 border border-red-200" :
-            "bg-gray-50 border"
-          }`}>
-            {answerIsCorrect === true && <p className="font-bold text-green-700">✓ إجابة صحيحة! +{answeredScore} نقطة</p>}
-            {answerIsCorrect === false && <p className="font-bold text-red-700">✗ إجابة خاطئة</p>}
-            {answerIsCorrect === null && <p className="text-gray-600">تم تسجيل إجابتك. في انتظار النتائج…</p>}
-            {questionClosed && <p className="text-xs text-gray-400 mt-1">في انتظار السؤال التالي…</p>}
+        {answered ? (
+          <div
+            className={`dlp-answer-feedback ${
+              answerIsCorrect === true ? "correct" : answerIsCorrect === false ? "wrong" : "pending"
+            }`}
+            role="status"
+          >
+            {answerIsCorrect === true ? <strong>✓ إجابة صحيحة! +{answeredScore} نقطة</strong> : null}
+            {answerIsCorrect === false ? <strong>✗ إجابة خاطئة</strong> : null}
+            {answerIsCorrect === null ? <strong>تم تسجيل إجابتك.</strong> : null}
+            {questionClosed ? <span>في انتظار السؤال التالي…</span> : null}
           </div>
-        )}
+        ) : null}
 
-        {/* Closed but not answered */}
-        {questionClosed && !answered && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-center">
-            <p className="text-orange-700 text-sm">انتهى وقت هذا السؤال.</p>
+        {questionClosed && !answered ? (
+          <div className="dlp-answer-feedback expired">
+            <strong>انتهى وقت هذا السؤال.</strong>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   );

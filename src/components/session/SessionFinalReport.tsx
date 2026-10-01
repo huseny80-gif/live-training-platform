@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface ReportData {
   participantCount: number;
@@ -14,49 +14,33 @@ interface ReportData {
 }
 
 function Row({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex justify-between text-sm py-2 border-b last:border-0">
-      <span className="text-gray-600">{label}</span>
-      <span className="font-semibold text-gray-800">{value}</span>
-    </div>
-  );
+  return <div className="dlp-report-row"><span>{label}</span><strong>{value}</strong></div>;
 }
 
 export default function SessionFinalReport({ sessionId }: { sessionId: string }) {
   const [data, setData] = useState<ReportData | null>(null);
   const [error, setError] = useState(false);
 
-  const fetchReport = () => {
+  const fetchReport = useCallback(async () => {
     setError(false);
-    fetch(`/api/session/${sessionId}/analytics`, { cache: "no-store" })
-      .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((d) => setData(d))
-      .catch(() => setError(true));
-  };
+    try {
+      const response = await fetch(`/api/session/${sessionId}/analytics`, { cache: "no-store" });
+      if (!response.ok) throw new Error("REPORT_LOAD_FAILED");
+      setData(await response.json());
+    } catch {
+      setError(true);
+    }
+  }, [sessionId]);
 
-  useEffect(() => { fetchReport(); }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void fetchReport(); }, [fetchReport]);
 
-  if (error) {
-    return (
-      <div className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-4">
-        <p className="text-sm text-red-700">تعذّر تحميل التقرير النهائي.</p>
-        <button
-          type="button"
-          onClick={fetchReport}
-          className="text-xs text-red-600 underline flex-shrink-0 hover:text-red-800"
-        >
-          إعادة المحاولة
-        </button>
-      </div>
-    );
-  }
-
+  if (error) return <div className="dlp-live-error"><p>تعذّر تحميل التقرير النهائي.</p><button type="button" onClick={fetchReport}>إعادة المحاولة</button></div>;
   if (!data || data.totalAnswers === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border p-5">
-      <h2 className="font-semibold text-gray-800 mb-3">📋 التقرير النهائي للجلسة</h2>
-      <div className="divide-y">
+    <section className="brand-card dlp-live-panel">
+      <div className="dlp-live-panel-head"><h2>📋 التقرير النهائي للجلسة</h2></div>
+      <div className="dlp-report-list">
         <Row label="إجمالي المشاركين" value={data.participantCount} />
         <Row label="أكملوا الاختبار" value={data.completedCount} />
         <Row label="نسبة المشاركة" value={`${data.participationRate}%`} />
@@ -66,6 +50,6 @@ export default function SessionFinalReport({ sessionId }: { sessionId: string })
         <Row label="متوسط الدرجة" value={data.averageScore} />
         <Row label="أعلى درجة" value={data.highestScore} />
       </div>
-    </div>
+    </section>
   );
 }

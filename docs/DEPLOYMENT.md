@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - PostgreSQL database (Neon, Supabase, Railway, or self-hosted)
 - Vercel account (recommended) or any Node.js hosting
 
@@ -19,7 +19,7 @@ Copy `.env.example` to `.env` and fill in all values.
 | `AUTH_URL` | ✅ | Full public URL of your deployment (no trailing slash) |
 | `NEXTAUTH_URL` | ✅ | Same as AUTH_URL (read by next.config.ts for allowedOrigins) |
 | `SESSION_SECRET` | ✅ | Signs participant JWT cookies — set independently from AUTH_SECRET |
-| `NEXT_PUBLIC_PARTICIPANT_URL` | ✅ | Used only for QR and participant join links; must be the stable public domain and must not be a protected Vercel Preview URL |
+| `NEXT_PUBLIC_PARTICIPANT_URL` | ✅ | Stable public participant domain used exclusively for QR/join links. Never set this to a Vercel Preview URL. |
 | `ANTHROPIC_API_KEY` | ✅ | Required for AI question generation |
 | `BLOB_READ_WRITE_TOKEN` | ⚠️ | Vercel Blob token; if absent, files saved to local disk (not for production) |
 | `LLAMA_CLOUD_API_KEY` | ❌ | Optional; enables LlamaParse for better PDF extraction |
@@ -53,7 +53,7 @@ npx prisma db push
 ### Important Vercel Settings
 
 - **Framework Preset**: Next.js
-- **Node.js Version**: 20.x
+- **Node.js Version**: 22.x
 - **Root Directory**: (leave empty — project is at repo root)
 - **Build Command**: `npx prisma generate && next build`
   - Add `npx prisma generate &&` prefix to ensure Prisma client is generated before build
@@ -114,6 +114,8 @@ After deployment, verify:
 2. `GET /login` → shows login form
 3. `GET /join` → shows join form
 4. Login with instructor credentials → redirects to `/dashboard`
+5. Create/open a session and verify the displayed QR target starts with the stable `NEXT_PUBLIC_PARTICIPANT_URL` and `/join/<CODE>`
+6. Scan QR from a signed-out phone/browser → it must open the participant name form directly, never a Vercel login/protection screen
 
 ---
 
@@ -122,9 +124,3 @@ After deployment, verify:
 - File storage without `BLOB_READ_WRITE_TOKEN` writes to local disk — data is lost on Vercel restarts. Set Vercel Blob for production.
 - No rate limiting on join endpoint — consider adding Upstash Rate Limit for large deployments.
 - Polling uses HTTP short-polling (5–8s intervals) — suitable for sessions up to ~200 concurrent participants. For larger scale, consider WebSockets or SSE.
-
-
-## QR / participant URL safety
-
-Set `NEXT_PUBLIC_PARTICIPANT_URL=https://live-training-platform.vercel.app` in Production.
-The QR generator intentionally does **not** use `VERCEL_URL`, because that value can point to a protected Preview deployment and send trainees to a Vercel login screen.

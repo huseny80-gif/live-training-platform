@@ -14,15 +14,6 @@ const STATUS_LABEL: Record<string, string> = {
   ENDED: "منتهي",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: "bg-amber-100 text-amber-800",
-  ACTIVE: "bg-emerald-100 text-emerald-800",
-  ARCHIVED: "bg-slate-100 text-slate-600",
-  APPROVED: "bg-emerald-100 text-emerald-800",
-  PAUSED: "bg-orange-100 text-orange-800",
-  ENDED: "bg-slate-100 text-slate-600",
-};
-
 const EXTRACTION_LABEL: Record<string, string> = {
   PENDING: "بانتظار المعالجة",
   PROCESSING: "جارٍ التحليل",
@@ -36,31 +27,29 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let program: any;
+  let program;
   try {
     program = await getProgram(id);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg === "NOT_FOUND" || msg === "FORBIDDEN") notFound();
-    throw e;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "NOT_FOUND" || message === "FORBIDDEN") notFound();
+    throw error;
   }
   if (!program) notFound();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const totalQuestions = program.days.reduce((sum: number, day: any) => sum + day._count.questions, 0);
+  const totalQuestions = program.days.reduce((sum, day) => sum + day._count.questions, 0);
 
   return (
     <main dir="rtl" lang="ar" className="dlp-simple-page">
       <header className="dlp-program-header">
-        <div className="flex items-center gap-3">
+        <div>
           <Link href="/dashboard">← الرئيسية</Link>
-          <span className="opacity-60">/</span>
+          <span>/</span>
           <strong>{brand.nameAr}</strong>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Link href={`/programs/${id}/manage`} className="dlp-session-button primary">إدارة المحتوى</Link>
-          <Link href={`/programs/${id}/edit`} className="dlp-session-button">تعديل البرنامج</Link>
+        <div className="dlp-program-actions">
+          <Link href={`/programs/${id}/manage`}>إدارة المحتوى</Link>
+          <Link href={`/programs/${id}/edit`}>تعديل البرنامج</Link>
         </div>
       </header>
 
@@ -83,17 +72,10 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         </section>
 
         <section className="brand-card dlp-program-section">
-          <div className="dlp-section-head">
-            <div>
-              <h2>المادة التدريبية</h2>
-              <p>ارفع المادة التي ستُبنى عليها الأيام والأسئلة.</p>
-            </div>
-          </div>
-
-          {program.documents?.length > 0 ? (
-            <div className="mt-4 space-y-2">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {program.documents.map((doc: any) => (
+          <div className="dlp-section-head"><div><h2>المادة التدريبية</h2><p>ارفع المادة التي ستُبنى عليها الأيام والأسئلة.</p></div></div>
+          {program.documents?.length ? (
+            <div className="dlp-doc-list">
+              {program.documents.map((doc) => (
                 <div key={doc.id} className="dlp-doc-row">
                   <strong>{doc.fileName}</strong>
                   <span>{doc.pageCount != null ? `${doc.pageCount} صفحة` : "عدد الصفحات غير محدد"}</span>
@@ -101,30 +83,18 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
                 </div>
               ))}
             </div>
-          ) : (
-            <p>لا توجد مادة مرفوعة بعد.</p>
-          )}
-
-          <div className="mt-4">
-            <DocumentUpload programId={id} />
-          </div>
+          ) : <p>لا توجد مادة مرفوعة بعد.</p>}
+          <div className="dlp-upload-wrap"><DocumentUpload programId={id} /></div>
         </section>
 
         <section className="brand-card dlp-program-section">
           <div className="dlp-section-head">
-            <div>
-              <h2>الأيام التدريبية</h2>
-              <p>إدارة تقسيم البرنامج والأسئلة الخاصة بكل يوم.</p>
-            </div>
+            <div><h2>الأيام التدريبية</h2><p>إدارة تقسيم البرنامج والأسئلة الخاصة بكل يوم.</p></div>
             <Link href={`/programs/${id}/days`} className="brand-button-primary dlp-new-button">+ إضافة يوم</Link>
           </div>
-
-          {program.days.length === 0 ? (
-            <div className="dlp-empty">لا توجد أيام تدريبية حتى الآن.</div>
-          ) : (
+          {program.days.length === 0 ? <div className="dlp-empty">لا توجد أيام تدريبية حتى الآن.</div> : (
             <div className="dlp-days-list">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {program.days.map((day: any) => (
+              {program.days.map((day) => (
                 <Link key={day.id} href={`/programs/${id}/days/${day.id}`} className="dlp-day-row">
                   <span>اليوم {day.dayNumber}</span>
                   <strong>{day.title}</strong>
@@ -136,24 +106,13 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         </section>
 
         <section className="brand-card dlp-program-section">
-          <div className="dlp-section-head">
-            <div>
-              <h2>الجلسات المباشرة</h2>
-              <p>افتح جلسة لمتابعة المشاركين والأسئلة والنتائج المباشرة.</p>
-            </div>
-          </div>
-
-          {program.sessions.length === 0 ? (
-            <div className="dlp-empty">لا توجد جلسات لهذا البرنامج بعد.</div>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {program.sessions.map((item: any) => (
+          <div className="dlp-section-head"><div><h2>الجلسات المباشرة</h2><p>افتح جلسة لمتابعة المشاركين والأسئلة والنتائج المباشرة.</p></div></div>
+          {program.sessions.length === 0 ? <div className="dlp-empty">لا توجد جلسات لهذا البرنامج بعد.</div> : (
+            <div className="dlp-session-list">
+              {program.sessions.map((item) => (
                 <Link key={item.id} href={`/programs/${id}/sessions/${item.id}`} className="dlp-doc-row">
                   <strong dir="ltr">{item.sessionCode}</strong>
-                  <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[item.status] ?? "bg-slate-100 text-slate-600"}`}>
-                    {STATUS_LABEL[item.status] ?? item.status}
-                  </span>
+                  <span>{STATUS_LABEL[item.status] ?? item.status}</span>
                   <span>فتح الجلسة ←</span>
                 </Link>
               ))}
@@ -161,14 +120,12 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
           )}
         </section>
 
-        <form
-          action={async () => {
-            "use server";
-            const result = await deleteProgram(id);
-            if (!result.ok) throw new Error(result.error);
-            redirect("/dashboard");
-          }}
-        >
+        <form action={async () => {
+          "use server";
+          const result = await deleteProgram(id);
+          if (!result.ok) throw new Error(result.error);
+          redirect("/dashboard");
+        }}>
           <button type="submit" className="dlp-danger-button">حذف البرنامج</button>
         </form>
       </div>

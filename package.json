@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run test:public-url && next build",
     "start": "next start",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -20,7 +20,8 @@
     "test:live": "npx tsx tests/live-session.test.ts",
     "server": "npx tsx server.ts",
     "postinstall": "prisma generate",
-    "test:safety": "npx tsx tests/safety.test.ts"
+    "test:safety": "npx tsx tests/safety.test.ts",
+    "test:public-url": "npx tsx tests/public-participant-url.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
