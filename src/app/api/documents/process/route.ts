@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { recoverStaleDocument } from "@/lib/extraction/recovery";
+import { recoverStaleProgramDocuments } from "@/lib/extraction/recovery";
 import { extractionService } from "@/lib/extraction/service";
-import { contentGenerationService } from "@/lib/ai/service";
 
 export const maxDuration = 300;
+
+// Log only fixed codes; provider responses can contain sensitive request data.
+function failureCode(message: string): string {
+  const known = message.match(/\b(ANTHROPIC_API_KEY|NO_EXTRACTED_PAGES|AI_INCOMPLETE_CONTENT|AI_INVALID_CONTENT|AI_LANGUAGE_MISMATCH_AR|OCR_REQUIRED|INVALID_PDF|PDF_PASSWORD_REQUIRED|CONTENT_ALREADY_EXISTS|BLOB_READ_FAILED)\b/);
+  if (known) return known[1];
+  if (/timeout|timed out|aborted/i.test(message)) return "PROCESSING_TIMEOUT";
+  if (/401|403|authentication/i.test(message)) return "PROVIDER_AUTH_FAILED";
+  if (/429|quota|credit|billing/i.test(message)) return "PROVIDER_LIMIT";
+  return "PROCESSING_FAILED";
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -35,12 +44,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
 
-  await recoverStaleDocument(documentId, instructorId);
+  await recoverStaleProgramDocuments(programId, instructorId);
 
-  // Claim atomically: a failed document can retry, concurrent requests cannot run twice.
+  // Extraction is independent per file and never starts question generation.
   const claimed = await prisma.trainingDocument.updateMany({
-    where: { id: documentId, extractionStatus: { in: ["PENDING", "FAILED", "OCR_REQUIRED"] } },
-    data: { extractionStatus: "PROCESSING", extractionNotes: null },
+    where: { id: documentId, programId, program: { instructorId }, extractionStatus: { in: ["PENDING", "FAILED", "OCR_REQUIRED"] } },
+    data: { extractionStatus: "PROCESSING", extractionNotes: "PROCESSING_EXTRACTING" },
   });
   if (claimed.count === 0) {
     const current = await prisma.trainingDocument.findUnique({ where: { id: documentId }, select: { extractionStatus: true } });
@@ -51,10 +60,13 @@ export async function POST(req: NextRequest) {
   // after() passes the promise to Vercel's waitUntil, keeping the invocation
   // alive until the pipeline completes or maxDuration is reached.
   after(async () => {
+    const stage = "extraction";
     try {
+      console.info("[documents] processing", { documentId, stage });
       const extraction = await extractionService.processDocument(documentId, instructorId, undefined, { keepProcessing: true });
 
       if (extraction.status !== "COMPLETED") {
+        console.error("[documents] failed", { documentId, stage, code: failureCode(extraction.errorMessage ?? "") });
         await prisma.trainingDocument.update({
           where: { id: documentId },
           data: {
@@ -65,41 +77,19 @@ export async function POST(req: NextRequest) {
         return;
       }
 
-      // Extraction done but generation hasn't run yet. Reset to PROCESSING so
-      // the client keeps polling instead of refreshing before days/questions exist.
-      await prisma.trainingDocument.update({
-        where: { id: documentId },
-        data: { extractionStatus: "PROCESSING" },
-      });
-
-      const generation = await contentGenerationService.generateForProgram(
-        programId,
-        documentId,
-        instructorId
-      );
-
-      if (generation.status !== "COMPLETED") {
-        await prisma.trainingDocument.update({
-          where: { id: documentId },
-          data: {
-            extractionStatus: "FAILED",
-            extractionNotes: generation.errorMessage ?? "Content generation failed",
-          },
-        });
-        return;
-      }
-
-      // Both extraction and generation succeeded
+      // Acceptance finishes after real text extraction; AI is a separate later step.
       await prisma.trainingDocument.update({
         where: { id: documentId },
         data: {
           extractionStatus: "COMPLETED",
-          extractionNotes: `${generation.daysGenerated} days · ${generation.questionsGenerated} questions`,
+          extractionNotes: `EXTRACTION_COMPLETED: ${extraction.completedPages}/${extraction.totalPages}`,
           extractedAt: new Date(),
         },
       });
+      console.info("[documents] accepted", { documentId, pagesExtracted: extraction.completedPages, totalPages: extraction.totalPages });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown pipeline error";
+      console.error("[documents] failed", { documentId, stage, code: failureCode(msg) });
       try {
         await prisma.trainingDocument.update({
           where: { id: documentId },

@@ -18,6 +18,7 @@ test.beforeAll(async () => {
   // This checks an actual missing-provider failure; it must never spend real API credits.
   expect(process.env.ANTHROPIC_API_KEY).toBeFalsy();
   expect(process.env.LLAMA_CLOUD_API_KEY).toBeFalsy();
+  expect(process.env.BLOB_READ_WRITE_TOKEN).toBeFalsy();
   const { PrismaClient } = await import("@prisma/client");
   const { PrismaPg } = await import("@prisma/adapter-pg");
   prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
@@ -40,7 +41,11 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => {
   if (prisma) {
-    if (programId) await prisma.trainingProgram.delete({ where: { id: programId } });
+    if (programId) {
+      const documents = await prisma.trainingDocument.findMany({ where: { programId }, select: { storagePath: true } });
+      for (const document of documents) await storage.delete(document.storagePath);
+      await prisma.trainingProgram.delete({ where: { id: programId } });
+    }
     if (foreignProgramId) await prisma.trainingProgram.delete({ where: { id: foreignProgramId } });
     if (foreignInstructorId) await prisma.instructor.delete({ where: { id: foreignInstructorId } });
     await prisma.$disconnect();
@@ -48,7 +53,7 @@ test.afterAll(async () => {
   await storage.delete(key);
 });
 
-test("failed PDF retries through the real production route and shows actionable Arabic errors", async ({ page, request }) => {
+test("PDF acceptance recovers a stale upload and extracts 147 real pages without generating questions", async ({ page, request }) => {
   test.setTimeout(90000);
   const unauthenticated = await request.post("/api/documents/process", { data: { documentId, programId }, maxRedirects: 0 });
   expect(unauthenticated.status()).toBe(307);
@@ -63,17 +68,24 @@ test("failed PDF retries through the real production route and shows actionable 
   expect(forbidden.status()).toBe(404);
   const untouched = await prisma.trainingDocument.findUniqueOrThrow({ where: { id: foreignDocumentId } });
   expect(untouched.extractionStatus).toBe("FAILED");
+  let statusRequests = 0;
+  await page.route("**/api/documents/status?*", route => { statusRequests++; return route.fulfill({ status: 503, body: "unavailable" }); });
   await page.goto(`/programs/${programId}`);
   await expect(page.getByText("GIS_Training_course.pdf")).toBeVisible();
   await expect(page.locator("p[role=alert]")).toContainText("انتهت مهلة المعالجة", { timeout: 20000 });
+  expect(statusRequests).toBe(0); // Server rendering recovered the stale job without any polling request.
+  await page.unroute("**/api/documents/status?*");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   const initialDays = await prisma.trainingDay.findMany({ where: { programId }, orderBy: { dayNumber: "asc" } });
   const responsePromise = page.waitForResponse(r => r.url().endsWith("/api/documents/process") && r.request().method() === "POST");
   await page.getByRole("button", { name: "إعادة المعالجة" }).click();
   const response = await responsePromise;
   expect(response.status()).toBe(202);
-  await expect(page.locator("p[role=alert]")).toContainText("خدمة توليد الأسئلة غير مهيأة", { timeout: 60000 });
-  await expect(page.getByRole("button", { name: "إعادة المعالجة" })).toBeEnabled();
+  await expect(page.getByText("تم قبول المستند واستخراج النص", { exact: true })).toBeVisible({ timeout: 60000 });
+  const accepted = await prisma.trainingDocument.findUniqueOrThrow({ where: { id: documentId } });
+  expect(accepted.extractionStatus).toBe("COMPLETED");
+  expect(accepted.extractionNotes).toBe("EXTRACTION_COMPLETED: 147/147");
+  expect(accepted.extractedAt).not.toBeNull();
   await expect(page.getByText("ANTHROPIC_API_KEY", { exact: false })).toHaveCount(0);
   const pages = await prisma.documentPage.findMany({ where: { documentId } });
   expect(pages).toHaveLength(147);
@@ -82,4 +94,50 @@ test("failed PDF retries through the real production route and shows actionable 
   const finalDays = await prisma.trainingDay.findMany({ where: { programId }, orderBy: { dayNumber: "asc" } });
   expect(finalDays.map(d => d.id)).toEqual(initialDays.map(d => d.id));
   expect(await prisma.question.count({ where: { programId } })).toBe(0);
+});
+
+
+test("failed status polling is visible and refreshing recovers a stale job", async ({ page }) => {
+  await prisma.trainingDocument.update({ where: { id: documentId }, data: { extractionStatus: "PROCESSING", extractionNotes: "PROCESSING_EXTRACTING", updatedAt: new Date() } });
+  await page.goto("/login");
+  await page.getByLabel("البريد الإلكتروني").fill("test@example.com");
+  await page.getByLabel("كلمة المرور").fill("TestPass123!");
+  await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  await page.route("**/api/documents/status?*", route => route.fulfill({ status: 503, body: "unavailable" }));
+  await page.goto(`/programs/${programId}`);
+  await expect(page.getByText("جاري التحقق من الملف واستخراج نصه…")).toBeVisible();
+  await expect(page.locator("p[role=alert]")).toContainText("تعذّر الاتصال لمتابعة حالة المستند", { timeout: 15000 });
+  expect((await prisma.trainingDocument.findUniqueOrThrow({ where: { id: documentId } })).extractionStatus).toBe("PROCESSING");
+  await prisma.trainingDocument.update({ where: { id: documentId }, data: { updatedAt: new Date(Date.now() - 7 * 60 * 1000) } });
+  await page.getByRole("button", { name: "تحديث الحالة", exact: true }).click();
+  await expect(page.getByRole("button", { name: "إعادة المعالجة" })).toBeVisible();
+  await expect(page.locator("p[role=alert]")).toContainText("انتهت مهلة المعالجة");
+  expect(await prisma.question.count({ where: { programId } })).toBe(0);
+  expect(await prisma.trainingDay.count({ where: { programId } })).toBe(10);
+});
+
+
+test("uploading a PDF accepts and saves the real file while leaving questions for later", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.goto("/login");
+  await page.getByLabel("البريد الإلكتروني").fill("test@example.com");
+  await page.getByLabel("كلمة المرور").fill("TestPass123!");
+  await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  await page.goto(`/programs/${programId}`);
+  const buffer = textPdf(147);
+  const uploadedResponse = page.waitForResponse(response => response.url().endsWith("/api/documents/upload") && response.request().method() === "POST");
+  await page.locator('input[type="file"]').setInputFiles({ name: "GIS_upload_acceptance.pdf", mimeType: "application/pdf", buffer });
+  const uploaded = await uploadedResponse;
+  expect(uploaded.status()).toBe(201);
+  const payload = await uploaded.json();
+  expect(payload.pageCount).toBe(147);
+  await expect(page.getByText("تم قبول الملف وحفظه واستخراج نصه بنجاح.", { exact: true })).toBeVisible({ timeout: 60000 });
+  const document = await prisma.trainingDocument.findUniqueOrThrow({ where: { id: payload.documentId } });
+  expect(document.extractionStatus).toBe("COMPLETED");
+  expect((await storage.read(document.storagePath)).equals(buffer)).toBeTruthy();
+  expect(await prisma.documentPage.count({ where: { documentId: document.id, extractionMethod: "NATIVE_TEXT", extractionStatus: "COMPLETED" } })).toBe(147);
+  expect(await prisma.question.count({ where: { programId } })).toBe(0);
+  expect(await prisma.trainingDay.count({ where: { programId } })).toBe(10);
 });

@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { recoverStaleProgramDocuments } from "@/lib/extraction/recovery";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export async function listOwnedPrograms() {
 export async function getProgram(programId: string) {
   const instructorId = await requireInstructor();
   await requireOwnership(programId, instructorId);
+  await recoverStaleProgramDocuments(programId, instructorId);
   return prisma.trainingProgram.findUnique({
     where: { id: programId },
     include: {

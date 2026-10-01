@@ -52,7 +52,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       const s = data.extractionStatus as string;
 
       if (s === "COMPLETED") {
-        setMessage("اكتمل تجهيز المحتوى بنجاح.");
+        setMessage("تم قبول الملف وحفظه واستخراج نصه بنجاح.");
         setStatus("success");
         router.refresh();
         return;
@@ -65,7 +65,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       }
 
       if (s === "PROCESSING") {
-        setMessage("جاري معالجة المستند… قد يستغرق ذلك بضع دقائق");
+        setMessage("جاري التحقق من الملف واستخراج نصه…");
       }
     }
     throw new Error("استغرقت معالجة المستند وقتاً طويلاً. تحقق من حالته لاحقاً.");
@@ -101,13 +101,13 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
     if (pipelineStatus === "COMPLETED") {
       // Document was already processed (idempotent path)
-      setMessage("تم تجهيز هذا المستند سابقاً.");
+      setMessage("تم قبول هذا المستند واستخراج نصه سابقاً.");
       setStatus("success");
       router.refresh();
       return;
     }
 
-    setMessage("جاري معالجة المستند… قد يستغرق ذلك بضع دقائق");
+    setMessage("جاري التحقق من الملف واستخراج نصه…");
     await pollUntilDone(docId);
   }
 
@@ -216,7 +216,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       <div>
         <h2 className="tp-text-lg tp-font-semibold">المستند التدريبي</h2>
         <p className="tp-text-sm tp-text-gray-500 tp-mt-1">
-          ارفع مستند PDF لاستخراج المحتوى وتجهيز الأيام التدريبية والموضوعات والأسئلة.
+          ارفع مستند PDF لحفظه واستخراج نصه والتحقق من صفحاته.
         </p>
       </div>
 

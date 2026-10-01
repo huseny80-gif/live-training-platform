@@ -1,6 +1,7 @@
 /** Translate known failures without exposing provider responses or credentials. */
 export function documentErrorLabel(reason: string | null | undefined): string {
   const message = reason ?? "";
+  if (/SESSION_EXPIRED|UNAUTHORIZED/.test(message)) return "انتهت جلسة تسجيل الدخول. سجّل الدخول مجدداً لمتابعة المستند.";
   if (/OCR_REQUIRED|MOCK_ONLY_CONTENT/.test(message)) return "يحتاج المستند إلى قراءة الصور. فعّل خدمة قراءة المستندات ثم أعد المحاولة، أو ارفع نسخة PDF تحتوي على نص قابل للتحديد.";
   if (/NO_ADAPTER_AVAILABLE/.test(message)) return "لم تتوفر معالجة مناسبة للمستند في المحاولة السابقة. أعد المعالجة لاستخراج النص من الملف المحفوظ.";
   if (/ANTHROPIC_API_KEY/.test(message)) return "خدمة توليد الأسئلة غير مهيأة. تواصل مع مسؤول المنصة ثم أعد المحاولة.";
