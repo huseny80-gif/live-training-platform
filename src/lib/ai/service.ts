@@ -8,13 +8,17 @@
 import { prisma } from "@/lib/prisma";
 import type { AIAdapter, ContentGenerationRequest, SourcePageRef } from "./types";
 import { ClaudeAIAdapter } from "./adapters/claude";
+import { OpenAIAdapter } from "./adapters/openai";
 
 const TOTAL_DAYS = 10;
 const QUESTIONS_PER_DAY = 5;
 
-// Adapter registry — swap here to change provider
+// Provider registry. OpenAI is the default; Anthropic remains available as an optional provider.
 function getAdapter(): AIAdapter {
-  return new ClaudeAIAdapter();
+  const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
+  if (provider === "openai") return new OpenAIAdapter();
+  if (provider === "anthropic" || provider === "claude") return new ClaudeAIAdapter();
+  throw new Error(`UNSUPPORTED_AI_PROVIDER: ${provider}`);
 }
 
 export interface GenerationProgress {
