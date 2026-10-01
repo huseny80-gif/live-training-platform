@@ -25,9 +25,29 @@ export async function createSession(
   // Verify questions exist for the day
   const day = await prisma.trainingDay.findFirst({
     where: { programId, dayNumber },
-    include: { questions: { where: { status: { in: ["APPROVED", "DRAFT"] } } } },
+    include: {
+      questions: {
+        where: { status: { in: ["APPROVED", "DRAFT"] } },
+        include: { options: true },
+      },
+    },
   });
   if (!day || day.questions.length === 0) throw new Error("NO_QUESTIONS_FOR_DAY");
+
+  const arabicPattern = /[\u0600-\u06FF]/;
+  const sessionQuestions =
+    program.language === "AR"
+      ? day.questions.filter(
+          (q) =>
+            arabicPattern.test(q.questionText) &&
+            q.options.length >= 2 &&
+            q.options.every((opt) => arabicPattern.test(opt.optionText))
+        )
+      : day.questions;
+
+  if (sessionQuestions.length === 0) {
+    throw new Error(program.language === "AR" ? "NO_ARABIC_QUESTIONS_FOR_DAY" : "NO_QUESTIONS_FOR_DAY");
+  }
 
   // Generate unique session code
   const sessionCode = await generateUniqueCode();
@@ -44,7 +64,7 @@ export async function createSession(
   });
 
   // Create SessionQuestion rows (ordered)
-  for (const q of day.questions.sort((a, b) => a.questionOrder - b.questionOrder)) {
+  for (const q of sessionQuestions.sort((a, b) => a.questionOrder - b.questionOrder)) {
     await prisma.sessionQuestion.create({
       data: {
         sessionId: session.id,
