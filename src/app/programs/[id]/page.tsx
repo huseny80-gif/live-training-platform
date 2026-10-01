@@ -3,6 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { getProgram, deleteProgram } from "@/app/actions/programs";
 import Link from "next/link";
 import DocumentUpload from "./DocumentUpload";
+import DeleteDocumentButton from "./DeleteDocumentButton";
 import { brand } from "@/lib/brand";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -49,6 +50,8 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="dlp-program-actions">
           <Link href={`/programs/${id}/manage`}>إدارة المحتوى</Link>
+          <Link href={`/programs/${id}/final-questions`}>الأسئلة النهائية</Link>
+          <Link href="/about">من نحن</Link>
           <Link href={`/programs/${id}/edit`}>تعديل البرنامج</Link>
         </div>
       </header>
@@ -80,6 +83,11 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
                   <strong>{doc.fileName}</strong>
                   <span>{doc.pageCount != null ? `${doc.pageCount} صفحة` : "عدد الصفحات غير محدد"}</span>
                   <span>{EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}</span>
+                  <DeleteDocumentButton
+                    documentId={doc.id}
+                    fileName={doc.fileName}
+                    status={doc.extractionStatus}
+                  />
                 </div>
               ))}
             </div>
