@@ -83,7 +83,8 @@ export async function listOwnedPrograms() {
 export async function getProgram(programId: string) {
   const instructorId = await requireInstructor();
   await requireOwnership(programId, instructorId);
-  return prisma.trainingProgram.findUnique({
+
+  const program = await prisma.trainingProgram.findUnique({
     where: { id: programId },
     include: {
       _count: { select: { days: true, sessions: true } },
@@ -111,6 +112,48 @@ export async function getProgram(programId: string) {
       },
     },
   });
+
+  if (!program) return null;
+
+  const documentIds = program.documents.map((document) => document.id);
+  const realPages = documentIds.length
+    ? await prisma.documentPage.findMany({
+        where: {
+          documentId: { in: documentIds },
+          extractionStatus: "COMPLETED",
+          NOT: { extractionMethod: "MOCK" },
+        },
+        select: {
+          documentId: true,
+          extractedText: true,
+        },
+      })
+    : [];
+
+  const realPageCountByDocument = new Map<string, number>();
+  for (const page of realPages) {
+    if ((page.extractedText?.trim().length ?? 0) <= 20) continue;
+    realPageCountByDocument.set(
+      page.documentId,
+      (realPageCountByDocument.get(page.documentId) ?? 0) + 1
+    );
+  }
+
+  return {
+    ...program,
+    documents: program.documents.map((document) => {
+      const realPageCount = realPageCountByDocument.get(document.id) ?? 0;
+      const totalPages = Math.max(document.pageCount ?? realPageCount, 1);
+      const requiredPageCount = Math.max(1, Math.ceil(totalPages * 0.7));
+
+      return {
+        ...document,
+        realPageCount,
+        requiredPageCount,
+        sourceReady: realPageCount >= requiredPageCount,
+      };
+    }),
+  };
 }
 
 export async function updateProgram(
