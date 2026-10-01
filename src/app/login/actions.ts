@@ -27,7 +27,7 @@ export async function loginAction(
     const minutes = Math.ceil(retryAfterMs / 60000);
     return {
       success: false,
-      error: `Too many login attempts. Try again in ${minutes} minute(s).`,
+      error: `محاولات تسجيل الدخول كثيرة. حاول مرة أخرى بعد ${minutes} دقيقة.`,
       retryAfterMs,
     };
   }
@@ -41,7 +41,7 @@ export async function loginAction(
     return { success: true };
   } catch (err) {
     if (err instanceof AuthError) {
-      return { success: false, error: "Invalid email or password." };
+      return { success: false, error: "البريد الإلكتروني أو كلمة المرور غير صحيحة." };
     }
     throw err;
   }
