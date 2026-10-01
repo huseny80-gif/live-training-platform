@@ -12,9 +12,25 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: live_training
+          POSTGRES_PASSWORD: live_training
+          POSTGRES_DB: live_training_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U live_training -d live_training_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
-      DATABASE_URL: postgresql://release_validation:release_validation@localhost:5432/release_validation
+      DATABASE_URL: postgresql://live_training:live_training@localhost:5432/live_training_test
       AUTH_SECRET: release-validation-secret-release-validation-secret
       SESSION_SECRET: release-validation-session-secret-release-validation
       NEXTAUTH_URL: http://localhost:3000
@@ -37,11 +53,32 @@ jobs:
       - name: Clean install from generated lock
         run: npm ci
 
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed isolated test database
+        run: npm run db:seed
+
       - name: TypeScript check
         run: npx tsc --noEmit
 
       - name: QR and Arabic-language safety tests
         run: npm run test:safety
+
+      - name: Authentication tests
+        run: npm run test:auth
+
+      - name: Program ownership tests
+        run: npx tsx tests/programs.test.ts
+
+      - name: Content generation tests
+        run: npx tsx tests/generation.test.ts
+
+      - name: Live session tests
+        run: npm run test:live
+
+      - name: Document pipeline tests
+        run: npx tsx tests/documents.test.ts
 
       - name: Production build
         run: npm run build
