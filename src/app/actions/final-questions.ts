@@ -1,6 +1,5 @@
 "use server";
 
-import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -56,14 +55,17 @@ SOURCE START
 ${source}
 SOURCE END`;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ok: false, error: "ANTHROPIC_API_KEY غير مضبوط." };
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001", max_tokens: 8000,
-    messages: [{ role: "user", content: prompt }],
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { ok: false, error: "OPENAI_API_KEY غير مضبوط." };
+  const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, input: prompt }),
   });
-  const text = response.content.filter(b => b.type === "text").map(b => b.type === "text" ? b.text : "").join("");
+  if (!response.ok) return { ok: false, error: `تعذر إنشاء الأسئلة النهائية عبر OpenAI (${response.status}).` };
+  const data = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
+  const text = data.output_text ?? data.output?.flatMap(o => o.content ?? []).filter(x => x.type === "output_text").map(x => x.text ?? "").join("") ?? "";
   try {
     const raw = text.replace(/^```(?:json)?\s*/,"").replace(/\s*```$/,"");
     const parsed = JSON.parse(raw) as { summary: string; questions: FinalQuestion[] };
