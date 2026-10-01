@@ -153,6 +153,37 @@ async function runTests() {
     await prisma.trainingDay.delete({ where: { id: emptyDay.id } });
   });
 
+  // LIVE-02A: Arabic program rejects English questions before session creation
+  await test("LIVE-02A: Arabic session fails closed when the day contains an English question", async () => {
+    const englishQuestion = await prisma.question.create({
+      data: {
+        dayId,
+        programId,
+        questionText: "What is cybersecurity governance?",
+        questionOrder: 99,
+        status: "APPROVED",
+        generatedBy: "MANUAL",
+      },
+    });
+    for (const [index, text] of ["Policy", "Risk management", "Network", "Database"].entries()) {
+      await prisma.questionOption.create({
+        data: {
+          questionId: englishQuestion.id,
+          optionLabel: (["A", "B", "C", "D"] as const)[index],
+          optionText: text,
+          displayOrder: index + 1,
+        },
+      });
+    }
+
+    await assert.rejects(
+      () => createSession(programId, instructorId, 1),
+      /NON_ARABIC_QUESTIONS_IN_ARABIC_PROGRAM:1/
+    );
+
+    await prisma.question.delete({ where: { id: englishQuestion.id } });
+  });
+
   // LIVE-03: createSession generates a unique session code
   await test("LIVE-03: createSession generates a unique 6-char session code", async () => {
     const session = await createSession(programId, instructorId, 1);
