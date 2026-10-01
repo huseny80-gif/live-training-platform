@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import bcryptjs from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "./auth.config";
+import { brand } from "./brand";
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -44,7 +45,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return {
           id: instructor.id,
           email: instructor.email,
-          name: instructor.name,
+          name: brand.instructorName,
         };
       },
     }),
@@ -69,6 +70,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       session.user.id = (token.instructorId ?? token.sub ?? "") as string;
+      session.user.name = brand.instructorName;
       return session;
     },
   },
