@@ -135,6 +135,7 @@ model Instructor {
   programs      TrainingProgram[]
   sessions      LiveSession[]
   auditLogs     AuditLog[]
+  platformSettings PlatformSettings?
 
   @@index([email])
   @@map("instructors")
@@ -548,4 +549,32 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+
+// ─────────────────────────────────────────────
+// PLATFORM BRANDING / ADMIN SETTINGS
+// One settings row per instructor; safe defaults preserve current branding.
+// ─────────────────────────────────────────────
+model PlatformSettings {
+  id             String   @id @default(uuid())
+  instructorId   String   @unique @map("instructor_id")
+  platformNameAr String   @default("الحقيبة التدريبية") @map("platform_name_ar")
+  platformNameEn String   @default("Training Portfolio") @map("platform_name_en")
+  taglineAr      String   @default("محتوى تدريبي ذكي من المصدر إلى التقييم") @map("tagline_ar")
+  taglineEn      String   @default("Smart training content from source to assessment") @map("tagline_en")
+  logoUrl        String?  @map("logo_url")
+  primaryColor   String   @default("#00A6A6") @map("primary_color")
+  primaryDark    String   @default("#087F86") @map("primary_dark")
+  navyColor      String   @default("#0B1F3A") @map("navy_color")
+  accentColor    String   @default("#D4AF37") @map("accent_color")
+  defaultLanguage Language @default(AR) @map("default_language")
+  defaultTheme   String   @default("light") @map("default_theme")
+  fontScale      String   @default("medium") @map("font_scale")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  instructor Instructor @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@map("platform_settings")
 }
