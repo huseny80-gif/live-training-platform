@@ -210,12 +210,17 @@ export class DocumentExtractionService {
     );
     const hasRealReadablePages = pages.some(
       (page) =>
+        page.extractionMethod !== null &&
         page.extractionMethod !== "MOCK" &&
         page.extractionStatus === "COMPLETED" &&
         (page.extractedText?.trim().length ?? 0) > 50
     );
 
-    if (hasRealReadablePages && !hasMockPages) {
+    const hasUnknownLegacyPages = pages.some(
+      (page) => page.extractionMethod === null
+    );
+
+    if (hasRealReadablePages && !hasMockPages && !hasUnknownLegacyPages) {
       return null;
     }
 

@@ -178,6 +178,7 @@ export default function ManageClient({ program }: { program: Program }) {
       alert(
         `تم إنشاء المحتوى العربي بنجاح: ${result.daysGenerated} أيام و${result.questionsGenerated} سؤالًا.`
       );
+      router.refresh();
     });
   }
 
