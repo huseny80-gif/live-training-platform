@@ -150,6 +150,15 @@ export class DocumentExtractionService {
         await this.persistPage(documentId, page);
       }
 
+      // Once a real provider succeeds, remove any stale MOCK-only rows that
+      // were not replaced by page-number upserts. Questions linked to them
+      // use onDelete:SetNull, so historical content is not corrupted.
+      if (result.method !== "MOCK") {
+        await prisma.documentPage.deleteMany({
+          where: { documentId, extractionMethod: "MOCK" },
+        });
+      }
+
       // Partial success is still usable — treat as COMPLETED so content
       // generation can proceed with the pages that did extract.
       const finalStatus: DocumentProcessingStatus =
