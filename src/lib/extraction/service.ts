@@ -251,28 +251,58 @@ export class DocumentExtractionService {
         await this.persistPage(documentId, page);
       }
 
-      // Once a real provider succeeds, remove any stale MOCK-only rows that
-      // were not replaced by page-number upserts. Questions linked to them
-      // use onDelete:SetNull, so historical content is not corrupted.
-      if (result.method !== "MOCK") {
+      // Measure cumulative real-source coverage across the WHOLE document.
+      // This makes extraction resumable: callers may process a 147-page PDF
+      // in multiple smaller requests without resetting previously extracted pages.
+      const cumulativeRealPages = await prisma.documentPage.findMany({
+        where: {
+          documentId,
+          extractionStatus: "COMPLETED",
+          NOT: { extractionMethod: "MOCK" },
+        },
+        select: {
+          pageNumber: true,
+          extractedText: true,
+          extractionMethod: true,
+        },
+      });
+
+      const readableRealPages = cumulativeRealPages.filter(
+        (page) =>
+          page.extractionMethod !== null &&
+          page.extractionMethod !== "MOCK" &&
+          (page.extractedText?.trim().length ?? 0) > 20
+      );
+
+      const intendedPageCount = Math.max(
+        doc.pageCount ?? 0,
+        inspection.pageCount,
+        result.totalPages,
+        targetPages.length > 0 ? Math.max(...targetPages) : 0
+      );
+      const requiredPages = requiredReadablePages(intendedPageCount);
+      const completedPages = new Set(
+        readableRealPages.map((page) => page.pageNumber)
+      ).size;
+
+      const isPartialRequest = Boolean(pageNumbers && pageNumbers.length > 0);
+      const finalStatus: DocumentProcessingStatus =
+        completedPages >= requiredPages
+          ? "COMPLETED"
+          : completedPages > 0
+          ? isPartialRequest
+            ? "PROCESSING"
+            : "OCR_REQUIRED"
+          : "FAILED";
+
+      // Only remove stale MOCK rows once enough real coverage exists. During a
+      // resumable partial extraction, untouched MOCK rows remain harmless and
+      // can still be replaced by later page-number upserts.
+      if (finalStatus === "COMPLETED" && result.method !== "MOCK") {
         await prisma.documentPage.deleteMany({
           where: { documentId, extractionMethod: "MOCK" },
         });
       }
-
-      // A large training document must have enough real coverage before it is
-      // considered safe for 10-day / 50-question generation.
-      const intendedPageCount =
-        targetPages.length > 0
-          ? targetPages.length
-          : Math.max(result.totalPages, inspection.pageCount);
-      const requiredPages = requiredReadablePages(intendedPageCount);
-      const finalStatus: DocumentProcessingStatus =
-        result.successCount >= requiredPages
-          ? "COMPLETED"
-          : result.successCount > 0
-          ? "OCR_REQUIRED"
-          : "FAILED";
 
       await this.updateDocumentStatus(documentId, finalStatus);
 
@@ -280,13 +310,13 @@ export class DocumentExtractionService {
         documentId,
         status: finalStatus,
         totalPages: intendedPageCount,
-        completedPages: result.successCount,
-        failedPages: Math.max(0, intendedPageCount - result.successCount),
+        completedPages,
+        failedPages: Math.max(0, intendedPageCount - completedPages),
         inspection,
         errorMessage:
           finalStatus === "COMPLETED"
             ? undefined
-            : `INSUFFICIENT_REAL_EXTRACTION_COVERAGE — extracted ${result.successCount}/${intendedPageCount}; require at least ${requiredPages}`,
+            : `INSUFFICIENT_REAL_EXTRACTION_COVERAGE — extracted ${completedPages}/${intendedPageCount}; require at least ${requiredPages}`,
       };
     } catch (err) {
       await this.updateDocumentStatus(documentId, "FAILED");
