@@ -20,47 +20,47 @@ export default function AddDayPage() {
   }, [state, router, params.id]);
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-xl mx-auto bg-white rounded-2xl border p-8">
-        <h1 className="text-xl font-bold mb-6">Add Training Day</h1>
+    <main dir="rtl" lang="ar" className="dlp-simple-page p-6">
+      <div className="brand-card max-w-xl mx-auto p-8">
+        <h1 className="text-xl font-bold mb-6">إضافة يوم تدريبي</h1>
         <form action={dispatch} className="space-y-4">
           <input type="hidden" name="programId" value={params.id} />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Day Number (1–10) *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">رقم اليوم (1–10) *</label>
             <input
               name="dayNumber"
               type="number"
               min={1}
               max={10}
               required
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">العنوان *</label>
             <input
               name="title"
               required
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Objectives (one per line)
+              الأهداف (هدف في كل سطر)
             </label>
             <textarea
               name="objectives"
               rows={4}
-              placeholder="Understand X&#10;Apply Y&#10;Analyze Z"
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="فهم المفهوم الأساسي&#10;تطبيق المهارة&#10;تحليل الحالة"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Content Summary</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ملخص المحتوى</label>
             <textarea
               name="contentSummary"
               rows={3}
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           {state && !state.ok && (
@@ -72,14 +72,14 @@ export default function AddDayPage() {
               onClick={() => router.back()}
               className="flex-1 py-2 rounded-lg border text-sm hover:bg-gray-50"
             >
-              Cancel
+              إلغاء
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 py-2 rounded-lg bg-teal-700 text-white text-sm hover:bg-teal-800 disabled:opacity-50"
             >
-              {isPending ? "Adding…" : "Add Day"}
+              {isPending ? "جارٍ الإضافة…" : "إضافة اليوم"}
             </button>
           </div>
         </form>
