@@ -17,7 +17,7 @@ export default async function ParticipantResultPage({
   // No token — show Arabic error page instead of redirect
   if (!token) {
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl">🔒</div>
           <h1 className="text-lg font-bold text-gray-800">لم يتم التعرف عليك</h1>
@@ -40,7 +40,7 @@ export default async function ParticipantResultPage({
     const msg = err instanceof Error ? err.message : "ERROR";
     const isEnded = msg === "SESSION_NOT_FOUND";
     return (
-      <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <main dir="rtl" lang="ar" className="dlp-participant-page">
         <div className="bg-white rounded-2xl border p-8 text-center max-w-sm space-y-4">
           <div className="text-5xl">⚠️</div>
           <h1 className="text-lg font-bold text-gray-800">
@@ -84,7 +84,7 @@ export default async function ParticipantResultPage({
     <main dir="rtl" lang="ar" className="dlp-participant-page">
       <div className="w-full max-w-sm space-y-4">
         {/* Result card */}
-        <div className="brand-card dlp-join-card text-center space-y-5">
+        <div className="bg-white rounded-3xl shadow-lg p-8 text-center space-y-5">
           {/* Emoji / rank */}
           <div className="text-5xl">{medalEmoji ?? "🎯"}</div>
 
