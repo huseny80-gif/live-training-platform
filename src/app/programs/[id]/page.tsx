@@ -114,12 +114,22 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
                 <div key={doc.id} className="dlp-doc-row">
                   <strong>{doc.fileName}</strong>
                   <span>{doc.pageCount != null ? `${doc.pageCount} صفحة` : "عدد الصفحات غير محدد"}</span>
-                  <span>{EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}</span>
+                  <span>
+                    {doc.sourceReady
+                      ? "مصدر معتمد"
+                      : EXTRACTION_LABEL[doc.extractionStatus] ?? doc.extractionStatus}
+                  </span>
+                  <span>
+                    {doc.realPageCount}/{doc.requiredPageCount} صفحة حقيقية مطلوبة
+                  </span>
                   <ReprocessDocumentButton
                     programId={id}
                     documentId={doc.id}
                     status={doc.extractionStatus}
                     totalQuestions={totalQuestions}
+                    sourceReady={doc.sourceReady}
+                    realPageCount={doc.realPageCount}
+                    requiredPageCount={doc.requiredPageCount}
                   />
                   <DeleteDocumentButton
                     documentId={doc.id}
