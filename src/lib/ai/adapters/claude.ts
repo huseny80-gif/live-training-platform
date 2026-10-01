@@ -5,6 +5,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AIAdapter, ContentGenerationRequest, ContentGenerationResult, GeneratedDayPlan, GeneratedQuestion } from "../types";
 import { buildDayPlanPrompt, buildQuestionsPrompt, PROMPT_VERSION } from "../prompts";
+import { isArabicQuestionContent } from "@/lib/language";
 
 const MODEL_ID = "claude-haiku-4-5-20251001";
 
@@ -77,6 +78,15 @@ export class ClaudeAIAdapter implements AIAdapter {
 
       const dayQuestions = parseQuestions(qText, day.dayNumber, req.questionsPerDay);
       allQuestions.push(...dayQuestions);
+    }
+
+    if (req.language === "AR") {
+      const invalid = allQuestions.filter(
+        (question) => !isArabicQuestionContent(question.questionText, question.options)
+      );
+      if (invalid.length > 0) {
+        throw new Error(`AI_LANGUAGE_MISMATCH_AR:${invalid.length}`);
+      }
     }
 
     return {
