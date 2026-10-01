@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { buildSessionExcel } from "@/lib/excel/export";
+import { brand } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -60,12 +61,6 @@ export async function GET(
   const totalQ = liveSession.sessionQuestions.length;
   const sr = liveSession.sessionResult;
 
-  // Fetch instructor name
-  const instructor = await prisma.instructor.findUnique({
-    where: { id: userId },
-    select: { name: true },
-  });
-
   const participants = liveSession.participants.map((p) => ({
     rank: p.rank,
     displayName: p.displayName,
@@ -95,7 +90,7 @@ export async function GET(
   const summary = {
     title: liveSession.title,
     sessionCode: liveSession.sessionCode,
-    instructorName: instructor?.name ?? "",
+    instructorName: brand.instructorName,
     date: (liveSession.startedAt ?? liveSession.createdAt).toLocaleDateString("ar-SA"),
     participationRate: totalQ > 0 && totalParticipants > 0
       ? Math.round((participants.filter((p) => p.answersCount > 0).length / totalParticipants) * 100)
