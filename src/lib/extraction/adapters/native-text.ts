@@ -52,7 +52,7 @@ function parseObjects(buffer: Buffer): Map<number, PdfObject> {
 }
 
 function decodeAsciiHex(input: Buffer): Buffer {
-  const text = input.toString("latin1").replace(/\s+/g, "").replace(/>.*$/s, "");
+  const text = input.toString("latin1").replace(/\s+/g, "").replace(/>[\s\S]*$/, "");
   const padded = text.length % 2 === 0 ? text : text + "0";
   return Buffer.from(padded, "hex");
 }
@@ -68,7 +68,7 @@ function extractStream(body: string): Buffer | null {
   const end = body.indexOf("endstream", start);
   if (end < 0) return null;
 
-  let bytes = Buffer.from(body.slice(start, end), "latin1");
+  let bytes: Buffer<ArrayBufferLike> = Buffer.from(body.slice(start, end), "latin1");
 
   try {
     if (/\/Filter\s*\/FlateDecode\b/.test(body) || /\/Filter\s*\[\s*\/FlateDecode/.test(body)) {
@@ -150,7 +150,7 @@ function resolveResourcesBody(
     const resourcesRef = parseRef(obj.body, "Resources");
     if (resourcesRef) return objects.get(resourcesRef)?.body ?? "";
 
-    const inline = obj.body.match(/\/Resources\s*<<(.*?)>>/s)?.[1];
+    const inline = obj.body.match(/\/Resources\s*<<([\s\S]*?)>>/)?.[1];
     if (inline) return inline;
 
     currentId = parseRef(obj.body, "Parent");
@@ -241,7 +241,7 @@ function pageFontDecoders(
   objects: Map<number, PdfObject>
 ): Map<string, FontDecoder> {
   const resources = resolveResourcesBody(pageId, objects);
-  const fontDict = resources.match(/\/Font\s*<<(.*?)>>/s)?.[1] ?? resources;
+  const fontDict = resources.match(/\/Font\s*<<([\s\S]*?)>>/)?.[1] ?? resources;
   const aliases = new Map<string, number>();
 
   const refRe = /\/([A-Za-z0-9_.+-]+)\s+(\d+)\s+\d+\s+R/g;
