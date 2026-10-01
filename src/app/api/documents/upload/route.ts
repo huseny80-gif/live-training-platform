@@ -67,15 +67,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Storage key: instructor/program/uuid-filename (no path traversal possible)
   const storageKey = `${instructorId}/${programId}/${randomUUID()}-${safeName}`;
 
-  // Save to storage
-  await storage.save(storageKey, buffer, "application/pdf");
+  // Save to storage and persist the opaque key returned by the adapter.
+  // In Vercel Blob this is the real private blob URL; locally it remains
+  // the logical storage key. Never assume the requested key equals the
+  // persisted key.
+  const stored = await storage.save(storageKey, buffer, "application/pdf");
 
   // Create TrainingDocument record
   const doc = await prisma.trainingDocument.create({
     data: {
       programId,
       fileName: safeName,
-      storagePath: storageKey,
+      storagePath: stored.key,
       fileSizeBytes: buffer.length,
       mimeType: "application/pdf",
       pageCount: inspection.pageCount,
