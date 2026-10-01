@@ -3,7 +3,7 @@ name: Release validation
 on:
   push:
     branches:
-      - release/live-training-stable-20261001
+      - "release/**"
   workflow_dispatch:
 
 permissions:
