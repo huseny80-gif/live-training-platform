@@ -112,7 +112,7 @@ export default async function InstructorSessionPage({
         <SessionLiveStats sessionId={sessionId} />
 
         {/* Live participants list */}
-        <SessionParticipantsList sessionId={sessionId} />
+        <SessionParticipantsList sessionId={sessionId} sessionCode={session.sessionCode} />
 
         {/* Analytics dashboard */}
         <SessionAnalyticsDashboard
