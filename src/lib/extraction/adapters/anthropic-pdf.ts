@@ -9,7 +9,7 @@ import type {
 const MODEL_ID =
   process.env.ANTHROPIC_EXTRACTION_MODEL ||
   process.env.ANTHROPIC_MODEL ||
-  "claude-haiku-4-5-20251001";
+  "claude-sonnet-5-5";
 
 type AnthropicResponse = {
   content?: Array<{ type?: string; text?: string }>;
