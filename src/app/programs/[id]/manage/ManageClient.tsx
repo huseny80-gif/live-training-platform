@@ -59,12 +59,22 @@ interface Session {
   _count: { participants: number };
 }
 
+interface TrainingDocument {
+  id: string;
+  fileName: string;
+  pageCount: number | null;
+  extractionStatus: string;
+  extractionNotes: string | null;
+  createdAt: string | Date;
+}
+
 interface Program {
   id: string;
   title: string;
   language: string;
   days: Day[];
   sessions: Session[];
+  documents: TrainingDocument[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -81,6 +91,14 @@ const SESSION_STATUS_COLOR: Record<string, string> = {
   ACTIVE: "bg-green-100 text-green-800",
   PAUSED: "bg-orange-100 text-orange-800",
   ENDED: "bg-gray-100 text-gray-600",
+};
+
+const SOURCE_STATUS_AR: Record<string, string> = {
+  PENDING: "بانتظار المعالجة",
+  PROCESSING: "قيد المعالجة",
+  COMPLETED: "مكتمل التحليل",
+  OCR_REQUIRED: "يحتاج متابعة استخراج",
+  FAILED: "فشل التحليل",
 };
 
 function Badge({ text, color }: { text: string; color: string }) {
@@ -164,7 +182,7 @@ export default function ManageClient({ program }: { program: Program }) {
     });
   }
 
-  async function handleRegenerateArabic() {
+  async function handleRegenerateArabic(documentId?: string) {
     const message =
       program.language === "AR"
         ? "إعادة تحليل ملف PDF الحقيقي ثم إعادة بناء 10 أيام و50 سؤالًا بالعربية؟\n\nلن يُستبدل المحتوى الحالي إلا بعد نجاح التوليد الكامل والتحقق."
@@ -177,6 +195,7 @@ export default function ManageClient({ program }: { program: Program }) {
     try {
       const result = await runProgramRebuild({
         programId: program.id,
+        documentId,
         onProgress: (text) => setPipelineMessage(text),
       });
       setPipelineMessage(
@@ -214,6 +233,50 @@ export default function ManageClient({ program }: { program: Program }) {
       {/* ── Days Tab ──────────────────────────────────────────────────────── */}
       {activeTab === "days" && (
         <div className="space-y-3">
+          <section className="brand-card dlp-source-status">
+            <div className="dlp-source-status-head">
+              <div>
+                <h2>حالة المصدر التدريبي</h2>
+                <p>المعالجة محفوظة ويمكن استئنافها من آخر تقدم دون إعادة الرفع.</p>
+              </div>
+              <strong>{program.documents.length} ملف</strong>
+            </div>
+
+            {program.documents.length === 0 ? (
+              <p className="dlp-source-empty">لا يوجد ملف PDF مرفوع لهذا البرنامج.</p>
+            ) : (
+              <div className="dlp-source-list">
+                {program.documents.map((document) => {
+                  const ready = document.extractionStatus === "COMPLETED";
+                  return (
+                    <article key={document.id} className="dlp-source-row">
+                      <div>
+                        <strong>{document.fileName}</strong>
+                        <span>
+                          {SOURCE_STATUS_AR[document.extractionStatus] ?? document.extractionStatus}
+                          {document.pageCount ? ` · ${document.pageCount} صفحة` : ""}
+                        </span>
+                        {document.extractionNotes ? <small>{document.extractionNotes}</small> : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRegenerateArabic(document.id)}
+                        disabled={isPending || isRebuilding}
+                        className="dlp-control-button primary"
+                      >
+                        {isRebuilding
+                          ? "جارٍ المعالجة…"
+                          : ready
+                          ? "توليد/إعادة توليد 50 سؤالًا"
+                          : "متابعة المعالجة والتوليد"}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h2 className="font-semibold text-gray-800">الأيام والمواضيع والأسئلة</h2>
@@ -225,7 +288,7 @@ export default function ManageClient({ program }: { program: Program }) {
             </div>
             <div className="flex gap-2 flex-wrap">
               <button
-                onClick={handleRegenerateArabic}
+                onClick={() => handleRegenerateArabic()}
                 disabled={isPending || isRebuilding}
                 className="px-3 py-1.5 bg-teal-700 text-white rounded-lg text-sm hover:bg-teal-800 disabled:opacity-50"
               >

@@ -6,7 +6,7 @@ import {
   generateFinalQuestions,
   type FinalQuestionsState,
 } from "@/app/actions/final-questions";
-import { runProgramRebuild } from "@/lib/client/program-rebuild";
+import { runDocumentSourcePreparation } from "@/lib/client/document-source";
 import CopyCodeButton from "@/components/CopyCodeButton";
 
 export default function FinalQuestionsClient({ programId }: { programId: string }) {
@@ -25,23 +25,24 @@ export default function FinalQuestionsClient({ programId }: { programId: string 
     try {
       let result = await generateFinalQuestions(programId, null, new FormData());
 
-      if (
-        !result.ok &&
-        (result.code === "SOURCE_NOT_READY" || result.code === "DAILY_BANK_NOT_READY")
-      ) {
+      if (!result.ok && result.code === "SOURCE_NOT_READY") {
+        if (!result.documentId) {
+          setState(result);
+          setProgress("");
+          return;
+        }
+
         setProgress(
-          result.code === "DAILY_BANK_NOT_READY"
-            ? "بنك الأسئلة اليومية غير مكتمل. جارٍ إصلاح المصدر وإنشاء 10 أيام و50 سؤالًا بالعربية أولًا…"
-            : "المصدر غير مكتمل. جارٍ إصلاح استخراج PDF ثم إنشاء 10 أيام و50 سؤالًا بالعربية قبل الامتحان النهائي…"
+          "المصدر الحقيقي غير مكتمل. جارٍ متابعة استخراج PDF من آخر تقدم محفوظ…"
         );
 
-        await runProgramRebuild({
-          programId,
+        await runDocumentSourcePreparation({
+          documentId: result.documentId,
           onProgress: (message) => setProgress(message),
         });
 
         setProgress(
-          "اكتمل بنك الأسئلة اليومي. جارٍ الآن إنشاء 10 أسئلة اختيار من متعدد و20 سؤال صح/خطأ…"
+          "اكتمل اعتماد المصدر الحقيقي. جارٍ إنشاء 10 أسئلة اختيار من متعدد و20 سؤال صح/خطأ…"
         );
         result = await generateFinalQuestions(programId, null, new FormData());
       }
@@ -66,7 +67,7 @@ export default function FinalQuestionsClient({ programId }: { programId: string 
     <div className="dlp-final-wrap">
       <form onSubmit={handleGenerate}>
         <button className="brand-button-primary dlp-generate-button" disabled={pending}>
-          {pending ? "جارٍ الإصلاح والتوليد…" : "إنشاء الملخص والأسئلة النهائية"}
+          {pending ? "جارٍ اعتماد المصدر وتوليد الامتحان…" : "إنشاء الملخص والأسئلة النهائية"}
         </button>
       </form>
 

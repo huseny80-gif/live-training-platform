@@ -58,6 +58,17 @@ export async function getProgramContent(programId: string) {
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { participants: true } } },
       },
+      documents: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          fileName: true,
+          pageCount: true,
+          extractionStatus: true,
+          extractionNotes: true,
+          createdAt: true,
+        },
+      },
     },
   });
 }
