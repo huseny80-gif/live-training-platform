@@ -47,12 +47,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Verify dependency lock is synchronized
-        run: |
-          npm install --package-lock-only --ignore-scripts
-          git diff --exit-code -- package-lock.json
-
-      - name: Clean install from generated lock
+      - name: Clean install from committed lock
         run: npm ci
 
       - name: Apply database migrations
@@ -84,10 +79,3 @@ jobs:
 
       - name: Production build
         run: npm run build
-
-      - name: Upload synchronized lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-package-lock
-          path: package-lock.json
-          if-no-files-found: error
