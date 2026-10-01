@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./brand-tokens.css";
 
 export const metadata: Metadata = {
-  title: "القيادة الرقمية والحوكمة الذكية",
-  description: "Digital Leadership & Smart Governance",
+  title: "الحقيبة التدريبية",
+  description: "Training Portfolio",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
