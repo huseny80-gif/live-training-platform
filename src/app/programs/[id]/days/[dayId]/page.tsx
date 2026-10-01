@@ -39,14 +39,14 @@ export default async function DayDetailsPage({
   return (
     <main dir="rtl" lang="ar" className="dlp-simple-page">
       <header className="dlp-program-header">
-        <div className="flex items-center gap-3">
+        <div>
           <Link href={`/programs/${id}`}>← البرنامج</Link>
-          <span className="opacity-60">/</span>
+          <span>/</span>
           <strong>{brand.nameAr}</strong>
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-5">
+      <div className="dlp-day-container">
         {query.sessionError ? (
           <div role="alert" className="brand-card dlp-session-error">
             <strong>تعذر إنشاء جلسة الاختبار.</strong>
@@ -64,47 +64,54 @@ export default async function DayDetailsPage({
           </div>
         ) : null}
 
-        <section className="brand-card p-6 md:p-8">
-          <p className="text-sm font-bold text-teal-700">اليوم {day.dayNumber}</p>
-          <h1 className="text-2xl font-black mt-1">{day.title}</h1>
-          <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-600">
-            <span>الحالة: {DAY_STATUS[day.status] ?? day.status}</span>
-            <span>الأسئلة: {day._count.questions}</span>
+        <section className="brand-card dlp-day-hero">
+          <span>اليوم {day.dayNumber}</span>
+          <h1>{day.title}</h1>
+          <div className="dlp-day-meta">
+            <span>الحالة <strong>{DAY_STATUS[day.status] ?? day.status}</strong></span>
+            <span>الأسئلة <strong>{day._count.questions}</strong></span>
           </div>
         </section>
 
-        <section className="brand-card p-6">
-          <h2 className="text-lg font-black">الأهداف</h2>
-          {day.objectives.length ? (
-            <ol className="mt-4 space-y-2 list-decimal list-inside">
-              {day.objectives.map((objective, index) => <li key={index}>{objective}</li>)}
-            </ol>
-          ) : <p className="mt-3 text-slate-500">لم تُضف أهداف لهذا اليوم.</p>}
-        </section>
+        <div className="dlp-day-grid">
+          <section className="brand-card dlp-day-section">
+            <h2>الأهداف</h2>
+            {day.objectives.length ? (
+              <ol>
+                {day.objectives.map((objective, index) => <li key={index}>{objective}</li>)}
+              </ol>
+            ) : <p>لم تُضف أهداف لهذا اليوم.</p>}
+          </section>
 
-        <section className="brand-card p-6">
-          <h2 className="text-lg font-black">ملخص المحتوى</h2>
-          <p className="mt-4 whitespace-pre-wrap text-slate-700">{day.contentSummary || "لا يوجد ملخص مضاف."}</p>
-        </section>
+          <section className="brand-card dlp-day-section">
+            <h2>ملخص المحتوى</h2>
+            <p className="dlp-prewrap">{day.contentSummary || "لا يوجد ملخص مضاف."}</p>
+          </section>
+        </div>
 
-        <section className="brand-card p-6">
-          <h2 className="text-lg font-black">المواضيع</h2>
+        <section className="brand-card dlp-day-section">
+          <div className="dlp-live-panel-head">
+            <h2>المواضيع</h2>
+            <span>{day.topics.length}</span>
+          </div>
           {day.topics.length ? (
-            <div className="mt-4 space-y-2">
+            <div className="dlp-topic-list">
               {day.topics.map((topic) => (
-                <div key={topic.id} className="border rounded-xl p-3 bg-white">
-                  {topic.topicOrder}. {topic.title}
+                <div key={topic.id} className="dlp-topic-row">
+                  <span>{topic.topicOrder}</span>
+                  <strong>{topic.title}</strong>
                 </div>
               ))}
             </div>
-          ) : <p className="mt-3 text-slate-500">لا توجد مواضيع بعد.</p>}
+          ) : <p>لا توجد مواضيع بعد.</p>}
         </section>
 
         {day._count.questions > 0 ? (
-          <section className="brand-card p-6 border-t-4 border-t-amber-500 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <section className="brand-card dlp-session-ready">
             <div>
-              <p className="font-black text-slate-900">جاهز لبدء جلسة مباشرة؟</p>
-              <p className="text-sm text-slate-600 mt-1">{day._count.questions} سؤال متاح لليوم {day.dayNumber}.</p>
+              <span className="dlp-session-ready-kicker">جلسة مباشرة</span>
+              <h2>جاهز لبدء جلسة الاختبار؟</h2>
+              <p>{day._count.questions} سؤال متاح لليوم {day.dayNumber}.</p>
             </div>
             <form
               action={async () => {
@@ -114,6 +121,7 @@ export default async function DayDetailsPage({
                   liveSession = await createLiveSession(id, day.dayNumber);
                 } catch (error) {
                   const message = error instanceof Error ? error.message : "";
+
                   if (message.startsWith("NON_ARABIC_QUESTIONS_IN_ARABIC_PROGRAM:")) {
                     const count = message.split(":")[1] ?? "0";
                     redirect(`/programs/${id}/days/${dayId}?sessionError=arabic-questions&count=${encodeURIComponent(count)}`);
@@ -127,18 +135,20 @@ export default async function DayDetailsPage({
                   if (message === "PROGRAM_NOT_FOUND") {
                     redirect(`/programs/${id}/days/${dayId}?sessionError=program`);
                   }
+
                   redirect(`/programs/${id}/days/${dayId}?sessionError=unexpected`);
                 }
+
                 redirect(`/programs/${id}/sessions/${liveSession.id}`);
               }}
             >
-              <button type="submit" className="px-5 py-2.5 bg-teal-700 text-white rounded-xl font-bold hover:bg-teal-800">
+              <button type="submit" className="dlp-control-button success dlp-session-create-button">
                 إنشاء جلسة الاختبار
               </button>
             </form>
           </section>
         ) : (
-          <div className="rounded-2xl border bg-amber-50 p-5 text-amber-800">
+          <div className="brand-card dlp-session-warning">
             أضف أسئلة لهذا اليوم قبل إنشاء جلسة مباشرة.
           </div>
         )}
