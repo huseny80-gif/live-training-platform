@@ -20,9 +20,11 @@ Copy `.env.example` to `.env` and fill in all values.
 | `NEXTAUTH_URL` | ✅ | Same as AUTH_URL (read by next.config.ts for allowedOrigins) |
 | `SESSION_SECRET` | ✅ | Signs participant JWT cookies — set independently from AUTH_SECRET |
 | `NEXT_PUBLIC_PARTICIPANT_URL` | ✅ | Stable public participant domain used exclusively for QR/join links. Never set this to a Vercel Preview URL. |
-| `ANTHROPIC_API_KEY` | ✅ | Required for AI question generation |
+| `OPENAI_API_KEY` | ⚠️ | One of OPENAI_API_KEY or ANTHROPIC_API_KEY is required. Supports PDF extraction, daily generation, and final questions. |
+| `ANTHROPIC_API_KEY` | ⚠️ | One of ANTHROPIC_API_KEY or OPENAI_API_KEY is required. Supports PDF extraction, daily generation, and final questions. |
+| `AI_PROVIDER` | ❌ | Optional explicit provider: `openai` or `anthropic`. If omitted, the app auto-selects a configured provider. |
 | `BLOB_READ_WRITE_TOKEN` | ⚠️ | Vercel Blob token; if absent, files saved to local disk (not for production) |
-| `LLAMA_CLOUD_API_KEY` | ❌ | Optional; enables LlamaParse for better PDF extraction |
+| `LLAMA_CLOUD_API_KEY` | ❌ | Optional secondary PDF extraction provider |
 
 > **Security**: Never commit real values. Use Vercel's Environment Variables UI or your hosting provider's secret management.
 
