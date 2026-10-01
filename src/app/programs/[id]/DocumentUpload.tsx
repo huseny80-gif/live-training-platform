@@ -3,11 +3,9 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { completeBlobUpload } from "@/app/actions/documents";
+import { runProgramRebuild } from "@/lib/client/program-rebuild";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
-const POLL_INTERVAL_MS = 4000;
-const POLL_MAX_ATTEMPTS = 90; // 90 × 4s = 6 minutes
-
 // Safe JSON parser — never throws on HTML error pages or empty bodies
 async function safeJson(res: Response): Promise<{ ok: true; data: unknown } | { ok: false; text: string }> {
   const text = await res.text();
@@ -25,87 +23,26 @@ export default function DocumentUpload({ programId }: { programId: string }) {
   const [message, setMessage] = useState("");
   const [documentId, setDocumentId] = useState("");
 
-  /** Poll /api/documents/status until COMPLETED or FAILED */
-  async function pollUntilDone(docId: string): Promise<void> {
-    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-
-      let pollRes: Response;
-      try {
-        pollRes = await fetch(`/api/documents/status?documentId=${encodeURIComponent(docId)}`);
-      } catch {
-        // network hiccup — keep polling
-        continue;
-      }
-
-      if (!pollRes.ok) {
-        // status endpoint failed — keep polling up to limit
-        continue;
-      }
-
-      const parsed = await safeJson(pollRes);
-      if (!parsed.ok) continue;
-
-      const data = parsed.data as Record<string, unknown>;
-      const s = data.extractionStatus as string;
-
-      if (s === "COMPLETED") {
-        setMessage("اكتمل تحليل المادة وإنشاء المحتوى بنجاح.");
-        setStatus("success");
-        router.refresh();
-        return;
-      }
-
-      if (s === "FAILED") {
-        const notes = (data.extractionNotes as string) ?? "فشلت معالجة المادة";
-        throw new Error(notes);
-      }
-
-      if (s === "PROCESSING") {
-        setMessage("جارٍ تحليل المادة… قد يستغرق ذلك بضع دقائق.");
-      }
-    }
-    throw new Error("استغرقت معالجة المادة وقتًا أطول من المتوقع. حدّث الصفحة بعد قليل للتحقق من الحالة.");
-  }
-
-  /** Fire-and-forget: start the pipeline, then poll for completion */
+  /** Run the same resumable real-PDF pipeline used by manual reprocessing. */
   async function startPipeline(docId: string, fileName: string, pageCount?: number) {
     setDocumentId(docId);
     setMessage(
       pageCount != null
-        ? `تم رفع ${fileName} (${pageCount} صفحة). جارٍ بدء التحليل…`
-        : `تم رفع ${fileName}. جارٍ بدء التحليل…`
+        ? `تم رفع ${fileName} (${pageCount} صفحة). جارٍ تحليل المصدر الحقيقي…`
+        : `تم رفع ${fileName}. جارٍ تحليل المصدر الحقيقي…`
     );
 
-    const res = await fetch("/api/documents/process", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ documentId: docId, programId }),
+    const result = await runProgramRebuild({
+      programId,
+      documentId: docId,
+      onProgress: (text) => setMessage(text),
     });
 
-    if (!res.ok && res.status !== 202) {
-      const parsed = await safeJson(res);
-      const errMsg = parsed.ok
-        ? ((parsed.data as Record<string, unknown>).error as string) ?? "تعذر بدء معالجة المادة"
-        : `فشل بدء المعالجة (${res.status})`;
-      throw new Error(errMsg);
-    }
-
-    const parsed = await safeJson(res);
-    const pipelineStatus = parsed.ok
-      ? (parsed.data as Record<string, unknown>).status
-      : null;
-
-    if (pipelineStatus === "COMPLETED") {
-      // Document was already processed (idempotent path)
-      setMessage("تمت معالجة هذه المادة مسبقًا.");
-      setStatus("success");
-      router.refresh();
-      return;
-    }
-
-    setMessage("جارٍ تحليل المادة… قد يستغرق ذلك بضع دقائق.");
-    await pollUntilDone(docId);
+    setMessage(
+      `اكتملت المعالجة: ${result.daysGenerated} أيام و${result.questionsGenerated} سؤالًا.`
+    );
+    setStatus("success");
+    router.refresh();
   }
 
   async function handleFile(file: File) {
