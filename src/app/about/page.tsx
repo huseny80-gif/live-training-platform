@@ -10,7 +10,7 @@ export default async function AboutPage() {
   <div className="dlp-program-container"><section className="brand-card dlp-program-section">
     <h1>من نحن</h1><p>الملف التعريفي لمدير الحقيبة التدريبية.</p>
     <div className="dlp-about-preview">{profile?.photoUrl?<img src={profile.photoUrl} alt="صورة المدير"/>:<div className="dlp-about-avatar">👤</div>}<div><h2>{instructor?.name}</h2>{profile?.title&&<strong>{profile.title}</strong>}<p>{profile?.bio||"أضف نبذة تعريفية من النموذج أدناه."}</p><small>{profile?.organization}</small></div></div>
-    <form action={saveAdminProfile} className="dlp-profile-form">
+    <form action={async (formData: FormData) => { "use server"; await saveAdminProfile(formData); }} className="dlp-profile-form">
       <label>المسمى/الصفة<input name="title" defaultValue={profile?.title??""}/></label>
       <label>جهة العمل<input name="organization" defaultValue={profile?.organization??""}/></label>
       <label>المؤهل/البرنامج<input name="qualification" defaultValue={profile?.qualification??""}/></label>
