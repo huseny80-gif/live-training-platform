@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./brand-tokens.css";
+import PreferenceLoader from "@/components/PreferenceLoader";
 
 export const metadata: Metadata = {
   title: "الحقيبة التدريبية",
@@ -13,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="brand-page">{children}</body>
+      <body className="brand-page"><PreferenceLoader />{children}</body>
     </html>
   );
 }
