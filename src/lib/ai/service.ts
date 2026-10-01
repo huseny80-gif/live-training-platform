@@ -45,7 +45,8 @@ export class ContentGenerationService {
   async generateForProgram(
     programId: string,
     documentId: string,
-    instructorId: string
+    instructorId: string,
+    languageOverride?: "AR" | "EN"
   ): Promise<GenerationProgress> {
     // Ownership check
     const program = await prisma.trainingProgram.findFirst({
@@ -106,7 +107,7 @@ export class ContentGenerationService {
 
     const req: ContentGenerationRequest = {
       pages: sourcePages,
-      language: (program.language as "AR" | "EN") ?? "AR",
+      language: languageOverride ?? (program.language as "AR" | "EN") ?? "AR",
       programTitle: program.title,
       totalDays: TOTAL_DAYS,
       questionsPerDay: QUESTIONS_PER_DAY,
@@ -168,7 +169,7 @@ export class ContentGenerationService {
               sourcePageId,
               sourcePageStart: q.sourcePageNumber,
               topic: q.topic,
-              language: program.language as "AR" | "EN",
+              language: languageOverride ?? (program.language as "AR" | "EN"),
               status: "DRAFT",
               generatedBy: "AI",
               aiModel: result.modelUsed,
