@@ -16,7 +16,7 @@ export type FinalQuestion = {
 };
 
 export type FinalQuestionsState =
-  | { ok: false; error: string }
+  | { ok: false; error: string; code?: "SOURCE_NOT_READY" | "GENERATION_FAILED" }
   | {
       ok: true;
       summary: string;
@@ -315,6 +315,7 @@ export async function generateFinalQuestions(
   if (!sourceDocument.ok) {
     return {
       ok: false,
+      code: "SOURCE_NOT_READY",
       error: extractionErrorToArabic(sourceDocument.errorMessage),
     };
   }
@@ -343,7 +344,8 @@ export async function generateFinalQuestions(
   if (!usable.length) {
     return {
       ok: false,
-      error: "لا توجد صفحات حقيقية مستخرجة من الملف. أعد تحليل المادة ثم حاول إنشاء الأسئلة النهائية.",
+      code: "SOURCE_NOT_READY",
+      error: "لا توجد صفحات حقيقية مستخرجة من الملف. سيحاول النظام الآن إصلاح المصدر وتوليد بنك الأسئلة قبل إنشاء الامتحان النهائي.",
     };
   }
 
@@ -394,6 +396,7 @@ export async function generateFinalQuestions(
 
   return {
     ok: false,
+    code: "GENERATION_FAILED",
     error:
       `تمت محاولتان تلقائيتان لإنشاء الامتحان النهائي، لكن التحقق الصارم لم ينجح. السبب الأخير: ${previousFailure ?? "مخرجات غير صالحة"}`,
   };
