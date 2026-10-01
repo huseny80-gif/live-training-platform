@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { brand } from "@/lib/brand";
 import { joinSessionAction } from "@/app/actions/sessions";
 
@@ -16,6 +16,12 @@ const ERROR_MESSAGES: Record<string, string> = {
 type State = { error: string } | null;
 
 export default function JoinPage() {
+  const [initialCode, setInitialCode] = useState("");
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("code")?.trim().toUpperCase() ?? "";
+    if (code) setInitialCode(code.slice(0, 6));
+  }, []);
+
   const [state, action, isPending] = useActionState<State, FormData>(
     async (_prev: State, formData: FormData) => {
       try {
@@ -35,8 +41,8 @@ export default function JoinPage() {
     : null;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl border shadow-sm p-8 space-y-6">
+    <main dir="rtl" lang="ar" className="dlp-participant-page">
+      <div className="brand-card dlp-join-card">
         <div className="text-center space-y-1">
           <div className="text-4xl mb-2">🎓</div>
           <h1 className="text-2xl font-bold text-gray-900">{brand.nameAr}</h1>
@@ -49,6 +55,8 @@ export default function JoinPage() {
             <input
               id="join-code"
               name="code"
+              value={initialCode}
+              onChange={(e) => setInitialCode(e.target.value.toUpperCase())}
               required
               autoComplete="off"
               placeholder="مثال: A3F2B1"
