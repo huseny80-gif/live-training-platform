@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { NativeTextExtractionAdapter } from "../src/lib/extraction/adapters/native-text";
+import { requiredReadablePages } from "../src/lib/extraction/coverage";
 
 function buildTwoPagePdf(): Buffer {
   const objects = [
@@ -19,7 +20,11 @@ async function main() {
   const adapter = new NativeTextExtractionAdapter();
   assert.equal(adapter.supports("TEXT_BASED"), true);
   assert.equal(adapter.supports("UNKNOWN"), true);
-  assert.equal(adapter.supports("IMAGE_BASED"), false);
+  assert.equal(
+    adapter.supports("IMAGE_BASED"),
+    true,
+    "Native extraction must be attempted even when structural inspection says IMAGE_BASED"
+  );
 
   const result = await adapter.extract({
     fileBuffer: buildTwoPagePdf(),
@@ -35,7 +40,15 @@ async function main() {
   assert.equal(result.pages[0].pageNumber, 1);
   assert.equal(result.pages[1].pageNumber, 2);
 
-  console.log("✓ native PDF text extraction tests passed");
+  // Large 147-page course PDFs must not require an excessive 70% (103 pages)
+  // before grounded generation can proceed. The scalable policy caps the
+  // readiness requirement at 60 real pages while still using every extracted
+  // real page available during generation.
+  assert.equal(requiredReadablePages(147), 60);
+  assert.equal(requiredReadablePages(20), 14);
+  assert.equal(requiredReadablePages(40), 20);
+
+  console.log("✓ native PDF text extraction + source coverage tests passed");
 }
 
 main().catch((error) => {
