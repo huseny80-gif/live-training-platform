@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { NativeTextExtractionAdapter } from "../src/lib/extraction/adapters/native-text";
 import { requiredReadablePages } from "../src/lib/extraction/coverage";
+import { representativePageOrder } from "../src/lib/extraction/page-sampling";
 
 function buildTwoPagePdf(): Buffer {
   const objects = [
@@ -40,15 +41,22 @@ async function main() {
   assert.equal(result.pages[0].pageNumber, 1);
   assert.equal(result.pages[1].pageNumber, 2);
 
-  // Large 147-page course PDFs must not require an excessive 70% (103 pages)
-  // before grounded generation can proceed. The scalable policy caps the
-  // readiness requirement at 60 real pages while still using every extracted
-  // real page available during generation.
-  assert.equal(requiredReadablePages(147), 60);
+  // Large 147-page course PDFs are accepted after 30 real readable pages,
+  // sampled across the document rather than requiring 60 sequential pages.
+  assert.equal(requiredReadablePages(147), 30);
   assert.equal(requiredReadablePages(20), 14);
   assert.equal(requiredReadablePages(40), 20);
 
-  console.log("✓ native PDF text extraction + source coverage tests passed");
+  const order = representativePageOrder(147);
+  const firstThirty = order.slice(0, 30);
+  assert.equal(new Set(firstThirty).size, 30);
+  assert.equal(firstThirty[0], 1);
+  assert.equal(firstThirty[firstThirty.length - 1], 147);
+  assert.ok(firstThirty.some((page) => page >= 70 && page <= 78));
+  assert.equal(order.length, 147);
+  assert.equal(new Set(order).size, 147);
+
+  console.log("✓ native PDF extraction + representative source acceptance tests passed");
 }
 
 main().catch((error) => {
