@@ -29,10 +29,14 @@ export function resetRateLimit(key: string): void {
   store.delete(key);
 }
 
-// Prune expired entries every 30 minutes to prevent unbounded memory growth
-setInterval(() => {
+// Prune expired entries every 30 minutes to prevent unbounded memory growth.
+// unref() ensures this maintenance timer never keeps a Node.js process alive by itself
+// (important for tests, scripts and graceful server shutdown).
+const pruneTimer = setInterval(() => {
   const now = Date.now();
   store.forEach((entry, key) => {
     if (now > entry.resetAt) store.delete(key);
   });
 }, 30 * 60 * 1000);
+
+pruneTimer.unref?.();
