@@ -292,12 +292,80 @@ export async function deleteSessionAction(sessionId: string): Promise<ActionResu
   const instructorId = await requireInstructor();
   const session = await prisma.liveSession.findFirst({
     where: { id: sessionId, instructorId },
-    select: { programId: true, status: true },
+    select: { programId: true },
   });
   if (!session) return { ok: false, error: "NOT_FOUND" };
-  if (session.status === "ACTIVE") return { ok: false, error: "CANNOT_DELETE_ACTIVE" };
 
+  // LiveSession dependants use ON DELETE CASCADE, so one authoritative delete
+  // removes participants, answers, session questions, and aggregate results.
+  // This is intentionally allowed for ACTIVE sessions after explicit UI confirmation.
   await prisma.liveSession.delete({ where: { id: sessionId } });
   revalidatePath(`/programs/${session.programId}/manage`);
+  revalidatePath(`/programs/${session.programId}`);
   return { ok: true, data: undefined };
+}
+
+export async function deleteNonArabicQuestionsAction(
+  programId: string
+): Promise<ActionResult<{ deleted: number; blocked: number; blockedSessionCodes: string[] }>> {
+  const instructorId = await requireInstructor();
+  await requireProgramOwnership(programId, instructorId);
+
+  const program = await prisma.trainingProgram.findUnique({
+    where: { id: programId },
+    select: { language: true },
+  });
+  if (!program) return { ok: false, error: "NOT_FOUND" };
+  if (program.language !== "AR") {
+    return { ok: false, error: "PROGRAM_NOT_ARABIC" };
+  }
+
+  const questions = await prisma.question.findMany({
+    where: { programId },
+    include: {
+      options: { orderBy: { displayOrder: "asc" } },
+      sessionQuestions: {
+        select: {
+          session: { select: { sessionCode: true } },
+        },
+      },
+    },
+  });
+
+  const invalid = questions.filter(
+    (question) =>
+      !isArabicQuestionContent(
+        question.questionText,
+        question.options.map((option) => ({ text: option.optionText }))
+      )
+  );
+
+  const removable = invalid.filter((question) => question.sessionQuestions.length === 0);
+  const blocked = invalid.filter((question) => question.sessionQuestions.length > 0);
+
+  if (removable.length > 0) {
+    await prisma.question.deleteMany({
+      where: { id: { in: removable.map((question) => question.id) } },
+    });
+  }
+
+  const blockedSessionCodes = Array.from(
+    new Set(
+      blocked.flatMap((question) =>
+        question.sessionQuestions.map((link) => link.session.sessionCode)
+      )
+    )
+  ).sort();
+
+  revalidatePath(`/programs/${programId}/manage`);
+  revalidatePath(`/programs/${programId}`);
+
+  return {
+    ok: true,
+    data: {
+      deleted: removable.length,
+      blocked: blocked.length,
+      blockedSessionCodes,
+    },
+  };
 }
