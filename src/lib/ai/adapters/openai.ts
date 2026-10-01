@@ -16,7 +16,7 @@ import {
 } from "@/lib/language";
 
 const MODEL_ID = process.env.OPENAI_MODEL || "gpt-6-luna";
-const MAX_GENERATION_ATTEMPTS = 2;
+const MAX_GENERATION_ATTEMPTS = 4;
 
 type OpenAIResponse = {
   output_text?: string;
@@ -136,19 +136,21 @@ export class OpenAIAdapter implements AIAdapter {
       inputTokens: number;
       outputTokens: number;
     }> => {
-      let accepted: GeneratedQuestion[] | null = null;
       let failure = "";
       let dayInputTokens = 0;
       let dayOutputTokens = 0;
+      const acceptedByText = new Map<string, GeneratedQuestion>();
+      const candidateCount = Math.max(req.questionsPerDay + 3, req.questionsPerDay);
 
       for (
         let attempt = 1;
-        attempt <= MAX_GENERATION_ATTEMPTS;
+        attempt <= MAX_GENERATION_ATTEMPTS && acceptedByText.size < req.questionsPerDay;
         attempt++
       ) {
+        const missing = req.questionsPerDay - acceptedByText.size;
         const repair =
           attempt > 1
-            ? `\n\nتصحيح إلزامي للمحاولة السابقة: ${failure}. أعد ${req.questionsPerDay} أسئلة كاملة لهذا اليوم فقط. لا تحذف سؤالًا ولا تستخدم لغة غير اللغة المطلوبة.`
+            ? `\n\nتصحيح إلزامي للمحاولة السابقة: ${failure}. نحتاج ${missing} سؤال/أسئلة إضافية صالحة على الأقل. أنشئ مجموعة مرشحة جديدة كاملة، والتزم بالعربية وبصفحات مصدر اليوم فقط.`
             : "";
 
         const questionResponse = await respond(
@@ -156,43 +158,72 @@ export class OpenAIAdapter implements AIAdapter {
             day,
             req.pages,
             req.language,
-            req.questionsPerDay,
-            priorQuestionTexts
+            candidateCount,
+            [
+              ...priorQuestionTexts,
+              ...Array.from(acceptedByText.values()).map((q) => q.questionText),
+            ]
           ) + repair
         );
         dayInputTokens += questionResponse.inputTokens;
         dayOutputTokens += questionResponse.outputTokens;
 
         try {
-          const candidate = parseQuestions(
+          const candidates = parseQuestions(
             questionResponse.text,
             day.dayNumber,
-            req.questionsPerDay
-          );
-          const validation = validateQuestions(
-            candidate,
-            day,
-            req,
-            validPageNumbers
+            candidateCount
           );
 
-          if (!validation) {
-            accepted = candidate;
-            break;
+          const rejectionReasons: string[] = [];
+          for (const candidate of candidates) {
+            const validation = validateSingleQuestion(
+              candidate,
+              day,
+              req,
+              validPageNumbers
+            );
+            if (validation) {
+              rejectionReasons.push(validation);
+              continue;
+            }
+
+            const key = candidate.questionText
+              .trim()
+              .toLocaleLowerCase("ar")
+              .replace(/\s+/g, " ");
+
+            if (!key || acceptedByText.has(key)) continue;
+            acceptedByText.set(key, candidate);
+            if (acceptedByText.size >= req.questionsPerDay) break;
           }
 
-          failure = validation;
+          if (acceptedByText.size < req.questionsPerDay) {
+            failure =
+              `تم قبول ${acceptedByText.size}/${req.questionsPerDay} فقط من المرشحين` +
+              (rejectionReasons.length > 0
+                ? `: ${rejectionReasons.slice(0, 3).join(" | ")}`
+                : "");
+          }
         } catch (error) {
           failure =
             error instanceof Error ? error.message : "INVALID_QUESTIONS";
         }
       }
 
-      if (!accepted) {
+      if (acceptedByText.size < req.questionsPerDay) {
         throw new Error(
           `AI_QUESTIONS_VALIDATION_FAILED_DAY_${day.dayNumber}: ${failure || "unknown"}`
         );
       }
+
+      const accepted = Array.from(acceptedByText.values())
+        .slice(0, req.questionsPerDay)
+        .map((question, index) => ({
+          ...question,
+          questionOrder: index + 1,
+          dayNumber: day.dayNumber,
+        }));
 
       return {
         dayNumber: day.dayNumber,
@@ -295,6 +326,49 @@ function validateDayPlans(
   return null;
 }
 
+function validateSingleQuestion(
+  question: GeneratedQuestion,
+  day: GeneratedDayPlan,
+  req: ContentGenerationRequest,
+  validPageNumbers: Set<number>
+): string | null {
+  const dayPages = new Set(day.sourcePages);
+
+  if (!question.questionText.trim()) return "يوجد سؤال بلا نص";
+  if (!question.explanation.trim()) return "يوجد سؤال بلا تفسير";
+
+  if (
+    !validPageNumbers.has(question.sourcePageNumber) ||
+    !dayPages.has(question.sourcePageNumber)
+  ) {
+    return `السؤال يشير إلى صفحة خارج مصادر اليوم: ${question.sourcePageNumber}`;
+  }
+
+  if (question.options.length !== 4) {
+    return "السؤال لا يحتوي أربعة خيارات";
+  }
+  if (question.options.some((option) => !option.text.trim())) {
+    return "السؤال يحتوي خيارًا فارغًا";
+  }
+  if (
+    !question.options.some(
+      (option) => option.label === question.correctLabel
+    )
+  ) {
+    return "السؤال لا يحتوي الإجابة الصحيحة المحددة";
+  }
+
+  if (
+    req.language === "AR" &&
+    (!isArabicQuestionContent(question.questionText, question.options) ||
+      !isPredominantlyArabic(question.explanation))
+  ) {
+    return "السؤال أو خياراته/تفسيره ليس بالعربية";
+  }
+
+  return null;
+}
+
 function validateQuestions(
   questions: GeneratedQuestion[],
   day: GeneratedDayPlan,
@@ -306,11 +380,7 @@ function validateQuestions(
   }
 
   const orders = new Set<number>();
-  const dayPages = new Set(day.sourcePages);
-
   for (const question of questions) {
-    if (!question.questionText.trim()) return "يوجد سؤال بلا نص";
-    if (!question.explanation.trim()) return "يوجد سؤال بلا تفسير";
     if (
       !Number.isInteger(question.questionOrder) ||
       question.questionOrder < 1 ||
@@ -321,34 +391,13 @@ function validateQuestions(
     }
     orders.add(question.questionOrder);
 
-    if (
-      !validPageNumbers.has(question.sourcePageNumber) ||
-      !dayPages.has(question.sourcePageNumber)
-    ) {
-      return `السؤال ${question.questionOrder} يشير إلى صفحة خارج مصادر اليوم`;
-    }
-
-    if (question.options.length !== 4) {
-      return `السؤال ${question.questionOrder} لا يحتوي أربعة خيارات`;
-    }
-    if (question.options.some((option) => !option.text.trim())) {
-      return `السؤال ${question.questionOrder} يحتوي خيارًا فارغًا`;
-    }
-    if (
-      !question.options.some(
-        (option) => option.label === question.correctLabel
-      )
-    ) {
-      return `السؤال ${question.questionOrder} لا يحتوي الإجابة الصحيحة المحددة`;
-    }
-
-    if (
-      req.language === "AR" &&
-      (!isArabicQuestionContent(question.questionText, question.options) ||
-        !isPredominantlyArabic(question.explanation))
-    ) {
-      return `السؤال ${question.questionOrder} أو خياراته/تفسيره ليس بالعربية`;
-    }
+    const validation = validateSingleQuestion(
+      question,
+      day,
+      req,
+      validPageNumbers
+    );
+    if (validation) return validation;
   }
 
   return null;
