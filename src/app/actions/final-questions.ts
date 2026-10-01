@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isArabicQuestionContent, isPredominantlyArabic } from "@/lib/language";
 import { extractionService } from "@/lib/extraction/service";
 import { extractionErrorToArabic } from "@/lib/extraction/errors";
+import { verifyArabicProgramBank } from "@/lib/ai/program-acceptance";
 
 export type FinalQuestion = {
   type: "MCQ" | "TF";
@@ -323,16 +324,14 @@ export async function generateFinalQuestions(
 
   if (!program) return { ok: false, error: "PROGRAM_NOT_FOUND" };
 
-  const dailyQuestionCount = await prisma.question.count({
-    where: { programId },
-  });
+  const dailyBank = await verifyArabicProgramBank(programId);
 
-  if (dailyQuestionCount !== 50) {
+  if (!dailyBank.ok) {
     return {
       ok: false,
       code: "DAILY_BANK_NOT_READY",
       error:
-        `بنك الأسئلة اليومية غير مكتمل: يوجد ${dailyQuestionCount} من أصل 50 سؤالًا. سيُعاد بناء المصدر والأسئلة اليومية أولًا قبل إنشاء الامتحان النهائي.`,
+        `بنك الأسئلة اليومية غير جاهز للاعتماد: ${dailyBank.days} أيام، ${dailyBank.questions} سؤالًا. سيُعاد اعتماد PDF وبناء 10 أيام و50 سؤالًا عربيًا أولًا.`,
     };
   }
 

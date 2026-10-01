@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { extractionService } from "@/lib/extraction/service";
 import { extractionErrorToArabic } from "@/lib/extraction/errors";
 import { requiredReadablePages } from "@/lib/extraction/coverage";
+import { representativePageOrder } from "@/lib/extraction/page-sampling";
 
 export const maxDuration = 300;
 
@@ -119,10 +120,7 @@ export async function POST(
     });
   }
 
-  const allPageNumbers = Array.from(
-    { length: readiness.totalPages },
-    (_, index) => index + 1
-  );
+  const allPageNumbers = representativePageOrder(readiness.totalPages);
 
   const unattemptedPages = allPageNumbers.filter(
     (pageNumber) => !readiness!.attemptedRealPageNumbers.has(pageNumber)
