@@ -349,14 +349,68 @@ export class DocumentExtractionService {
             : `INSUFFICIENT_REAL_EXTRACTION_COVERAGE — extracted ${completedPages}/${intendedPageCount}; require at least ${requiredPages}`,
       };
     } catch (err) {
-      await this.updateDocumentStatus(documentId, "FAILED");
       const msg = err instanceof Error ? err.message : "Unknown error";
+      const requestedPages =
+        pageNumbers && pageNumbers.length > 0
+          ? [...new Set(pageNumbers)].sort((a, b) => a - b)
+          : [];
+
+      // A failed bounded batch must not permanently poison a large document.
+      // Persist explicit failed-page markers so the next request can advance
+      // to unattempted pages, then circle back to failed pages later.
+      if (requestedPages.length > 0) {
+        for (const pageNumber of requestedPages) {
+          await prisma.documentPage.upsert({
+            where: {
+              documentId_pageNumber: { documentId, pageNumber },
+            },
+            create: {
+              documentId,
+              pageNumber,
+              extractedText: "",
+              extractionMethod: null,
+              extractionStatus: "FAILED",
+              errorMessage: msg.slice(0, 1500),
+            },
+            update: {
+              extractionStatus: "FAILED",
+              errorMessage: msg.slice(0, 1500),
+            },
+          });
+        }
+
+        const readable = await prisma.documentPage.count({
+          where: {
+            documentId,
+            extractionStatus: "COMPLETED",
+            NOT: { extractionMethod: "MOCK" },
+            extractedText: { not: null },
+          },
+        });
+        const totalPages = Math.max(
+          doc.pageCount ?? 0,
+          requestedPages[requestedPages.length - 1] ?? 0
+        );
+
+        await this.updateDocumentStatus(documentId, "PROCESSING");
+
+        return {
+          documentId,
+          status: "PROCESSING",
+          totalPages,
+          completedPages: readable,
+          failedPages: requestedPages.length,
+          errorMessage: msg,
+        };
+      }
+
+      await this.updateDocumentStatus(documentId, "FAILED");
       return {
         documentId,
         status: "FAILED",
-        totalPages: 0,
+        totalPages: doc.pageCount ?? 0,
         completedPages: 0,
-        failedPages: 0,
+        failedPages: doc.pageCount ?? 0,
         errorMessage: msg,
       };
     }
