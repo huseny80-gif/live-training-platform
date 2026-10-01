@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { regenerateProgramInArabic } from "@/app/actions/generation";
 import {
   createDayAction,
   updateDayAction,
@@ -11,6 +12,7 @@ import {
   createQuestionAction,
   deleteQuestionAction,
   deleteSessionAction,
+  deleteNonArabicQuestionsAction,
 } from "@/app/actions/content";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -59,6 +61,7 @@ interface Session {
 interface Program {
   id: string;
   title: string;
+  language: string;
   days: Day[];
   sessions: Session[];
 }
@@ -125,11 +128,50 @@ export default function ManageClient({ program }: { program: Program }) {
 
   // ── Session actions ────────────────────────────────────────────────────────
 
-  function handleDeleteSession(sessionId: string, code: string) {
-    if (!confirm(`حذف الجلسة ${code}؟ سيتم حذف جميع بياناتها.`)) return;
+  function handleDeleteSession(sessionId: string, code: string, status: string) {
+    const activeWarning =
+      status === "ACTIVE"
+        ? "\n\nتنبيه: الجلسة نشطة الآن، وسيتم إنهاؤها فورًا وحذف المشاركين والإجابات والنتائج المرتبطة بها."
+        : "";
+    if (!confirm(`حذف الجلسة ${code}؟ سيتم حذف جميع بياناتها نهائيًا.${activeWarning}`)) return;
     startTransition(async () => {
       const r = await deleteSessionAction(sessionId);
-      if (!r.ok) alert(r.error === "CANNOT_DELETE_ACTIVE" ? "لا يمكن حذف جلسة نشطة." : r.error);
+      if (!r.ok) alert(r.error);
+    });
+  }
+
+  function handleCleanLegacyQuestions() {
+    if (!confirm("فحص بنك الأسئلة العربي وحذف الأسئلة الإنجليزية القديمة غير المرتبطة بجلسات محفوظة؟")) return;
+    startTransition(async () => {
+      const r = await deleteNonArabicQuestionsAction(program.id);
+      if (!r.ok) {
+        alert(r.error);
+        return;
+      }
+      const blocked =
+        r.data.blocked > 0
+          ? `\nبقي ${r.data.blocked} سؤال قديم مرتبط بجلسات محفوظة، ولن يدخل في أي جلسة عربية جديدة. الجلسات: ${r.data.blockedSessionCodes.join("، ") || "غير محدد"}`
+          : "";
+      alert(`تم حذف ${r.data.deleted} سؤال إنجليزي قديم غير مستخدم.${blocked}`);
+    });
+  }
+
+  function handleRegenerateArabic() {
+    const message =
+      program.language === "AR"
+        ? "إعادة توليد الأيام والأسئلة بالعربية من آخر ملف تم تحليله بنجاح؟\n\nلن يُستبدل المحتوى الحالي إلا بعد نجاح توليد بنك كامل والتحقق منه."
+        : "تحويل البرنامج إلى العربية وإعادة توليد الأيام والأسئلة من آخر ملف تم تحليله بنجاح؟\n\nيجب حذف الجلسات القديمة أولًا.";
+    if (!confirm(message)) return;
+
+    startTransition(async () => {
+      const result = await regenerateProgramInArabic(program.id);
+      if (result.status !== "COMPLETED") {
+        alert(result.errorMessage ?? "تعذر إعادة توليد المحتوى بالعربية.");
+        return;
+      }
+      alert(
+        `تم إنشاء المحتوى العربي بنجاح: ${result.daysGenerated} أيام و${result.questionsGenerated} سؤالًا.`
+      );
     });
   }
 
@@ -153,14 +195,39 @@ export default function ManageClient({ program }: { program: Program }) {
       {/* ── Days Tab ──────────────────────────────────────────────────────── */}
       {activeTab === "days" && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-800">الأيام والمواضيع والأسئلة</h2>
-            <button
-              onClick={() => setShowAddDay(true)}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-            >
-              + يوم جديد
-            </button>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-semibold text-gray-800">الأيام والمواضيع والأسئلة</h2>
+              {program.language === "AR" ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  الجلسات العربية الجديدة تستبعد تلقائيًا أي سؤال إنجليزي قديم.
+                </p>
+              ) : null}
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={handleRegenerateArabic}
+                disabled={isPending}
+                className="px-3 py-1.5 bg-teal-700 text-white rounded-lg text-sm hover:bg-teal-800 disabled:opacity-50"
+              >
+                {program.language === "AR" ? "إعادة توليد المحتوى بالعربية" : "تحويل وإعادة التوليد بالعربية"}
+              </button>
+              {program.language === "AR" ? (
+                <button
+                  onClick={handleCleanLegacyQuestions}
+                  disabled={isPending}
+                  className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-sm hover:bg-amber-100"
+                >
+                  تنظيف الأسئلة الإنجليزية القديمة
+                </button>
+              ) : null}
+              <button
+                onClick={() => setShowAddDay(true)}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+              >
+                + يوم جديد
+              </button>
+            </div>
           </div>
 
           {showAddDay && (
@@ -320,15 +387,13 @@ export default function ManageClient({ program }: { program: Program }) {
                 text={SESSION_STATUS_AR[s.status] ?? s.status}
                 color={SESSION_STATUS_COLOR[s.status] ?? "bg-gray-100 text-gray-600"}
               />
-              {s.status !== "ACTIVE" && (
-                <button
-                  onClick={() => handleDeleteSession(s.id, s.sessionCode)}
-                  disabled={isPending}
-                  className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100"
-                >
-                  حذف
-                </button>
-              )}
+              <button
+                onClick={() => handleDeleteSession(s.id, s.sessionCode, s.status)}
+                disabled={isPending}
+                className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100"
+              >
+                حذف
+              </button>
             </div>
           ))}
         </div>
