@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import "./brand-tokens.css";
 
 export const metadata: Metadata = {
-  title: "Live Training Platform",
+  title: "القيادة الرقمية والحوكمة الذكية",
+  description: "Digital Leadership & Smart Governance",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -11,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body>{children}</body>
+      <body className="brand-page">{children}</body>
     </html>
   );
 }
