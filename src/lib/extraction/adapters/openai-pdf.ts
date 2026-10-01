@@ -122,8 +122,7 @@ Rules:
               {
                 type: "input_file",
                 filename: req.fileName,
-                file_data: `data:application/pdf;base64,${req.fileBuffer.toString("base64")}`,
-                detail: "low",
+                file_data: req.fileBuffer.toString("base64"),
               },
               { type: "input_text", text: prompt },
             ],
