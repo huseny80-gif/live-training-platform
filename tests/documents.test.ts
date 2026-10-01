@@ -1,9 +1,9 @@
 /**
  * DOC-01 through DOC-14: PDF Upload & Document Processing Tests
  *
- * NOTE on LlamaParse (DOC-09): egress to api.cloud.llamaindex.ai is blocked
- * (ACP-06). Tests use MockExtractionAdapter which is the active fallback.
- * When network policy allows LlamaParse, set LLAMA_CLOUD_API_KEY and re-run.
+ * NOTE on LlamaParse (DOC-09): egress to api.cloud.llamaindex.ai is not needed
+ * for the native-text pipeline tests. DOC-10/DOC-12 exercise NATIVE_TEXT with
+ * a real text stream; MockExtractionAdapter remains unit-tested separately.
  */
 
 import "dotenv/config";
@@ -40,23 +40,36 @@ async function createTestProgram(instructorId: string) {
   });
 }
 
-/** Minimal valid 1-page PDF binary (hand-crafted) */
+/** Minimal valid 1-page text PDF binary (hand-crafted).
+ * Includes a real text content stream so document pipeline tests exercise
+ * NATIVE_TEXT instead of depending on mock extraction.
+ */
 function minimalPdfBuffer(): Buffer {
+  const text = "Geographic Information Systems training source content for native extraction.";
+  const stream = `BT /F1 12 Tf 72 720 Td (${text}) Tj ET`;
   const pdf = `%PDF-1.4
-1 0 obj<</Type /Catalog /Pages 2 0 R>>endobj
-2 0 obj<</Type /Pages /Kids [3 0 R] /Count 1>>endobj
-3 0 obj<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]>>endobj
-xref
-0 4
-0000000000 65535 f
-0000000009 00000 n
-0000000058 00000 n
-0000000115 00000 n
-trailer<</Size 4 /Root 1 0 R>>
-startxref
-190
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length ${stream.length} >>
+stream
+${stream}
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+trailer
+<< /Root 1 0 R >>
 %%EOF`;
-  return Buffer.from(pdf, "utf-8");
+  return Buffer.from(pdf, "latin1");
 }
 
 /** PDF with many image XObject references to trigger IMAGE_BASED classification */

@@ -3,7 +3,7 @@ name: Release validation
 on:
   push:
     branches:
-      - release/live-training-stable-20261001
+      - "release/**"
   workflow_dispatch:
 
 permissions:
@@ -80,6 +80,9 @@ jobs:
 
       - name: Document pipeline tests
         run: npx tsx tests/documents.test.ts
+
+      - name: Native PDF extraction tests
+        run: npm run test:native-pdf
 
       - name: Production build
         run: npm run build

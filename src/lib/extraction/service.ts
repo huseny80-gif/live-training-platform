@@ -13,6 +13,7 @@ import { LlamaParseAdapter } from "./adapters/llamaparse";
 import { OpenAIPdfExtractionAdapter } from "./adapters/openai-pdf";
 import { AnthropicPdfExtractionAdapter } from "./adapters/anthropic-pdf";
 import { MockExtractionAdapter } from "./adapters/mock";
+import { NativeTextExtractionAdapter } from "./adapters/native-text";
 
 export type DocumentProcessingStatus =
   | "PENDING"
@@ -134,6 +135,10 @@ async function extractWithAdapter(
 function getAdapters(): ExtractionAdapter[] {
   const adapters: ExtractionAdapter[] = [];
 
+  // Native extraction is always available for text-bearing PDFs and does not
+  // require any external API key. It is the preferred first pass.
+  adapters.push(new NativeTextExtractionAdapter());
+
   // Reuse the platform's existing OpenAI key for real PDF/OCR extraction.
   if (process.env.OPENAI_API_KEY) {
     adapters.push(new OpenAIPdfExtractionAdapter());
@@ -223,7 +228,11 @@ export class DocumentExtractionService {
           : [];
 
       let result: ExtractionResult | null = null;
+      let bestCandidate: ExtractionResult | null = null;
       const adapterErrors: string[] = [];
+      const candidateRequiredPages = requiredReadablePages(
+        targetPages.length > 0 ? targetPages.length : inspection.pageCount
+      );
 
       for (const adapter of adapters) {
         try {
@@ -235,19 +244,31 @@ export class DocumentExtractionService {
           });
 
           if (candidate.successCount > 0 && candidate.method !== "MOCK") {
-            result = candidate;
-            break;
-          }
+            if (!bestCandidate || candidate.successCount > bestCandidate.successCount) {
+              bestCandidate = candidate;
+            }
 
-          adapterErrors.push(
-            `${adapter.name}: no real extracted pages were returned`
-          );
+            // Stop as soon as one real adapter reaches the source-coverage
+            // threshold. Otherwise keep trying configured OCR/AI fallbacks.
+            if (candidate.successCount >= candidateRequiredPages) {
+              result = candidate;
+              break;
+            }
+          } else {
+            adapterErrors.push(
+              `${adapter.name}: no real extracted pages were returned`
+            );
+          }
         } catch (error) {
           adapterErrors.push(
             `${adapter.name}: ${error instanceof Error ? error.message : String(error)}`
           );
         }
       }
+
+      // If no adapter reached the threshold, keep the best real partial result.
+      // Its pages are persisted so a later rebuild call can resume from there.
+      result = result ?? bestCandidate;
 
       if (!result) {
         throw new Error(
