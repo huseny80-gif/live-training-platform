@@ -14,12 +14,34 @@ import { OpenAIAdapter } from "./adapters/openai";
 const TOTAL_DAYS = 10;
 const QUESTIONS_PER_DAY = 5;
 
-// Provider registry. OpenAI is the default; Anthropic remains available as an optional provider.
+// Provider registry. If AI_PROVIDER is explicit, honor it. Otherwise
+// choose a provider that is actually configured instead of failing on a
+// hard-coded default.
 function getAdapter(): AIAdapter {
-  const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
-  if (provider === "openai") return new OpenAIAdapter();
-  if (provider === "anthropic" || provider === "claude") return new ClaudeAIAdapter();
-  throw new Error(`UNSUPPORTED_AI_PROVIDER: ${provider}`);
+  const explicit = process.env.AI_PROVIDER?.trim().toLowerCase();
+
+  if (explicit) {
+    if (explicit === "openai") {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error("AI_PROVIDER_OPENAI_SELECTED_BUT_KEY_MISSING");
+      }
+      return new OpenAIAdapter();
+    }
+    if (explicit === "anthropic" || explicit === "claude") {
+      if (!process.env.ANTHROPIC_API_KEY) {
+        throw new Error("AI_PROVIDER_ANTHROPIC_SELECTED_BUT_KEY_MISSING");
+      }
+      return new ClaudeAIAdapter();
+    }
+    throw new Error(`UNSUPPORTED_AI_PROVIDER: ${explicit}`);
+  }
+
+  if (process.env.OPENAI_API_KEY) return new OpenAIAdapter();
+  if (process.env.ANTHROPIC_API_KEY) return new ClaudeAIAdapter();
+
+  throw new Error(
+    "NO_AI_PROVIDER_CONFIGURED — set OPENAI_API_KEY or ANTHROPIC_API_KEY"
+  );
 }
 
 export interface GenerationProgress {

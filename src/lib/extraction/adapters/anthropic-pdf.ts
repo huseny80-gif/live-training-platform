@@ -7,13 +7,12 @@ import type {
 } from "../types";
 
 const MODEL_ID =
-  process.env.OPENAI_EXTRACTION_MODEL ||
-  process.env.OPENAI_MODEL ||
-  "gpt-6-luna";
+  process.env.ANTHROPIC_EXTRACTION_MODEL ||
+  process.env.ANTHROPIC_MODEL ||
+  "claude-sonnet-5-5";
 
-type OpenAIResponse = {
-  output_text?: string;
-  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+type AnthropicResponse = {
+  content?: Array<{ type?: string; text?: string }>;
 };
 
 type ExtractedPayload = {
@@ -24,24 +23,12 @@ type ExtractedPayload = {
   }>;
 };
 
-function responseText(data: OpenAIResponse): string {
-  return (
-    data.output_text ??
-    data.output
-      ?.flatMap((item) => item.content ?? [])
-      .filter((item) => item.type === "output_text")
-      .map((item) => item.text ?? "")
-      .join("") ??
-    ""
-  );
-}
-
 function extractJsonObject(text: string): string {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const raw = (fenced?.[1] ?? text).trim();
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("OPENAI_PDF_INVALID_JSON");
+  if (start < 0 || end <= start) throw new Error("ANTHROPIC_PDF_INVALID_JSON");
   return raw.slice(start, end + 1);
 }
 
@@ -53,16 +40,16 @@ function normalizeText(value: string | null | undefined): string {
     .trim();
 }
 
-export class OpenAIPdfExtractionAdapter implements ExtractionAdapter {
-  readonly name = "OPENAI_PDF" as const;
+export class AnthropicPdfExtractionAdapter implements ExtractionAdapter {
+  readonly name = "VISION_LLM" as const;
 
   supports(_contentType: PdfContentType): boolean {
     return true;
   }
 
   async extract(req: ExtractionRequest): Promise<ExtractionResult> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY env var not set");
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY env var not set");
 
     const start = Date.now();
     const requestedPages =
@@ -71,60 +58,59 @@ export class OpenAIPdfExtractionAdapter implements ExtractionAdapter {
         : null;
 
     const pageInstruction = requestedPages
-      ? `Extract only these PDF pages: ${requestedPages.join(", ")}.`
-      : "Extract every page in the PDF that contains readable or visually recoverable training content.";
-
-    const maxOutputTokens = requestedPages
-      ? Math.min(30000, Math.max(6000, requestedPages.length * 1600))
-      : 30000;
+      ? `استخرج فقط الصفحات التالية من ملف PDF: ${requestedPages.join(", ")}.`
+      : "استخرج جميع الصفحات التي تحتوي محتوى تدريبيًا قابلاً للقراءة.";
 
     const prompt = `
-You are a document extraction engine. Read the attached PDF directly.
-
+أنت محرك استخراج مستندات. اقرأ ملف PDF المرفق مباشرة.
 ${pageInstruction}
 
-Return STRICT JSON only in this exact shape:
+أعد JSON فقط بالشكل التالي:
 {
   "pages": [
     {
       "pageNumber": 1,
-      "title": "page title or null",
-      "text": "faithful extracted source text"
+      "title": "عنوان الصفحة أو null",
+      "text": "النص المستخرج بأمانة"
     }
   ]
 }
 
-Rules:
-- Preserve the source language exactly; do not translate.
-- Use OCR/vision for scanned or image-based pages when needed.
-- Do not invent, explain, summarize beyond what is visibly present, or add outside knowledge.
-- Keep meaningful headings, bullets, labels, definitions, and table text.
-- pageNumber must be the real 1-based PDF page number.
-- Include each requested page once.
-- If a requested page has no recoverable content, return it with an empty text string.
-- For very dense pages, preserve the important source wording while keeping each page under about 4000 characters.
-- Output JSON only. No Markdown fences and no commentary.
+قواعد إلزامية:
+- حافظ على لغة المصدر كما هي ولا تترجم أثناء الاستخراج.
+- استخدم قدرات الرؤية/OCR للصفحات المصورة عند الحاجة.
+- لا تخترع ولا تلخص ولا تضف معرفة خارجية.
+- حافظ على العناوين والنقاط والتعريفات ونصوص الجداول المهمة.
+- pageNumber يجب أن يكون رقم الصفحة الحقيقي 1-based.
+- أعد كل صفحة مطلوبة مرة واحدة فقط.
+- إذا لم يوجد محتوى قابل للاسترجاع في صفحة مطلوبة فأعد text فارغًا.
+- اجعل نص كل صفحة أقل من 4000 محرف تقريبًا.
+- لا تستخدم Markdown fences ولا أي تعليق خارج JSON.
 `.trim();
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
       },
       body: JSON.stringify({
         model: MODEL_ID,
-        max_output_tokens: maxOutputTokens,
-        input: [
+        max_tokens: 16000,
+        messages: [
           {
             role: "user",
             content: [
               {
-                type: "input_file",
-                filename: req.fileName,
-                file_data: req.fileBuffer.toString("base64"),
+                type: "document",
+                source: {
+                  type: "base64",
+                  media_type: "application/pdf",
+                  data: req.fileBuffer.toString("base64"),
+                },
               },
-              { type: "input_text", text: prompt },
+              { type: "text", text: prompt },
             ],
           },
         ],
@@ -134,23 +120,27 @@ Rules:
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `OPENAI_PDF_API_ERROR_${response.status}: ${body.slice(0, 500)}`
+        `ANTHROPIC_PDF_API_ERROR_${response.status}: ${body.slice(0, 500)}`
       );
     }
 
-    const data = (await response.json()) as OpenAIResponse;
-    const text = responseText(data);
-    if (!text.trim()) throw new Error("OPENAI_PDF_EMPTY_RESPONSE");
+    const data = (await response.json()) as AnthropicResponse;
+    const text = (data.content ?? [])
+      .filter((item) => item.type === "text")
+      .map((item) => item.text ?? "")
+      .join("");
+
+    if (!text.trim()) throw new Error("ANTHROPIC_PDF_EMPTY_RESPONSE");
 
     let parsed: ExtractedPayload;
     try {
       parsed = JSON.parse(extractJsonObject(text)) as ExtractedPayload;
     } catch {
-      throw new Error("OPENAI_PDF_INVALID_JSON");
+      throw new Error("ANTHROPIC_PDF_INVALID_JSON");
     }
 
     if (!Array.isArray(parsed.pages)) {
-      throw new Error("OPENAI_PDF_PAGES_MISSING");
+      throw new Error("ANTHROPIC_PDF_PAGES_MISSING");
     }
 
     const requestedSet = requestedPages ? new Set(requestedPages) : null;
@@ -169,7 +159,7 @@ Rules:
         pageNumber,
         extractedText,
         title: normalizeText(rawPage.title) || undefined,
-        extractionMethod: "OPENAI_PDF",
+        extractionMethod: "VISION_LLM",
         extractionStatus:
           extractedText.length >= 20 ? "COMPLETED" : "OCR_REQUIRED",
         errorMessage:
@@ -186,7 +176,7 @@ Rules:
         pages.push({
           pageNumber,
           extractedText: "",
-          extractionMethod: "OPENAI_PDF",
+          extractionMethod: "VISION_LLM",
           extractionStatus: "OCR_REQUIRED",
           errorMessage: "Page was not returned by the extraction model.",
           processingMs: 0,
@@ -200,12 +190,12 @@ Rules:
     ).length;
 
     if (successCount === 0) {
-      throw new Error("OPENAI_PDF_NO_READABLE_CONTENT");
+      throw new Error("ANTHROPIC_PDF_NO_READABLE_CONTENT");
     }
 
     return {
       pages,
-      method: "OPENAI_PDF",
+      method: "VISION_LLM",
       totalPages: pages.length,
       successCount,
       failureCount: pages.length - successCount,

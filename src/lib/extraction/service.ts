@@ -11,6 +11,7 @@ import { inspectPdf } from "./pdf-inspector";
 import type { ExtractionAdapter, PdfInspectionResult, ExtractedPage, ExtractionResult } from "./types";
 import { LlamaParseAdapter } from "./adapters/llamaparse";
 import { OpenAIPdfExtractionAdapter } from "./adapters/openai-pdf";
+import { AnthropicPdfExtractionAdapter } from "./adapters/anthropic-pdf";
 import { MockExtractionAdapter } from "./adapters/mock";
 
 export type DocumentProcessingStatus =
@@ -33,8 +34,8 @@ export interface ProcessingProgress {
 // Adapter registry — ordered by production preference.
 // IMPORTANT: Mock extraction is never a production fallback. It is available
 // only in tests/dev when explicitly enabled.
-const OPENAI_PDF_BATCH_SIZE = 15;
-const OPENAI_PDF_CONCURRENCY = 2;
+const PDF_BATCH_SIZE = 15;
+const PDF_BATCH_CONCURRENCY = 2;
 const MIN_REAL_SOURCE_COVERAGE = 0.7;
 
 function requiredReadablePages(totalPages: number): number {
@@ -61,7 +62,10 @@ async function extractWithAdapter(
 ): Promise<ExtractionResult> {
   const { fileBuffer, fileName, mimeType, targetPages } = params;
 
-  if (adapter.name !== "OPENAI_PDF" || targetPages.length <= OPENAI_PDF_BATCH_SIZE) {
+  const batchedProvider =
+    adapter.name === "OPENAI_PDF" || adapter.name === "VISION_LLM";
+
+  if (!batchedProvider || targetPages.length <= PDF_BATCH_SIZE) {
     return adapter.extract({
       fileBuffer,
       fileName,
@@ -70,13 +74,13 @@ async function extractWithAdapter(
     });
   }
 
-  const batches = chunkPageNumbers(targetPages, OPENAI_PDF_BATCH_SIZE);
+  const batches = chunkPageNumbers(targetPages, PDF_BATCH_SIZE);
   const byPage = new Map<number, ExtractedPage>();
   const batchErrors: string[] = [];
   let processingMs = 0;
 
-  for (let i = 0; i < batches.length; i += OPENAI_PDF_CONCURRENCY) {
-    const group = batches.slice(i, i + OPENAI_PDF_CONCURRENCY);
+  for (let i = 0; i < batches.length; i += PDF_BATCH_CONCURRENCY) {
+    const group = batches.slice(i, i + PDF_BATCH_CONCURRENCY);
     const groupResults = await Promise.all(
       group.map(async (pageBatch) => {
         try {
@@ -113,13 +117,13 @@ async function extractWithAdapter(
 
   if (successCount === 0) {
     throw new Error(
-      `OPENAI_PDF_BATCH_EXTRACTION_FAILED — ${batchErrors.join(" | ")}`
+      `PDF_BATCH_EXTRACTION_FAILED_${adapter.name} — ${batchErrors.join(" | ")}`
     );
   }
 
   return {
     pages,
-    method: "OPENAI_PDF",
+    method: adapter.name,
     totalPages: targetPages.length,
     successCount,
     failureCount: Math.max(0, targetPages.length - successCount),
@@ -133,6 +137,11 @@ function getAdapters(): ExtractionAdapter[] {
   // Reuse the platform's existing OpenAI key for real PDF/OCR extraction.
   if (process.env.OPENAI_API_KEY) {
     adapters.push(new OpenAIPdfExtractionAdapter());
+  }
+
+  // Reuse the platform's existing Anthropic key as a real PDF/OCR fallback.
+  if (process.env.ANTHROPIC_API_KEY) {
+    adapters.push(new AnthropicPdfExtractionAdapter());
   }
 
   // Optional secondary provider.
@@ -202,7 +211,7 @@ export class DocumentExtractionService {
       );
       if (adapters.length === 0) {
         throw new Error(
-          "NO_REAL_EXTRACTION_ADAPTER — configure OPENAI_API_KEY or LLAMA_CLOUD_API_KEY"
+          "NO_REAL_EXTRACTION_ADAPTER — configure OPENAI_API_KEY, ANTHROPIC_API_KEY, or LLAMA_CLOUD_API_KEY"
         );
       }
 
