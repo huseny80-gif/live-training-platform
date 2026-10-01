@@ -153,8 +153,8 @@ async function runTests() {
     await prisma.trainingDay.delete({ where: { id: emptyDay.id } });
   });
 
-  // LIVE-02A: Arabic program rejects English questions before session creation
-  await test("LIVE-02A: Arabic session fails closed when the day contains an English question", async () => {
+  // LIVE-02A: Arabic program excludes legacy English questions from new sessions
+  await test("LIVE-02A: Arabic session excludes English legacy questions", async () => {
     const englishQuestion = await prisma.question.create({
       data: {
         dayId,
@@ -176,11 +176,15 @@ async function runTests() {
       });
     }
 
-    await assert.rejects(
-      () => createSession(programId, instructorId, 1),
-      /NON_ARABIC_QUESTIONS_IN_ARABIC_PROGRAM:1/
-    );
+    const session = await createSession(programId, instructorId, 1);
+    const links = await prisma.sessionQuestion.findMany({
+      where: { sessionId: session.id },
+      select: { questionId: true },
+    });
+    assert.ok(links.some((link) => link.questionId === questionId), "Arabic question should be included");
+    assert.ok(!links.some((link) => link.questionId === englishQuestion.id), "English question must be excluded");
 
+    await prisma.liveSession.delete({ where: { id: session.id } });
     await prisma.question.delete({ where: { id: englishQuestion.id } });
   });
 
