@@ -56,30 +56,36 @@ export async function createSession(
   // Generate unique session code
   const sessionCode = await generateUniqueCode();
 
-  const session = await prisma.liveSession.create({
-    data: {
-      programId,
-      instructorId,
-      sessionCode,
-      dayNumber,
-      title: title ?? `${program.title} — Day ${dayNumber}`,
-      status: "DRAFT",
-    },
-  });
+  const orderedQuestions = [...eligibleQuestions].sort(
+    (a, b) => a.questionOrder - b.questionOrder
+  );
 
-  // Create SessionQuestion rows (ordered)
-  for (const q of eligibleQuestions.sort((a, b) => a.questionOrder - b.questionOrder)) {
-    await prisma.sessionQuestion.create({
+  // Create the session and its question snapshot atomically.
+  // If any row fails, Prisma rolls the entire transaction back so we never
+  // leave an orphan/partial LiveSession behind.
+  return prisma.$transaction(async (tx) => {
+    const session = await tx.liveSession.create({
       data: {
-        sessionId: session.id,
-        questionId: q.id,
-        questionOrder: q.questionOrder,
+        programId,
+        instructorId,
+        sessionCode,
+        dayNumber,
+        title: title ?? `${program.title} — Day ${dayNumber}`,
         status: "DRAFT",
       },
     });
-  }
 
-  return session;
+    await tx.sessionQuestion.createMany({
+      data: orderedQuestions.map((q) => ({
+        sessionId: session.id,
+        questionId: q.id,
+        questionOrder: q.questionOrder,
+        status: "DRAFT" as const,
+      })),
+    });
+
+    return session;
+  });
 }
 
 async function generateUniqueCode(): Promise<string> {
