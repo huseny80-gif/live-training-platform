@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "./brand-tokens.css";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "الحقيبة التدريبية",
