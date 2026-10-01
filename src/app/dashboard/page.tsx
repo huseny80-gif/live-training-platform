@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listOwnedPrograms } from "@/app/actions/programs";
 import Link from "next/link";
 import { brand } from "@/lib/brand";
+import LanguageToggle from "@/components/LanguageToggle";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "مسودة",
@@ -50,6 +51,7 @@ export default async function DashboardPage() {
               <p >{brand.nameEn}</p>
             </div>
           </div>
+          <LanguageToggle />
           <div className="dlp-user">
             <div className="dlp-user-copy">
               <p >مرحباً بك</p>
