@@ -50,6 +50,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "PROGRAM_NOT_FOUND" }, { status: 404 });
   }
 
+  const existingMaterial = await prisma.trainingDocument.findFirst({ where: { programId }, select: { id: true } });
+  if (existingMaterial) {
+    return NextResponse.json({ error: "APPROVED_MATERIAL_ALREADY_EXISTS" }, { status: 409 });
+  }
+
   // Read file buffer
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
