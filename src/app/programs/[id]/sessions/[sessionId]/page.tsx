@@ -22,6 +22,7 @@ import SessionParticipantsList from "@/components/session/SessionParticipantsLis
 import SessionAnalyticsDashboard from "@/components/session/SessionAnalyticsDashboard";
 import SessionLeaderboard from "@/components/session/SessionLeaderboard";
 import SessionFinalReport from "@/components/session/SessionFinalReport";
+import { getPublicParticipantOrigin } from "@/lib/public-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -87,17 +88,13 @@ export default async function InstructorSessionPage({
   const prevQ = questions.find((q) => q.questionOrder === currentOrder - 1) ?? null;
   const nextQ = questions.find((q) => q.questionOrder === currentOrder + 1) ?? null;
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ??
-    process.env.NEXTAUTH_URL ??
-    "http://localhost:3000";
-  const joinUrl = `${baseUrl}/join/${session.sessionCode}`;
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}&bgcolor=ffffff&color=1d4ed8&margin=10`;
+  const publicOrigin = getPublicParticipantOrigin();
+  const joinUrl = `${publicOrigin}/join/${encodeURIComponent(session.sessionCode)}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}&bgcolor=ffffff&color=0f766e&margin=10`;
 
   return (
-    <main dir="rtl" lang="ar" className="min-h-screen bg-gray-50 p-4 md:p-6">
-      <div className="max-w-3xl mx-auto space-y-5">
+    <main dir="rtl" lang="ar" className="dlp-simple-page dlp-live-admin">
+      <div className="dlp-live-wrap">
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -134,7 +131,7 @@ export default async function InstructorSessionPage({
         )}
 
         {/* Session info + QR */}
-        <div className="bg-white rounded-2xl border p-5 grid md:grid-cols-2 gap-5">
+        <div className="brand-card dlp-live-share">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className={`text-sm font-medium px-3 py-1 rounded-full ${STATUS_COLOR[session.status]}`}>
@@ -146,9 +143,9 @@ export default async function InstructorSessionPage({
             </div>
 
             {/* Session code */}
-            <div className="bg-blue-50 rounded-xl p-4 text-center">
+            <div className="dlp-live-code">
               <p className="text-xs text-gray-500 mb-1">رمز الجلسة</p>
-              <p className="text-4xl font-mono font-bold tracking-widest text-blue-700">{session.sessionCode}</p>
+              <p className="dlp-live-code-value">{session.sessionCode}</p>
               <p className="text-xs text-gray-400 mt-1 break-all">{joinUrl}</p>
               <CopyLinkButton url={joinUrl} />
               <ShareLinkButton url={joinUrl} />
@@ -306,7 +303,7 @@ export default async function InstructorSessionPage({
 
         {/* Current question */}
         {currentSQ && (
-          <div className="bg-white rounded-2xl border p-5">
+          <div className="brand-card dlp-live-question">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-semibold text-gray-800">السؤال الحالي — Q{currentSQ.questionOrder}</h2>
               <span className={`text-xs px-2 py-0.5 rounded-full ${SQ_STATUS_COLOR[currentSQ.status]}`}>
