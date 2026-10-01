@@ -74,6 +74,10 @@ export class OpenAIPdfExtractionAdapter implements ExtractionAdapter {
       ? `Extract only these PDF pages: ${requestedPages.join(", ")}.`
       : "Extract every page in the PDF that contains readable or visually recoverable training content.";
 
+    const maxOutputTokens = requestedPages
+      ? Math.min(30000, Math.max(6000, requestedPages.length * 1600))
+      : 30000;
+
     const prompt = `
 You are a document extraction engine. Read the attached PDF directly.
 
@@ -110,7 +114,7 @@ Rules:
       },
       body: JSON.stringify({
         model: MODEL_ID,
-        max_output_tokens: 100000,
+        max_output_tokens: maxOutputTokens,
         input: [
           {
             role: "user",
