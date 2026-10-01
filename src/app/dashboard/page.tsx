@@ -26,6 +26,7 @@ const navItems = [
   { label: "المشاركون", icon: "♙", href: "/dashboard" },
   { label: "الاختبارات", icon: "✓", href: "/dashboard" },
   { label: "النتائج والتحليلات", icon: "⌁", href: "/dashboard" },
+  { label: "من نحن", icon: "ⓘ", href: "/about" },
   { label: "الإعدادات", icon: "⚙", href: "/settings" },
 ];
 
@@ -154,7 +155,7 @@ export default async function DashboardPage() {
           <nav className="dlp-mobile-nav" aria-label="التنقل الرئيسي">
             <Link href="/dashboard" className="active">⌂<span className="block">الرئيسية</span></Link>
             <Link href="/dashboard" >▣<span className="block">البرامج</span></Link>
-            <Link href="/dashboard" >◉<span className="block">الجلسات</span></Link>
+            <Link href="/about" >ⓘ<span className="block">من نحن</span></Link>
             <Link href="/settings" >⚙<span className="block">الإعدادات</span></Link>
           </nav>
           <div className="dlp-mobile-spacer" />
