@@ -170,7 +170,11 @@ async function requestFinalExam(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, input: prompt }),
+    body: JSON.stringify({
+      model,
+      input: prompt,
+      max_output_tokens: 24000,
+    }),
   });
 
   if (!response.ok) {
@@ -260,11 +264,13 @@ export async function generateFinalQuestions(
     };
   }
 
+  // Keep all usable page references while bounding each page contribution so
+  // a large 147-page source remains inside a reliable model context window.
   const source = usable
-    .map(
-      (page) =>
-        `[PAGE ${page.pageNumber}${page.title ? ` — ${page.title}` : ""}]\n${page.extractedText}`,
-    )
+    .map((page) => {
+      const text = (page.extractedText ?? "").trim().slice(0, 1200);
+      return `[PAGE ${page.pageNumber}${page.title ? ` — ${page.title}` : ""}]\n${text}`;
+    })
     .join("\n\n");
 
   const apiKey = process.env.OPENAI_API_KEY;
