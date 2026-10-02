@@ -74,7 +74,7 @@ export async function listDays(programId: string) {
   const instructorId = await requireInstructor();
   await requireProgramOwnership(programId, instructorId);
   return prisma.trainingDay.findMany({
-    where: { programId },
+    where: { programId, dayNumber: { gt: 0 } },
     orderBy: { dayNumber: "asc" },
     include: { _count: { select: { questions: true } } },
   });

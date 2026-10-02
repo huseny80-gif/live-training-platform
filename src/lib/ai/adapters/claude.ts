@@ -19,13 +19,17 @@ const dayPlanSchema = objectSchema({ days: { type: "array", items: objectSchema(
   topics: strings, pageRangeStart: integerField, pageRangeEnd: integerField,
   sourcePages: { type: "array", items: integerField },
 }) } });
-const questionSchema = objectSchema({ questions: { type: "array", items: objectSchema({
-  questionText: stringField,
-  options: { type: "array", items: objectSchema({ label: { type: "string", enum: ["A", "B", "C", "D"] }, text: stringField }) },
-  correctLabel: { type: "string", enum: ["A", "B", "C", "D"] }, explanation: stringField,
-  questionOrder: integerField, sourcePageNumber: integerField, topic: stringField,
-  difficulty: { type: "string", enum: ["EASY", "MEDIUM", "HARD"] },
-}) } });
+function questionOutputSchema(labels: string[]) {
+  return objectSchema({ questions: { type: "array", items: objectSchema({
+    questionText: stringField,
+    options: { type: "array", items: objectSchema({ label: { type: "string", enum: labels }, text: stringField }) },
+    correctLabel: { type: "string", enum: labels }, explanation: stringField,
+    questionOrder: integerField, sourcePageNumber: integerField, topic: stringField,
+    difficulty: { type: "string", enum: ["EASY", "MEDIUM", "HARD"] },
+  }) } });
+}
+const questionSchema = questionOutputSchema(["A", "B", "C", "D"]);
+const trueFalseSchema = questionOutputSchema(["A", "B"]);
 
 export class ClaudeAIAdapter implements AIAdapter {
   readonly name = "CLAUDE";
@@ -42,7 +46,8 @@ export class ClaudeAIAdapter implements AIAdapter {
 
     // ── Step 1: Generate 10-day plan ─────────────────────────────────────────
 
-    const dayPlanPrompt = buildDayPlanPrompt(
+    const purpose = req.assessmentType === "FINAL" ? "\nهذا اختبار نهائي مستقل وشامل للدورة؛ اعتبر الأيام محاور تقييم تغطي مختلف أجزاء المستند، وأنشئ أسئلة جديدة تتطلب تطبيق المعرفة والتحليل.\n" : "";
+    const dayPlanPrompt = purpose + buildDayPlanPrompt(
       req.pages,
       req.programTitle,
       req.language,
@@ -75,6 +80,20 @@ export class ClaudeAIAdapter implements AIAdapter {
     }
     const days = await requestValidated(dayPlanPrompt, dayPlanSchema, 8192, text => parseDayPlans(text, req.totalDays, req.pages), "PLAN");
 
+    if (req.assessmentType === "FINAL") {
+      // Each question type spans the entire document, rather than only its first pages.
+      for (const type of ["MULTIPLE_CHOICE", "TRUE_FALSE"] as const) {
+        const sections = days.filter(day => req.questionTypesByDay?.[day.dayNumber] === type);
+        sections.forEach((day, index) => {
+          const start = Math.floor(index * req.pages.length / sections.length);
+          const end = Math.floor((index + 1) * req.pages.length / sections.length);
+          const pages = req.pages.slice(start, end);
+          day.sourcePages = (pages.length ? pages : [req.pages[index % req.pages.length]]).map(p => p.pageNumber);
+          day.pageRangeStart = day.sourcePages[0]; day.pageRangeEnd = day.sourcePages[day.sourcePages.length - 1];
+        });
+      }
+    }
+
     // ── Step 2: Generate questions for each day ───────────────────────────────
 
     const allQuestions: GeneratedQuestion[] = [];
@@ -82,18 +101,25 @@ export class ClaudeAIAdapter implements AIAdapter {
     // Two days at a time keep the 10-day course within the serverless budget.
     for (let offset = 0; offset < days.length; offset += 2) {
       const batch = await Promise.all(days.slice(offset, offset + 2).map(async day => {
-        const existingTexts = allQuestions.map((q) => q.questionText);
+        const existingTexts = [...(req.existingQuestionTexts ?? []), ...allQuestions.map((q) => q.questionText)];
 
-        const qPrompt = buildQuestionsPrompt(
+        const questionType = req.questionTypesByDay?.[day.dayNumber] ?? "MULTIPLE_CHOICE";
+        const qPrompt = purpose + buildQuestionsPrompt(
           day,
           req.pages,
           req.language,
           req.questionsPerDay,
-          existingTexts
+          existingTexts, questionType, req.assessmentType === "FINAL"
         );
 
-        const dayQuestions = await requestValidated(qPrompt, questionSchema, 8192, text => {
-          const questions = parseQuestions(text, day.dayNumber, req.questionsPerDay);
+        const dayQuestions = await requestValidated(qPrompt, questionType === "TRUE_FALSE" ? trueFalseSchema : questionSchema, 8192, text => {
+          const questions = parseQuestions(text, day.dayNumber, req.questionsPerDay, questionType);
+          if (questionType === "TRUE_FALSE" && questions.some(q => q.options[0].text !== (req.language === "AR" ? "صح" : "True") || q.options[1].text !== (req.language === "AR" ? "خطأ" : "False"))) throw new Error("AI_INVALID_CONTENT");
+          if (req.assessmentType === "FINAL") {
+            const normalize = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+            const seen = new Set(existingTexts.map(normalize));
+            for (const q of questions) { const key = normalize(q.questionText); if (seen.has(key)) throw new Error("AI_DUPLICATE_FINAL_QUESTION"); seen.add(key); }
+          }
           if (questions.some(q => !day.sourcePages.includes(q.sourcePageNumber))) throw new Error("AI_INVALID_SOURCE_PAGE");
           if (req.language === "AR" && questions.some(q => !/[\u0600-\u06FF]/.test(q.questionText) || q.options.some(o => !/[\u0600-\u06FF]/.test(o.text)))) throw new Error("AI_LANGUAGE_MISMATCH_AR");
           return questions;
@@ -178,7 +204,8 @@ function parseDayPlans(
 function parseQuestions(
   text: string,
   dayNumber: number,
-  questionsPerDay: number
+  questionsPerDay: number,
+  questionType: "MULTIPLE_CHOICE" | "TRUE_FALSE" = "MULTIPLE_CHOICE"
 ): GeneratedQuestion[] {
   let parsed: unknown;
   try {
@@ -190,7 +217,8 @@ function parseQuestions(
   const raw = parsed as { questions?: unknown[] };
   if (!Array.isArray(raw?.questions) || raw.questions.length !== questionsPerDay) throw new Error("AI_INCOMPLETE_CONTENT");
 
-  const validLabels = new Set(["A", "B", "C", "D"]);
+  const labels = questionType === "TRUE_FALSE" ? ["A", "B"] : ["A", "B", "C", "D"];
+  const validLabels = new Set(labels);
   const validDifficulties = new Set(["EASY", "MEDIUM", "HARD"]);
 
   return raw.questions
@@ -198,7 +226,7 @@ function parseQuestions(
     .map((q: unknown, i) => {
       const item = q as Record<string, unknown>;
       const options = Array.isArray(item.options) ? item.options as Array<Record<string, string>> : [];
-      if (options.length !== 4 || new Set(options.map(o => o.label)).size !== 4 ||
+      if (options.length !== labels.length || new Set(options.map(o => o.label)).size !== labels.length ||
           options.some(o => !validLabels.has(o.label) || typeof o.text !== "string" || !o.text.trim()) ||
           !validLabels.has(item.correctLabel as string) || !Number.isInteger(item.sourcePageNumber) ||
           typeof item.questionText !== "string" || !item.questionText.trim() || typeof item.explanation !== "string" || !item.explanation.trim()) {
@@ -207,8 +235,9 @@ function parseQuestions(
       const correctLabel = item.correctLabel as "A" | "B" | "C" | "D";
 
       return {
+        questionType,
         questionText: typeof item.questionText === "string" ? item.questionText : "",
-        options: ["A", "B", "C", "D"].map((label) => {
+        options: labels.map((label) => {
           const opt = options.find((o) => o.label === label);
           return { label: label as "A" | "B" | "C" | "D", text: typeof opt?.text === "string" ? opt.text : "" };
         }),

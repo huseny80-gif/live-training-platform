@@ -6,6 +6,7 @@
 // All methods here are server-only (called from Server Actions).
 
 import { Prisma } from "@prisma/client";
+import { isTransactionConflict } from "@/lib/transaction-conflict";
 import { prisma } from "@/lib/prisma";
 import type { AIAdapter, ContentGenerationRequest, SourcePageRef } from "./types";
 import { ClaudeAIAdapter } from "./adapters/claude";
@@ -120,7 +121,7 @@ export class ContentGenerationService {
     try {
       // Regeneration must never cascade-delete questions or session history.
       const occupied = await prisma.trainingProgram.count({
-        where: { id: programId, OR: [{ days: { some: { questions: { some: {} } } } }, { sessions: { some: {} } }] },
+        where: { id: programId, OR: [{ days: { some: { dayNumber: { gt: 0 }, questions: { some: {} } } } }, { sessions: { some: { dayNumber: { gt: 0 } } } }] },
       });
       if (occupied) throw new Error("CONTENT_ALREADY_EXISTS");
       const adapter = this.adapter ?? getAdapter();
@@ -159,9 +160,11 @@ export class ContentGenerationService {
       const pageIdByNumber = new Map(pages.map((p) => [p.pageNumber, p.id]));
 
       let totalQuestions = 0;
-      await prisma.$transaction(async tx => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        totalQuestions = 0;
+        try { await prisma.$transaction(async tx => {
         const occupied = await tx.trainingProgram.count({
-          where: { id: programId, OR: [{ days: { some: { questions: { some: {} } } } }, { sessions: { some: {} } }] },
+          where: { id: programId, OR: [{ days: { some: { dayNumber: { gt: 0 }, questions: { some: {} } } } }, { sessions: { some: { dayNumber: { gt: 0 } } } }] },
         });
         if (occupied) throw new Error("CONTENT_ALREADY_EXISTS");
 
@@ -251,6 +254,12 @@ export class ContentGenerationService {
         }
 
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 60_000 });
+          break;
+        } catch (error) {
+          if (!isTransactionConflict(error) || attempt === 4) throw error;
+          await new Promise(resolve => setTimeout(resolve, Math.min(800, 200 * 2 ** attempt)));
+        }
+      }
 
       return {
         programId, documentId,

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { isTransactionConflict } from "@/lib/transaction-conflict";
 import { prisma } from "@/lib/prisma";
 import { contentGenerationService } from "./service";
 import type { ContentGenerationService } from "./service";
@@ -18,13 +19,13 @@ export class GenerationJobs {
 
   async claim(documentId: string, programId: string, instructorId: string): Promise<{ status: string; runId?: string }> {
     await recoverGenerationJobs(instructorId, { programId });
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await prisma.$transaction(async tx => {
           const document = await tx.trainingDocument.findFirst({ where: { id: documentId, programId, program: { instructorId } } });
           if (!document) return { status: "NOT_FOUND" };
           if (document.extractionStatus !== "COMPLETED") return { status: "EXTRACTION_REQUIRED" };
-          const occupied = await tx.trainingProgram.count({ where: { id: programId, OR: [{ days: { some: { questions: { some: {} } } } }, { sessions: { some: {} } }] } });
+          const occupied = await tx.trainingProgram.count({ where: { id: programId, OR: [{ days: { some: { dayNumber: { gt: 0 }, questions: { some: {} } } } }, { sessions: { some: { dayNumber: { gt: 0 } } } }] } });
           if (occupied) return { status: "CONTENT_ALREADY_EXISTS" };
           if (document.extractionNotes?.startsWith(PREFIX)) return { status: "PROCESSING" };
           if (await tx.trainingDocument.count({ where: { programId, extractionNotes: { startsWith: PREFIX } } })) return { status: "PROGRAM_PROCESSING" };
@@ -35,7 +36,8 @@ export class GenerationJobs {
           return { status: "STARTED", runId };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
-        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2034" || attempt === 2) throw error;
+        if (!isTransactionConflict(error) || attempt === 4) throw error;
+        await new Promise(resolve => setTimeout(resolve, Math.min(800, 200 * 2 ** attempt)));
       }
     }
     throw new Error("CLAIM_FAILED");

@@ -15,6 +15,11 @@ test.beforeAll(async () => {
     const q = await prisma.question.create({ data: { dayId: day.id, programId, questionText: `ما الإجابة لليوم ${number}؟`, questionOrder: 1, status: number === 1 ? "APPROVED" : "DRAFT", options: { create: [{ optionLabel: "A", optionText: "الإجابة الصحيحة", displayOrder: 1 }, { optionLabel: "B", optionText: "الإجابة الأخرى", displayOrder: 2 }] } }, include: { options: true } });
     await prisma.question.update({ where: { id: q.id }, data: { correctOptionId: q.options.find(o => o.optionLabel === "A")!.id } });
   }
+  const finalDay = await prisma.trainingDay.create({ data: { programId, dayNumber: 0, title: "أسئلة الاختبار النهائي" } });
+  for (let i = 1; i <= 35; i++) {
+    const q = await prisma.question.create({ data: { programId, dayId: finalDay.id, questionOrder: i, questionText: `ما الإجابة للاختبار النهائي ${i}؟`, questionType: i <= 15 ? "MULTIPLE_CHOICE" : "TRUE_FALSE", status: "APPROVED", options: { create: (i <= 15 ? ["A", "B", "C", "D"] : ["A", "B"]).map((label, j) => ({ optionLabel: label as "A" | "B" | "C" | "D", optionText: i <= 15 ? `إجابة نهائية ${j + 1}` : (j === 0 ? "صح" : "خطأ"), displayOrder: j + 1 })) } }, include: { options: true } });
+    await prisma.question.update({ where: { id: q.id }, data: { correctOptionId: q.options.find(o => o.optionLabel === "A")!.id } });
+  }
 });
 test.afterAll(async () => {
   if (prisma) { await prisma.liveSession.deleteMany({ where: { programId } }); await prisma.trainingProgram.deleteMany({ where: { id: { in: [programId, foreignId] } } }); await prisma.instructor.delete({ where: { id: otherId } }); await prisma.$disconnect(); }
@@ -60,12 +65,15 @@ test("question editing saves text and correct answers in both screens and protec
   await expect(page.getByRole("button", { name: "اعتماد السؤال", exact: true })).toHaveCount(1);
   await page.getByRole("button", { name: "اعتماد السؤال", exact: true }).click();
   await expect(page.getByRole("button", { name: "اعتماد السؤال", exact: true })).toHaveCount(0);
-  await page.goto(`/final-exam?programId=${programId}`); await page.getByLabel("عدد أسئلة الاختبار النهائي").fill("2"); await page.getByRole("button", { name: "إنشاء اختبار نهائي", exact: true }).click(); await expect(page).toHaveURL(/\/sessions\//);
+  await page.goto(`/final-exam?programId=${programId}`); await expect(page.getByLabel("عدد أسئلة الاختبار النهائي")).toHaveValue("35"); await page.getByRole("button", { name: "إنشاء اختبار نهائي", exact: true }).click(); await expect(page).toHaveURL(/\/sessions\//);
   const exam = await prisma.liveSession.findFirstOrThrow({ where: { programId, dayNumber: 0 }, include: { sessionQuestions: { include: { question: { include: { day: true } } } } } });
-  expect(exam.sessionQuestions).toHaveLength(2); expect(new Set(exam.sessionQuestions.map(q => q.question.day.dayNumber)).size).toBe(2); expect(exam.scoringConfig).toEqual({ assessmentType: "FINAL" });
+  expect(exam.sessionQuestions).toHaveLength(35); expect(exam.sessionQuestions.every(q => q.question.day.dayNumber === 0)).toBe(true); expect(exam.scoringConfig).toEqual({ assessmentType: "FINAL" });
   await page.goto(`/google-forms?programId=${programId}&examId=${exam.id}`); await page.getByRole("button", { name: "تجهيز نموذج Google Forms" }).click();
   await expect(page.getByLabel("كود إنشاء النموذج")).toHaveValue(/FormApp.create/); const download = page.waitForEvent("download"); await page.getByRole("button", { name: "تحميل ملف النموذج" }).click(); expect((await download).suggestedFilename()).toBe("training-quiz.gs");
-  await prisma.liveSession.update({ where: { id: exam.id }, data: { status: "ACTIVE" } });
+  // A daily session protects the edited daily question independently of the final bank.
+  const { createSession } = await import("../../src/lib/session/service");
+  const daily = await createSession(programId, exam.instructorId, 1);
+  await prisma.liveSession.update({ where: { id: daily.id }, data: { status: "ACTIVE" } });
   await page.goto(`/questions?programId=${programId}`);
   await page.locator("article.platform-question").first().getByRole("button", { name: "تعديل السؤال والإجابات", exact: true }).click();
   const lockedEditor = page.getByRole("form", { name: "تعديل السؤال والإجابات" });

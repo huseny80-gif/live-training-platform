@@ -40,6 +40,7 @@ export async function getProgramContent(programId: string) {
     where: { id: programId },
     include: {
       days: {
+        where: { dayNumber: { gt: 0 } },
         orderBy: { dayNumber: "asc" },
         include: {
           topics: { orderBy: { topicOrder: "asc" } },

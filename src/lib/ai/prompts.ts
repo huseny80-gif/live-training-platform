@@ -1,7 +1,7 @@
 // Versioned prompt templates — bump PROMPT_VERSION when changing prompts
 // so aiPromptVersion on Question tracks which prompt produced each question.
 
-export const PROMPT_VERSION = "v1.1";
+export const PROMPT_VERSION = "v1.2";
 
 export function buildDayPlanPrompt(
   pages: Array<{ pageNumber: number; title?: string | null; extractedText: string }>,
@@ -54,17 +54,29 @@ export function buildQuestionsPrompt(
   pages: Array<{ pageNumber: number; title?: string | null; extractedText: string }>,
   language: "AR" | "EN",
   questionsPerDay: number,
-  existingQuestionTexts: string[] = []
+  existingQuestionTexts: string[] = [],
+  questionType: "MULTIPLE_CHOICE" | "TRUE_FALSE" = "MULTIPLE_CHOICE",
+  fullContent = false
 ): string {
   const dayPages = pages.filter((p) => dayPlan.sourcePages.includes(p.pageNumber));
   if (!dayPages.some(p => p.extractedText.trim())) throw new Error("NO_EXTRACTED_PAGES");
   const pageContent = dayPages
-    .map((p) => `[صفحة ${p.pageNumber}${p.title ? ` — ${p.title}` : ""}]\n${p.extractedText.slice(0, 1000)}`)
+    .map((p) => `[صفحة ${p.pageNumber}${p.title ? ` — ${p.title}` : ""}]\n${fullContent ? p.extractedText : p.extractedText.slice(0, 1000)}`)
     .join("\n\n---\n\n");
 
   const avoidBlock = existingQuestionTexts.length > 0
     ? `\nتجنب التكرار مع هذه الأسئلة الموجودة:\n${existingQuestionTexts.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n`
     : "";
+
+  if (questionType === "TRUE_FALSE") return `أنت خبير في التقييم النهائي. أنشئ ${questionsPerDay} عبارات صح/خطأ دقيقة تشمل مختلف موضوعات المحتوى التالي.
+اللغة: ${language === "AR" ? "العربية" : "الإنجليزية"}
+المحور: ${dayPlan.title}
+${avoidBlock}
+${pageContent}
+أعد JSON فقط: {"questions":[{"questionText":"عبارة قابلة للحكم بصح أو خطأ","options":[{"label":"A","text":"${language === "AR" ? "صح" : "True"}"},{"label":"B","text":"${language === "AR" ? "خطأ" : "False"}"}],"correctLabel":"A","explanation":"تفسير مع تصحيح العبارة إن كانت خاطئة","questionOrder":1,"sourcePageNumber":${dayPlan.sourcePages[0]},"topic":"الموضوع","difficulty":"MEDIUM"}]}
+المثال لعنصر واحد؛ أعد ${questionsPerDay} عناصر كاملة، وخيارين فقط لكل عبارة: A = ${language === "AR" ? "صح" : "True"} وB = ${language === "AR" ? "خطأ" : "False"}.
+اجعل بعض العبارات صحيحة وبعضها خاطئة، ولا تكرر الأسئلة السابقة، ولا تضف حقيقة من خارج المستند. يجب أن تكون مراجع الصفحات من [${dayPlan.sourcePages.join(", ")}].
+`;
 
   return `أنت خبير في إنشاء أسئلة اختيار متعدد تعليمية. مهمتك إنشاء ${questionsPerDay} أسئلة دقيقة لليوم التدريبي المحدد.
 

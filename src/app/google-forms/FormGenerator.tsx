@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { buildGoogleFormScript, type FormQuestion } from "@/lib/google-forms";
-export default function FormGenerator({ title, questions }: { title: string; questions: FormQuestion[] }) {
+export default function FormGenerator({ title, questions, blockedReason }: { title: string; questions: FormQuestion[]; blockedReason?: string }) {
   const [name, setName] = useState(title);
   const [script, setScript] = useState("");
   const [message, setMessage] = useState("");
@@ -14,7 +14,8 @@ export default function FormGenerator({ title, questions }: { title: string; que
   return <section className="brand-card tp-p-4 tp-space-y-3"><h2>إنشاء اختبار Google Forms</h2>
     <p>الأسئلة المعتمدة الجاهزة للتصدير: {questions.length}</p>
     <label htmlFor="form-title">عنوان النموذج</label><input id="form-title" className="platform-input" value={name} onChange={e => setName(e.target.value)} maxLength={200}/>
-    <button className="brand-btn brand-btn-primary" disabled={!questions.length} onClick={generate}>تجهيز نموذج Google Forms</button>
+    <button className="brand-btn brand-btn-primary" disabled={!questions.length || !!blockedReason} onClick={generate}>تجهيز نموذج Google Forms</button>
+    {blockedReason && <p>{blockedReason}</p>}
     {!questions.length && <p>اعتمد الأسئلة وحدد الإجابات الصحيحة من إدارة المحتوى أولاً.</p>}
     {message && <p role="status">{message}</p>}
     {script && <><div className="tp-flex tp-gap-3 tp-flex-wrap"><button className="brand-btn brand-btn-secondary" onClick={download}>تحميل ملف النموذج</button><button className="brand-btn brand-btn-secondary" onClick={copy}>نسخ الكود</button></div>

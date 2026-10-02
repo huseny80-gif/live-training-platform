@@ -72,8 +72,9 @@ export async function listOwnedPrograms() {
     where: { instructorId },
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { days: true, sessions: true } },
+      _count: { select: { days: { where: { dayNumber: { gt: 0 } } }, sessions: true } },
       days: {
+        where: { dayNumber: { gt: 0 } },
         include: {
           _count: { select: { questions: true } },
         },
@@ -90,8 +91,9 @@ export async function getProgram(programId: string) {
   return prisma.trainingProgram.findUnique({
     where: { id: programId },
     include: {
-      _count: { select: { days: true, sessions: true } },
+      _count: { select: { days: { where: { dayNumber: { gt: 0 } } }, sessions: true } },
       days: {
+        where: { dayNumber: { gt: 0 } },
         orderBy: { dayNumber: "asc" },
         include: { _count: { select: { questions: true } } },
       },

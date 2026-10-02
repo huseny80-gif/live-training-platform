@@ -82,7 +82,7 @@ export async function createSession(
 /** A separate cross-course assessment. dayNumber 0 denotes the final exam, not a training day. */
 export async function createFinalSession(programId: string, instructorId: string, count: number) {
   const program = await prisma.trainingProgram.findFirst({ where: { id: programId, instructorId }, include: {
-    days: { orderBy: { dayNumber: "asc" }, include: { questions: { where: { status: { in: ["APPROVED", "USED"] } }, orderBy: { questionOrder: "asc" }, include: { options: true } } } },
+    days: { where: { dayNumber: 0 }, orderBy: { dayNumber: "asc" }, include: { questions: { where: { status: { in: ["APPROVED", "USED"] } }, orderBy: { questionOrder: "asc" }, include: { options: true } } } },
   } });
   if (!program) throw new Error("PROGRAM_NOT_FOUND");
   const arabic = /[\u0600-\u06FF]/;
@@ -90,6 +90,7 @@ export async function createFinalSession(programId: string, instructorId: string
     q.questionText.trim() && q.options.length >= 2 && q.options.every(o => o.optionText.trim()) && q.options.some(o => o.id === q.correctOptionId) &&
     (program.language !== "AR" || (arabic.test(q.questionText) && q.options.every(o => arabic.test(o.optionText))))
   ) })), count);
+  if (count !== 35 || selected.filter(q => q.questionType === "MULTIPLE_CHOICE").length !== 15 || selected.filter(q => q.questionType === "TRUE_FALSE").length !== 20) throw new Error("INVALID_FINAL_EXAM_COMPOSITION");
   const sessionCode = await generateUniqueCode();
   return prisma.liveSession.create({ data: {
     programId, instructorId, sessionCode, dayNumber: 0, title: `${program.title} — الاختبار النهائي`,

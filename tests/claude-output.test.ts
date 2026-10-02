@@ -67,7 +67,27 @@ async function run() {
     const ordered = await new ClaudeAIAdapter().generate(request);
     assert.deepEqual(ordered.questions.slice(0, 5).map(q => q.questionOrder), [1, 2, 3, 4, 5]);
     console.log("PASS: question order is assigned from the validated array without changing answers");
-    console.log("Claude output validation: 7 passed, 0 failed (transport fixtures, no live API calls)");
+    const allPages = Array.from({ length: 147 }, (_, i) => ({ pageId: `page-${i + 1}`, pageNumber: i + 1, extractedText: "محتوى الصفحة ".repeat(100) + `نهاية الصفحة الكاملة ${i + 1}` }));
+    const coverage = { mcq: new Set<number>(), tf: new Set<number>() }; let finalCall = 0;
+    globalThis.fetch = async (_input, init) => {
+      const body = JSON.parse(String(init?.body)); const schema = body.output_config.format.schema; const prompt = body.messages[0].content;
+      let content: unknown;
+      if (schema.properties.days) content = { days: Array.from({ length: 7 }, (_, i) => ({ ...days[0], dayNumber: i + 1, sourcePages: [1] })) };
+      else {
+        const tf = schema.properties.questions.items.properties.options.items.properties.label.enum.length === 2;
+        const pageNumbers = [...prompt.matchAll(/\[صفحة (\d+)/g)].map(m => Number(m[1]));
+        pageNumbers.forEach(n => { coverage[tf ? "tf" : "mcq"].add(n); assert.ok(prompt.includes(`نهاية الصفحة الكاملة ${n}`)); });
+        content = { questions: questions.map((q, i) => ({ ...q, questionText: `عبارة الاختبار النهائي ${finalCall}-${i} صحيحة؟`, sourcePageNumber: pageNumbers[0], options: tf ? [{ label: "A", text: "صح" }, { label: "B", text: "خطأ" }] : q.options })) }; finalCall++;
+      }
+      return new Response(JSON.stringify({ id: "msg_final", type: "message", role: "assistant", model: "test", content: [{ type: "text", text: JSON.stringify(content) }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const final = await new ClaudeAIAdapter().generate({ ...request, pages: allPages, totalDays: 7, assessmentType: "FINAL", questionTypesByDay: { 1: "MULTIPLE_CHOICE", 2: "MULTIPLE_CHOICE", 3: "MULTIPLE_CHOICE", 4: "TRUE_FALSE", 5: "TRUE_FALSE", 6: "TRUE_FALSE", 7: "TRUE_FALSE" } });
+    assert.equal(final.questions.filter(q => q.questionType === "MULTIPLE_CHOICE").length, 15);
+    assert.equal(final.questions.filter(q => q.questionType === "TRUE_FALSE").length, 20);
+    assert.ok(final.questions.filter(q => q.questionType === "TRUE_FALSE").every(q => q.options.length === 2 && q.options[0].text === "صح" && q.options[1].text === "خطأ"));
+    assert.equal(coverage.mcq.size, 147); assert.equal(coverage.tf.size, 147);
+    console.log("PASS: final generation produces 15 MCQ and 20 true/false while each type reads all 147 complete source pages");
+    console.log("Claude output validation: 8 passed, 0 failed (transport fixtures, no live API calls)");
   } finally {
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;

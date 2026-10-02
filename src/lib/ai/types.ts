@@ -34,6 +34,7 @@ export interface GeneratedOption {
 }
 
 export interface GeneratedQuestion {
+  questionType?: "MULTIPLE_CHOICE" | "TRUE_FALSE";
   questionText: string;
   options: GeneratedOption[];            // always 4
   correctLabel: "A" | "B" | "C" | "D";  // NEVER exposed to participant APIs
@@ -51,8 +52,11 @@ export interface ContentGenerationRequest {
   pages: SourcePageRef[];
   language: AILanguage;
   programTitle: string;
-  totalDays: number;           // always 10
-  questionsPerDay: number;     // always 5
+  assessmentType?: "FINAL";
+  existingQuestionTexts?: string[];
+  questionTypesByDay?: Record<number, "MULTIPLE_CHOICE" | "TRUE_FALSE">;
+  totalDays: number;           // training days or final assessment sections
+  questionsPerDay: number;     // questions per section
   onProgress?: (completedDays: number) => Promise<void>;
 }
 
