@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { runProgramRebuild } from "@/lib/client/program-rebuild";
 import {
   createDayAction,
@@ -113,7 +113,20 @@ function Badge({ text, color }: { text: string; color: string }) {
 
 export default function ManageClient({ program }: { program: Program }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"days" | "questions" | "sessions">("days");
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const initialTab: "days" | "questions" | "sessions" =
+    requestedTab === "questions" || requestedTab === "sessions" ? requestedTab : "days";
+  const [activeTab, setActiveTab] = useState<"days" | "questions" | "sessions">(initialTab);
+
+  function selectTab(tab: "days" | "questions" | "sessions") {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "days") params.delete("tab");
+    else params.set("tab", tab);
+    const query = params.toString();
+    router.replace(query ? `?${query}` : window.location.pathname, { scroll: false });
+  }
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [showAddDay, setShowAddDay] = useState(false);
   const [editingDayId, setEditingDayId] = useState<string | null>(null);
@@ -231,7 +244,7 @@ export default function ManageClient({ program }: { program: Program }) {
         {(["days", "questions", "sessions"] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => selectTab(tab)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               activeTab === tab ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}
