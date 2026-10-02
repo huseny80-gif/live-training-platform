@@ -46,12 +46,17 @@ export async function getProgramContent(programId: string) {
         include: {
           topics: { orderBy: { topicOrder: "asc" } },
           questions: {
+            where: { status: { not: "REJECTED" } },
             orderBy: { questionOrder: "asc" },
             include: {
               options: { orderBy: { displayOrder: "asc" } },
             },
           },
-          _count: { select: { questions: true } },
+          _count: {
+            select: {
+              questions: { where: { status: { not: "REJECTED" } } },
+            },
+          },
         },
       },
       sessions: {
@@ -198,6 +203,7 @@ const QuestionSchema = z.object({
   optionD: z.string().max(500).optional(),
   correctLabel: z.enum(["A", "B", "C", "D"]),
   topic: z.string().max(200).optional(),
+  explanation: z.string().max(2000).optional(),
 });
 
 export async function createQuestionAction(
@@ -216,6 +222,7 @@ export async function createQuestionAction(
     optionD: formData.get("optionD") || undefined,
     correctLabel: formData.get("correctLabel"),
     topic: formData.get("topic") || undefined,
+    explanation: formData.get("explanation") || undefined,
   });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
@@ -252,6 +259,7 @@ export async function createQuestionAction(
       questionText: parsed.data.questionText,
       questionOrder: count + 1,
       topic: parsed.data.topic,
+      explanation: parsed.data.explanation,
       status: "APPROVED",
       generatedBy: "MANUAL",
     },
@@ -284,6 +292,208 @@ export async function createQuestionAction(
 
   revalidatePath(`/programs/${programId}/manage`);
   return { ok: true, data: { id: question.id } };
+}
+
+export async function updateQuestionAction(
+  questionId: string,
+  formData: FormData
+): Promise<ActionResult<{ id: string; versioned: boolean }>> {
+  const instructorId = await requireInstructor();
+
+  const parsed = QuestionSchema.safeParse({
+    questionText: formData.get("questionText"),
+    optionA: formData.get("optionA"),
+    optionB: formData.get("optionB"),
+    optionC: formData.get("optionC") || undefined,
+    optionD: formData.get("optionD") || undefined,
+    correctLabel: formData.get("correctLabel"),
+    topic: formData.get("topic") || undefined,
+    explanation: formData.get("explanation") || undefined,
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0].message };
+  }
+
+  const question = await prisma.question.findFirst({
+    where: {
+      id: questionId,
+      day: { program: { instructorId } },
+    },
+    include: {
+      options: { orderBy: { displayOrder: "asc" } },
+      sessionQuestions: { select: { id: true } },
+      day: {
+        select: {
+          id: true,
+          programId: true,
+          program: { select: { language: true } },
+        },
+      },
+    },
+  });
+  if (!question) return { ok: false, error: "السؤال غير موجود أو لا تملك صلاحية تعديله." };
+
+  const desiredOptions = [
+    { label: "A" as const, text: parsed.data.optionA },
+    { label: "B" as const, text: parsed.data.optionB },
+    ...(parsed.data.optionC ? [{ label: "C" as const, text: parsed.data.optionC }] : []),
+    ...(parsed.data.optionD ? [{ label: "D" as const, text: parsed.data.optionD }] : []),
+  ];
+
+  if (!desiredOptions.some((option) => option.label === parsed.data.correctLabel)) {
+    return {
+      ok: false,
+      error: "الخيار المحدد كإجابة صحيحة يجب أن يحتوي نصًا فعليًا.",
+    };
+  }
+
+  if (question.day.program.language === "AR") {
+    if (
+      !isArabicQuestionContent(
+        parsed.data.questionText,
+        desiredOptions.map((option) => ({ text: option.text }))
+      )
+    ) {
+      return {
+        ok: false,
+        error: "البرنامج عربي؛ يجب أن يكون نص السؤال والخيارات بالعربية أو بمصطلحات تقنية قصيرة فقط.",
+      };
+    }
+  }
+
+  const versioned = question.sessionQuestions.length > 0;
+
+  const savedQuestionId = await prisma.$transaction(async (tx) => {
+    if (versioned) {
+      // Preserve historical sessions exactly as they were. Retire the old bank
+      // record and create a fresh editable version for future sessions.
+      const lastQuestion = await tx.question.findFirst({
+        where: { dayId: question.dayId },
+        orderBy: { questionOrder: "desc" },
+        select: { questionOrder: true },
+      });
+      const retiredOrder = Math.max(lastQuestion?.questionOrder ?? 0, question.questionOrder) + 1;
+
+      await tx.question.update({
+        where: { id: question.id },
+        data: {
+          status: "REJECTED",
+          questionOrder: retiredOrder,
+        },
+      });
+
+      const next = await tx.question.create({
+        data: {
+          dayId: question.dayId,
+          programId: question.programId,
+          questionText: parsed.data.questionText,
+          questionOrder: question.questionOrder,
+          questionType: question.questionType,
+          difficulty: question.difficulty,
+          explanation: parsed.data.explanation,
+          sourcePageId: question.sourcePageId,
+          sourcePageStart: question.sourcePageStart,
+          sourcePageEnd: question.sourcePageEnd,
+          topic: parsed.data.topic,
+          language: question.language,
+          status: question.status === "DRAFT" ? "DRAFT" : "APPROVED",
+          weight: question.weight,
+          generatedBy: "MANUAL",
+        },
+      });
+
+      let correctOptionId: string | null = null;
+      for (let index = 0; index < desiredOptions.length; index++) {
+        const option = desiredOptions[index];
+        const created = await tx.questionOption.create({
+          data: {
+            questionId: next.id,
+            optionLabel: option.label,
+            optionText: option.text,
+            displayOrder: index + 1,
+          },
+        });
+        if (option.label === parsed.data.correctLabel) correctOptionId = created.id;
+      }
+
+      await tx.question.update({
+        where: { id: next.id },
+        data: { correctOptionId },
+      });
+
+      return next.id;
+    }
+
+    // Unused questions can be edited in place.
+    await tx.question.update({
+      where: { id: question.id },
+      data: {
+        questionText: parsed.data.questionText,
+        topic: parsed.data.topic,
+        explanation: parsed.data.explanation,
+        generatedBy: "MANUAL",
+        correctOptionId: null,
+      },
+    });
+
+    const existingByLabel = new Map(
+      question.options.map((option) => [option.optionLabel, option])
+    );
+
+    const activeOptionIds: string[] = [];
+    let correctOptionId: string | null = null;
+
+    for (let index = 0; index < desiredOptions.length; index++) {
+      const option = desiredOptions[index];
+      const existing = existingByLabel.get(option.label);
+
+      const saved = existing
+        ? await tx.questionOption.update({
+            where: { id: existing.id },
+            data: {
+              optionText: option.text,
+              displayOrder: index + 1,
+            },
+          })
+        : await tx.questionOption.create({
+            data: {
+              questionId: question.id,
+              optionLabel: option.label,
+              optionText: option.text,
+              displayOrder: index + 1,
+            },
+          });
+
+      activeOptionIds.push(saved.id);
+      if (option.label === parsed.data.correctLabel) correctOptionId = saved.id;
+    }
+
+    await tx.questionOption.deleteMany({
+      where: {
+        questionId: question.id,
+        id: { notIn: activeOptionIds },
+      },
+    });
+
+    await tx.question.update({
+      where: { id: question.id },
+      data: { correctOptionId },
+    });
+
+    return question.id;
+  });
+
+  revalidatePath(`/programs/${question.programId}/manage`);
+  revalidatePath(`/programs/${question.programId}`);
+  revalidatePath("/questions");
+
+  return {
+    ok: true,
+    data: {
+      id: savedQuestionId,
+      versioned,
+    },
+  };
 }
 
 export async function deleteQuestionAction(questionId: string): Promise<ActionResult> {
