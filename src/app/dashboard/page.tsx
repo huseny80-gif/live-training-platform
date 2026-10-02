@@ -6,7 +6,7 @@ import { listOwnedPrograms } from "@/app/actions/programs";
 import Link from "next/link";
 import { brand } from "@/lib/brand";
 
-const STATUS_LABEL: Record<string, string> = {
+const PROGRAM_COVERS = {\n  survey: "/program-covers/survey-program.webp",\n  gis: "/program-covers/gis-program.webp",\n} as const;\n\nfunction programCover(title: string) {\n  const normalized = title.toLowerCase();\n  if (normalized.includes("الجغرافية") || normalized.includes("gis")) return { src: PROGRAM_COVERS.gis, kind: "gis" as const, subtitle: "Geographic Information Systems - Level 1" };\n  if (normalized.includes("المساحة") || normalized.includes("seismic") || normalized.includes("survey")) return { src: PROGRAM_COVERS.survey, kind: "survey" as const, subtitle: "Positioning on a Land Seismic Crews" };\n  return null;\n}\n\nconst STATUS_LABEL: Record<string, string> = {
   DRAFT: "مسودة",
   ACTIVE: "نشط",
   ARCHIVED: "مؤرشف",
@@ -131,27 +131,35 @@ export default async function DashboardPage() {
               {programs.map((p) => {
                 const qCount = p.days.reduce((s, d) => s + d._count.questions, 0);
                 return (
-                  <Link key={p.id} href={`/programs/${p.id}`} className="brand-card dlp-program">
-                    <div className="dlp-program-top">
-                      <div>
-                        <div className="dlp-badges">
-                          <span className="dlp-program-title">{p.title}</span>
-                          <span className={`dlp-badge ${
-                            p.status === "ACTIVE" ? "active" : p.status === "DRAFT" ? "draft" : "archived"
-                          }`}>
-                            {STATUS_LABEL[p.status] ?? p.status}
-                          </span>
-                          <span className="dlp-language">{p.language === "AR" ? "العربية" : "الإنجليزية"}</span>
+                  <Link key={p.id} href={`/programs/${p.id}`} className="dlp-program-showcase">
+                    {(() => {
+                      const cover = programCover(p.title);
+                      return cover ? (
+                        <div className={`dlp-program-cover ${cover.kind}`}>
+                          <img src={cover.src} alt={`واجهة البرنامج التدريبي — ${p.title}`} />
+                          <span className="dlp-cover-shade" aria-hidden="true" />
+                          <span className="dlp-cover-icon" aria-hidden="true">{cover.kind === "gis" ? "◎" : "⌖"}</span>
                         </div>
-                        {p.description ? <p className="dlp-description">{p.description}</p> : null}
+                      ) : <div className="dlp-program-cover fallback"><PlatformLogo /></div>;
+                    })()}
+                    <div className="dlp-program-body">
+                      <div className="dlp-program-heading">
+                        <div>
+                          <div className="dlp-badges">
+                            <span className={`dlp-badge ${p.status === "ACTIVE" ? "active" : p.status === "DRAFT" ? "draft" : "archived"}`}>{STATUS_LABEL[p.status] ?? p.status}</span>
+                            <span className="dlp-language">{p.language === "AR" ? "العربية" : "الإنجليزية"}</span>
+                          </div>
+                          <h3>{p.title}</h3>
+                          {programCover(p.title)?.subtitle && <p className="dlp-program-subtitle">{programCover(p.title)?.subtitle}</p>}
+                        </div>
                       </div>
-                      <span className="dlp-arrow">←</span>
-                    </div>
-
-                    <div className="dlp-program-meta">
-                      <span>{p._count.days} يوم</span>
-                      <span>{qCount} سؤال</span>
-                      <span>{p._count.sessions} جلسة</span>
+                      {p.description ? <p className="dlp-description">{p.description}</p> : <p className="dlp-description">برنامج تدريبي تطبيقي منظم يجمع المحتوى العلمي والأنشطة والأسئلة التفاعلية.</p>}
+                      <div className="dlp-program-metrics">
+                        <span><b>{p._count.days}</b><small>أيام تدريبية</small></span>
+                        <span><b>{qCount}</b><small>أسئلة تفاعلية</small></span>
+                        <span><b>{p._count.sessions}</b><small>جلسات</small></span>
+                      </div>
+                      <span className="dlp-program-enter">الدخول إلى البرنامج <b aria-hidden="true">←</b></span>
                     </div>
                   </Link>
                 );
