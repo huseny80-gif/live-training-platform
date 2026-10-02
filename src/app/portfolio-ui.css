@@ -414,3 +414,41 @@ a.about-contact-card:hover{transform:translateY(-2px);border-color:color-mix(in 
 @media(max-width:700px) and (orientation:portrait){.dlp-header-inner{width:calc(100% - 24px);min-height:82px;gap:10px;padding-block:10px}.dlp-brand{gap:8px}.dlp-brand img{width:50px;height:50px}.dlp-brand h1{font-size:1.15rem}.dlp-brand p{font-size:.72rem}.dlp-user-copy{display:none}.dlp-avatar{width:38px;height:38px;flex-basis:38px}.tp-header-signout{padding:7px 9px;font-size:.72rem}.dlp-content{width:calc(100% - 20px)!important;padding-top:14px!important;padding-bottom:102px!important}.dlp-program-showcase{grid-template-columns:1fr!important;grid-template-areas:"cover" "body"!important;min-height:0!important;border-radius:19px}.dlp-program-cover{min-height:220px!important;padding:14px 12px 0!important}.dlp-program-cover img{width:min(72vw,230px)!important;max-width:90%!important}.dlp-program-body{padding:15px!important}.dlp-program-metrics{grid-template-columns:repeat(3,minmax(0,1fr))!important}.dlp-mobile-nav{inset-inline:8px;bottom:max(7px,env(safe-area-inset-bottom));padding:6px;border-radius:18px}.dlp-mobile-nav a{min-height:48px;flex-direction:column;gap:1px;padding:4px 2px;font-size:.82rem}.dlp-mobile-nav a span{font-size:.65rem}}
 /* Phones landscape: horizontal without oversized image or vertical overflow */
 @media(max-width:950px) and (orientation:landscape) and (max-height:540px){.dlp-header-inner{width:calc(100% - 24px);min-height:66px;padding-block:6px}.dlp-brand img{width:44px;height:44px}.dlp-brand h1{font-size:1.05rem}.dlp-brand p{font-size:.68rem}.dlp-user-copy{display:none}.dlp-content{width:calc(100% - 24px)!important;padding:12px 0 82px!important}.dlp-program-showcase{grid-template-columns:clamp(170px,27vw,220px) minmax(0,1fr)!important;grid-template-areas:"cover body"!important;min-height:250px!important}.dlp-program-cover{min-height:230px!important;padding:8px!important}.dlp-program-cover img{width:clamp(155px,23vw,195px)!important}.dlp-program-body{padding:12px 14px!important;gap:8px!important}.dlp-program-body .dlp-description{-webkit-line-clamp:2}.dlp-mobile-nav{max-width:620px;padding:5px}.dlp-mobile-nav a{min-height:42px;padding:5px;font-size:.75rem}}
+
+/* Final wide-screen correction — isolated desktop and iPad landscape */
+@media(min-width:1280px){
+ .dlp-header-inner{width:min(calc(100% - 48px),1680px)!important}
+ .dlp-content{width:min(calc(100% - 48px),1680px)!important;max-width:1680px!important;padding:28px 0 112px!important}
+ .dlp-program-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:22px!important}
+ .dlp-program-showcase{direction:ltr!important;grid-template-columns:minmax(190px,36%) minmax(0,64%)!important;grid-template-areas:"cover body"!important;min-height:390px!important;height:auto!important}
+ .dlp-program-cover{grid-area:cover!important;min-height:100%!important;height:100%!important;padding:22px 12px!important;display:flex!important;align-items:center!important;justify-content:center!important}
+ .dlp-program-cover img{width:min(92%,250px)!important;max-width:250px!important;height:auto!important;max-height:250px!important;object-fit:contain!important}
+ .dlp-program-body{grid-area:body!important;min-width:0!important;padding:24px 22px 20px!important}
+ .dlp-program-heading h3{font-size:clamp(1.08rem,1.15vw,1.28rem)!important;overflow-wrap:anywhere}
+ .dlp-program-subtitle{overflow-wrap:anywhere}
+ .dlp-program-metrics{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+ .dlp-program-metrics small{white-space:normal!important;text-align:center}
+}
+@media(min-width:900px) and (max-width:1279px) and (orientation:landscape){
+ .dlp-header-inner{width:calc(100% - 32px)!important}
+ .dlp-content{width:calc(100% - 32px)!important;max-width:1180px!important;padding:20px 0 104px!important}
+ .dlp-program-grid{grid-template-columns:1fr!important;gap:18px!important}
+ .dlp-program-showcase{direction:ltr!important;grid-template-columns:minmax(230px,31%) minmax(0,69%)!important;grid-template-areas:"cover body"!important;min-height:310px!important;height:auto!important}
+ .dlp-program-cover{grid-area:cover!important;min-height:310px!important;height:100%!important;padding:16px!important;display:flex!important;align-items:center!important;justify-content:center!important}
+ .dlp-program-cover img{width:min(88%,245px)!important;max-width:245px!important;height:auto!important;max-height:245px!important;object-fit:contain!important}
+ .dlp-program-body{grid-area:body!important;min-width:0!important;padding:20px!important;gap:12px!important}
+ .dlp-program-body .dlp-description{-webkit-line-clamp:2!important}
+ .dlp-program-metrics small{white-space:normal!important}
+}
+/* Ultra-wide screens: cap content so cards never stretch unnaturally */
+@media(min-width:1800px){
+ .dlp-header-inner,.dlp-content{max-width:1680px!important}
+ .dlp-program-showcase{grid-template-columns:260px minmax(0,1fr)!important}
+}
+/* Rotation safety: never inherit phone-landscape rules on tablets */
+@media(min-width:900px) and (orientation:landscape){
+ .dlp-mobile-nav{max-width:1100px!important}
+ .dlp-brand h1{font-size:clamp(1.35rem,2vw,2.1rem)!important}
+ .dlp-brand p{font-size:clamp(.8rem,1vw,1rem)!important}
+ .dlp-user-copy{display:block!important}
+}
