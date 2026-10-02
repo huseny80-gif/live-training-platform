@@ -525,11 +525,39 @@ export async function generateFinalQuestions(
   );
 
   if (!sourceDocument.ok) {
-    const candidate = await prisma.trainingDocument.findFirst({
+    const candidates = await prisma.trainingDocument.findMany({
       where: { programId },
       orderBy: { createdAt: "desc" },
-      select: { id: true },
+      select: {
+        id: true,
+        createdAt: true,
+        pages: {
+          where: { extractionStatus: "COMPLETED" },
+          select: {
+            extractionMethod: true,
+            extractedText: true,
+          },
+        },
+      },
     });
+
+    const candidate = candidates
+      .map((document) => ({
+        id: document.id,
+        createdAt: document.createdAt,
+        realReadablePages: document.pages.filter(
+          (page) =>
+            page.extractionMethod !== null &&
+            page.extractionMethod !== "MOCK" &&
+            (page.extractedText?.trim().length ?? 0) > 20,
+        ).length,
+      }))
+      .sort((a, b) => {
+        if (b.realReadablePages !== a.realReadablePages) {
+          return b.realReadablePages - a.realReadablePages;
+        }
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      })[0];
 
     return {
       ok: false,
