@@ -323,3 +323,26 @@ a.about-contact-card:hover{transform:translateY(-2px);border-color:color-mix(in 
 .about-contact-signature small{font-size:.78rem;color:var(--brand-muted)}
 @media(max-width:640px){.about-contact-section{padding:20px 16px;border-radius:20px}.about-contact-heading{gap:11px}.about-contact-heading-icon{width:46px;height:46px;flex-basis:46px;border-radius:14px}.about-contacts{grid-template-columns:1fr}.about-contact-card{padding:12px}.about-contact-heading p{font-size:.9rem}.about-contact-copy small{white-space:normal;overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){.about-contact-card{transition:none}a.about-contact-card:hover{transform:none}}
+
+
+/* Dashboard — visual training program showcase */
+.dlp-program-showcase{display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid color-mix(in srgb,var(--brand-primary) 18%,var(--brand-border));border-radius:22px;background:var(--brand-surface);color:var(--brand-text);text-decoration:none;box-shadow:0 10px 28px rgb(18 60 58 / .09);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.dlp-program-showcase:hover{transform:translateY(-4px);border-color:color-mix(in srgb,#b08a45 55%,var(--brand-border));box-shadow:0 18px 42px rgb(18 60 58 / .15)}
+.dlp-program-showcase:focus-visible{outline:3px solid color-mix(in srgb,var(--brand-primary) 75%,white);outline-offset:4px}
+.dlp-program-cover{position:relative;aspect-ratio:16/9;overflow:hidden;background:linear-gradient(135deg,#0f766e,#123c3a)}
+.dlp-program-cover img{width:100%;height:100%;display:block;object-fit:cover;transition:transform .45s ease}
+.dlp-program-showcase:hover .dlp-program-cover img{transform:scale(1.025)}
+.dlp-cover-shade{position:absolute;inset:0;background:linear-gradient(to top,rgb(5 42 40 / .28),transparent 45%)}
+.dlp-cover-icon{position:absolute;inset:auto 18px 14px auto;width:48px;height:48px;display:grid;place-items:center;border:2px solid rgb(255 255 255 / .82);border-radius:999px;background:rgb(15 118 110 / .9);color:#fff;font-size:25px;box-shadow:0 7px 18px rgb(0 0 0 / .18);backdrop-filter:blur(4px)}
+.dlp-program-cover.fallback{display:grid;place-items:center}.dlp-program-cover.fallback img{width:110px;height:110px;object-fit:contain}
+.dlp-program-body{display:flex;flex:1;flex-direction:column;gap:13px;padding:18px}
+.dlp-program-heading h3{margin:9px 0 0;font-size:1.15rem;line-height:1.75;color:#123c3a}
+.dlp-program-subtitle{margin:2px 0 0;color:var(--brand-muted);font-size:.84rem;direction:ltr;text-align:right}
+.dlp-program-body .dlp-description{margin:0;line-height:1.8;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dlp-program-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:auto}
+.dlp-program-metrics span{display:grid;place-items:center;gap:2px;padding:9px 5px;border:1px solid color-mix(in srgb,var(--brand-primary) 13%,var(--brand-border));border-radius:12px;background:color-mix(in srgb,var(--brand-primary) 4%,var(--brand-surface));text-align:center}
+.dlp-program-metrics b{font-size:1.05rem;color:var(--brand-primary)}.dlp-program-metrics small{font-size:.72rem;color:var(--brand-muted)}
+.dlp-program-enter{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:2px;padding:11px 14px;border:1px solid #b08a45;border-radius:12px;background:linear-gradient(100deg,#0f766e 0%,#167f77 65%,#b08a45 135%);color:#fff;font-weight:800;box-shadow:0 7px 18px rgb(15 118 110 / .16)}
+.dlp-program-enter b{font-size:1.2rem}
+@media(max-width:700px){.dlp-program-grid{grid-template-columns:1fr}.dlp-program-showcase{border-radius:18px}.dlp-program-body{padding:15px}.dlp-program-cover{aspect-ratio:16/10}.dlp-cover-icon{width:42px;height:42px;inset:auto 14px 12px auto}.dlp-program-heading h3{font-size:1.05rem}.dlp-program-metrics small{font-size:.68rem}}
+@media(prefers-reduced-motion:reduce){.dlp-program-showcase,.dlp-program-cover img{transition:none}.dlp-program-showcase:hover{transform:none}.dlp-program-showcase:hover .dlp-program-cover img{transform:none}}
