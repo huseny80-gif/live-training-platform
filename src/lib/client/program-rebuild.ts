@@ -84,12 +84,15 @@ export async function runProgramRebuild(params: {
     }
 
     if (stage === "FAILED" || !response.ok) {
+      const friendly = String(
+        data.error ??
+          "تعذر إكمال تحليل المادة وتوليد الأسئلة."
+      );
+      const raw = typeof data.rawError === "string" ? data.rawError.trim() : "";
       throw new Error(
-        String(
-          data.error ??
-            data.rawError ??
-            "تعذر إكمال تحليل المادة وتوليد الأسئلة."
-        )
+        raw && !friendly.includes(raw.slice(0, 80))
+          ? friendly + "\n\nرمز التشخيص: " + raw.slice(0, 300)
+          : friendly
       );
     }
 

@@ -18,7 +18,7 @@ import {
 
 const MODEL_ID =
   process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
-const MAX_GENERATION_ATTEMPTS = 4;
+const MAX_GENERATION_ATTEMPTS = 2;
 
 function extractJson(text: string): unknown {
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);

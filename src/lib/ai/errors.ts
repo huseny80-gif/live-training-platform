@@ -7,6 +7,15 @@ export function generationErrorToArabic(message?: string): string {
   if (value.includes("OPENAI_API_ERROR_429")) {
     return "وصل OpenAI إلى حد الاستخدام مؤقتًا. أعد المحاولة بعد قليل أو راجع الرصيد وحدود الاستخدام.";
   }
+  if (value.includes("OPENAI_API_ERROR_400")) {
+    return "رفض OpenAI طلب التوليد بسبب صيغة أو حجم الطلب. تم تقليل حجم الدفعات في الإصدار الجديد؛ أعد المحاولة.";
+  }
+  if (value.includes("OPENAI_API_ERROR_404")) {
+    return "نموذج OpenAI المحدد غير متاح لهذا المفتاح أو المشروع. راجع OPENAI_MODEL في إعدادات Vercel.";
+  }
+  if (value.includes("OPENAI_API_ERROR_5")) {
+    return "حدث خطأ مؤقت في خدمة OpenAI أثناء التوليد. أعد المحاولة؛ لن يتم استبدال المحتوى الحالي.";
+  }
   if (value.includes("OPENAI_EMPTY_RESPONSE")) {
     return "أعاد نموذج الذكاء الاصطناعي استجابة فارغة. أعد المحاولة؛ لم يتم استبدال المحتوى الحالي.";
   }
@@ -46,5 +55,6 @@ export function generationErrorToArabic(message?: string): string {
     return "توجد جلسات محفوظة مرتبطة ببنك الأسئلة الحالي. احذف الجلسات من تبويب الجلسات ثم أعد المحاولة.";
   }
 
-  return "تعذر إكمال توليد الأيام والأسئلة من المصدر الحقيقي. لم يتم استبدال المحتوى الحالي، ويمكن إعادة المحاولة بأمان.";
+  const compact = value.replace(/\s+/g, " ").slice(0, 220);
+  return "تعذر إكمال توليد الأيام والأسئلة من المصدر الحقيقي. لم يتم استبدال المحتوى الحالي. رمز التشخيص: " + compact;
 }

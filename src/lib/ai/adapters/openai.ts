@@ -16,7 +16,7 @@ import {
 } from "@/lib/language";
 
 const MODEL_ID = process.env.OPENAI_MODEL || "gpt-6-luna";
-const MAX_GENERATION_ATTEMPTS = 4;
+const MAX_GENERATION_ATTEMPTS = 2;
 
 type OpenAIResponse = {
   output_text?: string;
@@ -39,7 +39,7 @@ async function respond(
     body: JSON.stringify({
       model: MODEL_ID,
       input: prompt,
-      max_output_tokens: 30000,
+      max_output_tokens: 12000,
     }),
   });
 
@@ -125,7 +125,7 @@ export class OpenAIAdapter implements AIAdapter {
     }
 
     const questions: GeneratedQuestion[] = [];
-    const QUESTION_CONCURRENCY = 2;
+    const QUESTION_CONCURRENCY = 5;
 
     const generateDayQuestions = async (
       day: GeneratedDayPlan,
@@ -140,7 +140,7 @@ export class OpenAIAdapter implements AIAdapter {
       let dayInputTokens = 0;
       let dayOutputTokens = 0;
       const acceptedByText = new Map<string, GeneratedQuestion>();
-      const candidateCount = Math.max(req.questionsPerDay + 3, req.questionsPerDay);
+      const candidateCount = Math.max(req.questionsPerDay + 1, req.questionsPerDay);
 
       for (
         let attempt = 1;
