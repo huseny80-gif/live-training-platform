@@ -1,6 +1,8 @@
 /** Translate known failures without exposing provider responses or credentials. */
-export function documentErrorLabel(reason: string | null | undefined): string {
+export function documentErrorLabel(reason: string | null | undefined, fallback = "تعذّرت معالجة المستند. يمكنك إعادة المحاولة، وإذا تكرر الخطأ تواصل مع مسؤول المنصة."): string {
   const message = reason ?? "";
+  if (/PROGRAM_PROCESSING/.test(message)) return "يجري توليد الأسئلة من مستند آخر لهذا البرنامج. انتظر اكتماله قبل بدء محاولة أخرى.";
+  if (/EXTRACTION_REQUIRED/.test(message)) return "اقبل المستند واستخرج نصه أولاً، ثم ابدأ توليد الأسئلة.";
   if (/SESSION_EXPIRED|UNAUTHORIZED/.test(message)) return "انتهت جلسة تسجيل الدخول. سجّل الدخول مجدداً لمتابعة المستند.";
   if (/OCR_REQUIRED|MOCK_ONLY_CONTENT/.test(message)) return "يحتاج المستند إلى قراءة الصور. فعّل خدمة قراءة المستندات ثم أعد المحاولة، أو ارفع نسخة PDF تحتوي على نص قابل للتحديد.";
   if (/NO_ADAPTER_AVAILABLE/.test(message)) return "لم تتوفر معالجة مناسبة للمستند في المحاولة السابقة. أعد المعالجة لاستخراج النص من الملف المحفوظ.";
@@ -14,5 +16,5 @@ export function documentErrorLabel(reason: string | null | undefined): string {
   if (/429|quota|credit|billing|rate.limit/i.test(message)) return "بلغت خدمة المعالجة حد الاستخدام أو الرصيد المتاح. تحقق من الاشتراك ثم أعد المحاولة لاحقاً.";
   if (/timeout|timed out|TIMEOUT|aborted/i.test(message)) return "انتهت مهلة المعالجة. حاول لاحقاً أو قسّم المستند إلى أجزاء أصغر.";
   if (/NO_EXTRACTED_PAGES|EXTRACTION_INCOMPLETE/.test(message)) return "لم يكتمل استخراج نص المستند. أعد المحاولة أو ارفع نسخة أوضح.";
-  return "تعذّرت معالجة المستند. يمكنك إعادة المحاولة، وإذا تكرر الخطأ تواصل مع مسؤول المنصة.";
+  return fallback;
 }

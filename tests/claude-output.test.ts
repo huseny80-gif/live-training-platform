@@ -20,7 +20,9 @@ async function run() {
   }
   try {
     const calls = responses(JSON.stringify({ days }), JSON.stringify({ questions }));
-    const valid = await new ClaudeAIAdapter().generate(request);
+    const progress: number[] = [];
+    const valid = await new ClaudeAIAdapter().generate({ ...request, onProgress: async days => { progress.push(days); } });
+    assert.deepEqual(progress, [2, 4, 6, 8, 10]);
     assert.equal(valid.questions.length, 50); assert.equal(valid.days.length, 10); assert.equal(calls(), 11);
     console.log("PASS: valid provider JSON retains 10 days and 50 complete questions");
     responses("invalid JSON", JSON.stringify({ questions }));

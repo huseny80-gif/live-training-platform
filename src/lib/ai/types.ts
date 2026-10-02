@@ -53,6 +53,7 @@ export interface ContentGenerationRequest {
   programTitle: string;
   totalDays: number;           // always 10
   questionsPerDay: number;     // always 5
+  onProgress?: (completedDays: number) => Promise<void>;
 }
 
 export interface ContentGenerationResult {

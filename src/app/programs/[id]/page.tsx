@@ -104,14 +104,14 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
             <h2 className="tp-text-base tp-font-semibold">المستندات التدريبية</h2>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {program.documents.map((doc: any) => (
-              <div key={doc.id} className="tp-text-sm tp-border tp-rounded-lg tp-px-3 tp-py-2 tp-space-y-2">
+              <div key={doc.id} data-document-id={doc.id} className="tp-text-sm tp-border tp-rounded-lg tp-px-3 tp-py-2 tp-space-y-2">
                 <div>
                   <span className="tp-font-medium" style={{ overflowWrap: "anywhere" }}>{doc.fileName}</span>
                   {doc.pageCount != null && (
                     <span className="tp-ml-2 tp-text-gray-400 tp-text-xs">{doc.pageCount} صفحة</span>
                   )}
                 </div>
-                <DocumentProcessing documentId={doc.id} programId={id} status={doc.extractionStatus} notes={doc.extractionNotes} />
+                <DocumentProcessing documentId={doc.id} programId={id} status={doc.extractionStatus} notes={doc.extractionNotes} hasContent={totalQuestions > 0 || program._count.sessions > 0} />
               </div>
             ))}
           </div>

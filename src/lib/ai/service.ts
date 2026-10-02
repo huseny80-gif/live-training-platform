@@ -43,7 +43,8 @@ export class ContentGenerationService {
   async generateForProgram(
     programId: string,
     documentId: string,
-    instructorId: string
+    instructorId: string,
+    options: { onProgress?: (completedDays: number) => Promise<void> } = {}
   ): Promise<GenerationProgress> {
     // Ownership check
     const program = await prisma.trainingProgram.findFirst({
@@ -113,6 +114,7 @@ export class ContentGenerationService {
       programTitle: program.title,
       totalDays: TOTAL_DAYS,
       questionsPerDay: QUESTIONS_PER_DAY,
+      onProgress: options.onProgress,
     };
 
     try {

@@ -81,6 +81,7 @@ export class ClaudeAIAdapter implements AIAdapter {
         return dayQuestions;
       }));
       allQuestions.push(...batch.flat());
+      await req.onProgress?.(Math.min(offset + batch.length, days.length));
     }
 
     if (req.language === "AR") {

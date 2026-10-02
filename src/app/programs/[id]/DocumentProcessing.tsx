@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { documentErrorLabel } from "@/lib/document-errors";
+import DocumentGeneration from "./DocumentGeneration";
 import { statusLabel } from "@/lib/labels";
 
-export default function DocumentProcessing({ documentId, programId, status, notes }: {
-  documentId: string; programId: string; status: string; notes: string | null;
+export default function DocumentProcessing({ documentId, programId, status, notes, hasContent = false }: {
+  documentId: string; programId: string; status: string; notes: string | null; hasContent?: boolean;
 }) {
   const router = useRouter();
   const [current, setCurrent] = useState(status);
@@ -69,6 +70,7 @@ export default function DocumentProcessing({ documentId, programId, status, note
 
   return <div className="tp-space-y-2">
     <p className={`tp-text-xs ${failed ? "tp-text-red-700" : "tp-text-gray-500"}`} role="status">{current === "COMPLETED" ? "تم قبول المستند واستخراج النص" : statusLabel(current)}</p>
+    {current === "COMPLETED" && <DocumentGeneration documentId={documentId} programId={programId} notes={reason} hasContent={hasContent} />}
     {failed && <>
       <p className="tp-text-sm tp-text-red-700" role="alert">{documentErrorLabel(reason)}</p>
       <button type="button" onClick={retry} disabled={busy} className="brand-btn brand-btn-secondary">

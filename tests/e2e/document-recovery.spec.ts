@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { test, expect } from "@playwright/test";
 import type { PrismaClient } from "@prisma/client";
+import { generatedCourseFixture } from "../helpers/generation";
 import { textPdf } from "../helpers/pdf";
 import { storage } from "../../src/lib/storage";
 import { randomUUID } from "node:crypto";
@@ -140,4 +141,68 @@ test("uploading a PDF accepts and saves the real file while leaving questions fo
   expect(await prisma.documentPage.count({ where: { documentId: document.id, extractionMethod: "NATIVE_TEXT", extractionStatus: "COMPLETED" } })).toBe(147);
   expect(await prisma.question.count({ where: { programId } })).toBe(0);
   expect(await prisma.trainingDay.count({ where: { programId } })).toBe(10);
+});
+
+
+test("generation is a separate authorized action and configuration failures keep the PDF accepted", async ({ page, request }) => {
+  const uploaded = await prisma.trainingDocument.findFirstOrThrow({ where: { programId, fileName: "GIS_upload_acceptance.pdf" } });
+  const anonymous = await request.post("/api/documents/generate", { data: { documentId: uploaded.id, programId }, maxRedirects: 0 });
+  expect(anonymous.status()).toBe(307);
+  await page.goto("/login");
+  await page.getByLabel("البريد الإلكتروني").fill("test@example.com");
+  await page.getByLabel("كلمة المرور").fill("TestPass123!");
+  await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  const forbidden = await page.request.post("/api/documents/generate", { data: { programId: foreignProgramId, documentId: foreignDocumentId } });
+  expect(forbidden.status()).toBe(404);
+  await page.goto(`/programs/${programId}`);
+  const card = page.locator(`[data-document-id="${uploaded.id}"]`);
+  await expect(card.getByText("تم قبول المستند واستخراج النص", { exact: true })).toBeVisible();
+  const responsePromise = page.waitForResponse(response => response.url().endsWith("/api/documents/generate") && response.request().method() === "POST");
+  await card.getByRole("button", { name: "توليد الأسئلة", exact: true }).click();
+  expect((await responsePromise).status()).toBe(503);
+  await expect(card.getByRole("alert")).toContainText("خدمة توليد الأسئلة غير مهيأة");
+  expect((await prisma.trainingDocument.findUniqueOrThrow({ where: { id: uploaded.id } })).extractionStatus).toBe("COMPLETED");
+  expect(await prisma.documentPage.count({ where: { documentId: uploaded.id } })).toBe(147);
+  expect(await prisma.question.count({ where: { programId } })).toBe(0);
+});
+
+
+test("generation progress and 50 saved questions appear without changing the accepted pages", async ({ page }) => {
+  test.setTimeout(90000);
+  const document = await prisma.trainingDocument.findFirstOrThrow({ where: { programId, fileName: "GIS_upload_acceptance.pdf" } });
+  const instructor = await prisma.instructor.findUniqueOrThrow({ where: { email: "test@example.com" } });
+  const before = await prisma.documentPage.findMany({ where: { documentId: document.id }, orderBy: { pageNumber: "asc" }, select: { id: true } });
+  const { GenerationJobs } = await import("../../src/lib/ai/jobs");
+  const { ContentGenerationService } = await import("../../src/lib/ai/service");
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  // Only the test runner supplies a controlled AI response; the production server stays unmodified.
+  const jobs = new GenerationJobs(new ContentGenerationService({ name: "TEST_ONLY", modelId: "TEST_ONLY", generate: async request => {
+    await request.onProgress?.(2);
+    await gate;
+    await request.onProgress?.(10);
+    return generatedCourseFixture();
+  } }));
+  const claim = await jobs.claim(document.id, programId, instructor.id);
+  expect(claim.status).toBe("STARTED");
+  await page.goto("/login");
+  await page.getByLabel("البريد الإلكتروني").fill("test@example.com");
+  await page.getByLabel("كلمة المرور").fill("TestPass123!");
+  await page.getByRole("button", { name: "تسجيل الدخول", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  await page.goto(`/programs/${programId}`);
+  const card = page.locator(`[data-document-id="${document.id}"]`);
+  await expect(card.getByText("جاري إعداد خطة الأيام وتوليد الأسئلة…")).toBeVisible();
+  const running = jobs.run(document.id, programId, instructor.id, claim.runId!);
+  try {
+    await expect(card.getByText("جاري التوليد… اكتملت أسئلة 2 من 10 أيام.")).toBeVisible({ timeout: 15000 });
+    release(); await running;
+    await expect(card.getByText("تم توليد 50 سؤالاً موزعة على 10 أيام تدريبية.")).toBeVisible({ timeout: 15000 });
+    await expect(card.getByRole("link", { name: "مراجعة الأسئلة" })).toBeVisible();
+    expect(await prisma.question.count({ where: { programId } })).toBe(50);
+    const after = await prisma.documentPage.findMany({ where: { documentId: document.id }, orderBy: { pageNumber: "asc" }, select: { id: true } });
+    expect(after).toEqual(before);
+    expect((await prisma.trainingDocument.findUniqueOrThrow({ where: { id: document.id } })).extractionStatus).toBe("COMPLETED");
+  } finally { release(); await running; }
 });

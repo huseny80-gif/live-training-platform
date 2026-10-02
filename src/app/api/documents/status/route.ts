@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recoverGenerationJobs } from "@/lib/ai/jobs";
+import { generationState } from "@/lib/ai/generation-state";
 import { recoverStaleDocument } from "@/lib/extraction/recovery";
 
 export async function GET(req: NextRequest) {
@@ -16,6 +18,7 @@ export async function GET(req: NextRequest) {
   }
 
   await recoverStaleDocument(documentId, instructorId);
+  await recoverGenerationJobs(instructorId, { documentId });
 
   const doc = await prisma.trainingDocument.findFirst({
     where: { id: documentId, program: { instructorId } },
@@ -30,5 +33,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
 
-  return NextResponse.json(doc);
+  return NextResponse.json({ ...doc, generation: generationState(doc.extractionNotes) });
 }
