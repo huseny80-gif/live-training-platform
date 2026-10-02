@@ -121,6 +121,15 @@ export default function ManageClient({ program }: { program: Program }) {
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [pipelineMessage, setPipelineMessage] = useState("");
 
+  const totalQuestions = program.days.reduce(
+    (sum, day) => sum + day._count.questions,
+    0,
+  );
+  const completeDailyBank =
+    program.days.length === 10 &&
+    totalQuestions === 50 &&
+    program.days.every((day) => day._count.questions === 5);
+
   // ── Day actions ────────────────────────────────────────────────────────────
 
   function handleDeleteDay(dayId: string, dayTitle: string) {
@@ -275,6 +284,23 @@ export default function ManageClient({ program }: { program: Program }) {
                 })}
               </div>
             )}
+          </section>
+
+          <section
+            className={`brand-card dlp-bank-status ${completeDailyBank ? "complete" : "incomplete"}`}
+            role="status"
+          >
+            <div>
+              <strong>
+                {completeDailyBank ? "بنك الأسئلة مكتمل" : "بنك الأسئلة غير مكتمل"}
+              </strong>
+              <p>
+                {completeDailyBank
+                  ? "تم اعتماد 10 أيام و50 سؤالًا، بواقع 5 أسئلة لكل يوم."
+                  : `الحالة الحالية: ${program.days.length} أيام و${totalQuestions} سؤالًا. النجاح يتطلب 10 أيام و50 سؤالًا، 5 لكل يوم.`}
+              </p>
+            </div>
+            <span dir="ltr">{totalQuestions}/50</span>
           </section>
 
           <div className="flex items-center justify-between gap-3 flex-wrap">

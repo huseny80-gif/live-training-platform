@@ -203,3 +203,9 @@ html[data-theme="dark"] .dlp-settings-card,html[data-theme="dark"] .dlp-google-c
 .dlp-source-row small{color:var(--brand-muted);font-size:10px;overflow-wrap:anywhere}
 .dlp-source-empty{margin:0;padding:16px;border-radius:12px;background:#fff7ed;color:#9a5a10}
 @media(max-width:700px){.dlp-source-status-head,.dlp-source-row{flex-direction:column;align-items:stretch}.dlp-source-row .dlp-control-button{width:100%}}
+
+
+.dlp-bank-status{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;margin-bottom:14px;border-right:5px solid var(--brand-warning)}
+.dlp-bank-status strong{display:block;color:var(--brand-navy);margin-bottom:4px}.dlp-bank-status p{margin:0;color:var(--brand-muted);font-size:13px;line-height:1.7}.dlp-bank-status>span{min-width:72px;text-align:center;padding:8px 11px;border-radius:999px;font-weight:900;background:#fff7ed;color:#b45309}
+.dlp-bank-status.complete{border-right-color:var(--brand-success);background:#f0fdf4}.dlp-bank-status.complete>span{background:#dcfce7;color:#047857}.dlp-bank-status.incomplete{background:#fffbeb}
+@media(max-width:700px){.dlp-bank-status{align-items:stretch;flex-direction:column}.dlp-bank-status>span{width:max-content}}
