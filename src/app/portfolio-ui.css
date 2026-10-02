@@ -292,3 +292,34 @@
 .platform-question ol { padding-inline-start:24px; }
 .platform-script { width:100%; height:280px; direction:ltr; text-align:left; font-family:monospace; border:1px solid #cbd5e1; border-radius:8px; padding:12px; }
 @media(max-width:600px) { .platform-bar { padding:12px; } .platform-bar nav { gap:6px; font-size:13px; } }
+
+
+/* About — creative contact panel */
+.about-contact-section{position:relative;overflow:hidden;padding:28px;border:1px solid color-mix(in srgb,var(--brand-primary) 24%,var(--brand-border));border-radius:24px;background:linear-gradient(135deg,color-mix(in srgb,var(--brand-primary) 10%,var(--brand-surface)) 0%,var(--brand-surface) 55%,color-mix(in srgb,#b08a45 10%,var(--brand-surface)) 100%);box-shadow:var(--brand-shadow-card);isolation:isolate}
+.about-contact-orb{position:absolute;border-radius:999px;filter:blur(1px);opacity:.14;z-index:-1;pointer-events:none}
+.about-contact-orb-one{width:210px;height:210px;background:var(--brand-primary);inset:-95px auto auto -55px}
+.about-contact-orb-two{width:170px;height:170px;background:#b08a45;inset:auto -60px -85px auto}
+.about-contact-heading{display:flex;align-items:flex-start;gap:14px;margin-bottom:22px}
+.about-contact-heading-icon{width:52px;height:52px;display:grid;place-items:center;flex:0 0 52px;border-radius:16px;background:var(--brand-primary);color:#fff;box-shadow:0 10px 25px rgb(15 118 110 / .2)}
+.about-contact-heading-icon svg{width:25px;height:25px}
+.about-contact-kicker{display:inline-block;margin-bottom:3px;color:#85642d;font-size:.78rem;font-weight:800;letter-spacing:.04em}
+.about-contact-heading h2{margin:0 0 5px;font-size:1.3rem}
+.about-contact-heading p{margin:0;max-width:650px;color:var(--brand-muted);line-height:1.8}
+.about-contacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.about-contact-card{min-width:0;display:flex;align-items:center;gap:12px;padding:14px;border:1px solid color-mix(in srgb,var(--brand-primary) 16%,var(--brand-border));border-radius:16px;background:color-mix(in srgb,var(--brand-surface) 92%,transparent);color:var(--brand-text);text-decoration:none;box-shadow:0 5px 18px rgb(18 60 58 / .055);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease,background-color .2s ease}
+a.about-contact-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--brand-primary) 45%,var(--brand-border));background:var(--brand-surface);box-shadow:0 10px 24px rgb(18 60 58 / .11)}
+.about-contact-card:focus-visible{outline:2px solid var(--brand-primary);outline-offset:3px}
+.about-contact-card.is-disabled{opacity:.68}
+.about-contact-icon{width:42px;height:42px;display:grid;place-items:center;flex:0 0 42px;border-radius:13px;background:color-mix(in srgb,var(--brand-primary) 12%,var(--brand-surface));color:var(--brand-primary)}
+.about-contact-icon svg{width:21px;height:21px}
+.about-contact-copy{display:grid;gap:2px;min-width:0;flex:1}
+.about-contact-copy strong{font-size:.92rem}
+.about-contact-copy small{color:var(--brand-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:auto}
+.about-contact-arrow{display:grid;place-items:center;width:28px;height:28px;border-radius:999px;background:color-mix(in srgb,#b08a45 12%,var(--brand-surface));color:#85642d;font-weight:800}
+.about-contact-signature{display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:17px;border-top:1px solid color-mix(in srgb,var(--brand-primary) 16%,var(--brand-border))}
+.about-contact-signature img{width:44px;height:44px;object-fit:contain;background:transparent}
+.about-contact-signature span{display:grid;gap:1px}
+.about-contact-signature strong{font-size:.9rem;color:var(--brand-text)}
+.about-contact-signature small{font-size:.78rem;color:var(--brand-muted)}
+@media(max-width:640px){.about-contact-section{padding:20px 16px;border-radius:20px}.about-contact-heading{gap:11px}.about-contact-heading-icon{width:46px;height:46px;flex-basis:46px;border-radius:14px}.about-contacts{grid-template-columns:1fr}.about-contact-card{padding:12px}.about-contact-heading p{font-size:.9rem}.about-contact-copy small{white-space:normal;overflow-wrap:anywhere}}
+@media(prefers-reduced-motion:reduce){.about-contact-card{transition:none}a.about-contact-card:hover{transform:none}}
