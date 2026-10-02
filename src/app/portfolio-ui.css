@@ -371,3 +371,38 @@ a.about-contact-card:hover{transform:translateY(-2px);border-color:color-mix(in 
  .dlp-program-enter{padding:10px!important;font-size:.88rem!important}
  .dlp-mobile-nav{width:calc(100% - 28px)!important;max-width:900px!important}
 }
+
+/* Mobile-only bottom navigation fix — preserve stable tablet/desktop layouts */
+@media (max-width:700px){
+ .dlp-content{padding-bottom:calc(104px + env(safe-area-inset-bottom))!important}
+ .dlp-mobile-spacer{height:calc(88px + env(safe-area-inset-bottom))!important}
+ .dlp-mobile-nav{
+   position:fixed!important;
+   z-index:999!important;
+   left:10px!important;
+   right:10px!important;
+   bottom:calc(8px + env(safe-area-inset-bottom))!important;
+   transform:none!important;
+   width:auto!important;
+   max-width:none!important;
+   margin:0!important;
+   box-sizing:border-box!important;
+   grid-template-columns:repeat(4,minmax(0,1fr))!important;
+   direction:rtl!important;
+   overflow:hidden!important;
+ }
+ .dlp-mobile-nav a{min-width:0!important;width:100%!important;box-sizing:border-box!important;overflow:hidden!important}
+ .dlp-mobile-nav a span{max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+}
+/* Very narrow phones: keep all four destinations inside the viewport */
+@media (max-width:430px){
+ .dlp-mobile-nav{left:6px!important;right:6px!important;gap:3px!important;padding:5px!important;border-radius:17px!important}
+ .dlp-mobile-nav a{min-height:44px!important;padding:4px 1px!important;font-size:.74rem!important}
+ .dlp-mobile-nav a span{font-size:.59rem!important}
+}
+/* iPhone/mobile landscape only */
+@media (max-width:950px) and (orientation:landscape) and (max-height:550px){
+ .dlp-content{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}
+ .dlp-mobile-nav{left:max(8px,env(safe-area-inset-left))!important;right:max(8px,env(safe-area-inset-right))!important;bottom:calc(5px + env(safe-area-inset-bottom))!important;width:auto!important;max-width:none!important;transform:none!important}
+ .dlp-mobile-spacer{height:68px!important}
+}
