@@ -129,3 +129,15 @@ input[type="email"],input[type="password"]{direction:ltr;text-align:left}
   .brand-page header.tp-flex,.brand-page section.tp-flex{flex-wrap:wrap;gap:12px}
   .brand-page main>.tp-p-8{padding:22px 18px}.tp-result-card{padding:24px 18px}
 }
+
+/* About page: readable Arabic text and contact cards on narrow screens. */
+.about-page { line-height: 1.9; }
+.about-prose { white-space: pre-line; overflow-wrap: anywhere; }
+.about-list { list-style: disc; padding-inline-start: 1.4rem; }
+.about-list li + li { margin-top: .45rem; }
+.about-profile { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.about-photo { width: 160px; height: 192px; object-fit: cover; border-radius: 1rem; border: 2px solid #C6A15B; }
+.about-contacts { display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+.about-contacts > * { max-width: 100%; overflow-wrap: anywhere; }
+.about-notice { border-inline-start: 4px solid #C6A15B; border-radius: .5rem; padding: 1rem; background: #fffbeb; color: #713f12; }
+@media (max-width: 560px) { .about-profile { grid-template-columns: minmax(0, 1fr); } .about-contacts { flex-direction: column; align-items: stretch; } .about-contacts a { flex-wrap: wrap; } }

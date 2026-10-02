@@ -26,9 +26,9 @@ test.afterAll(async () => {
 });
 test("identity and about are visible while account settings require authentication", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await page.goto("/about");
-  await expect(page.getByRole("heading", { name: "من نحن" })).toBeVisible(); await expect(page.getByText("Eng.Husen Yasen")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "من نحن" })).toBeVisible(); await expect(page.getByRole("heading", { name: "حسين ياسين حسن / ر. مهندسين أقدم" })).toBeVisible();
   await expect(page.getByRole("img", { name: "شعار المنصة" })).toBeVisible();
-  await expect(page.locator('nav[aria-label="أقسام المنصة"]').getByRole("link", { name: "الأسئلة النهائية" })).toBeVisible();
+  await expect(page.locator('nav[aria-label="أقسام المنصة"]').getByRole("link", { name: "الأسئلة النهائية" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.goto("/settings"); await expect(page).toHaveURL(/\/login/);
 });
