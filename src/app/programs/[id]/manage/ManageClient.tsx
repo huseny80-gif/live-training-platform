@@ -1,5 +1,6 @@
 "use client";
 
+import QuestionEditor from "@/components/platform/QuestionEditor";
 import { errorLabel } from "@/lib/labels";
 import { useState, useTransition } from "react";
 import {
@@ -25,6 +26,7 @@ interface Option {
 interface Question {
   id: string;
   questionText: string;
+  explanation?: string | null;
   questionOrder: number;
   topic: string | null;
   status: string;
@@ -499,6 +501,7 @@ function QuestionRow({
           حذف
         </button>
       </div>
+      <QuestionEditor question={question}/>
       <div className="tp-flex tp-flex-wrap tp-gap-1-5">
         {question.options.map((o) => (
           <span

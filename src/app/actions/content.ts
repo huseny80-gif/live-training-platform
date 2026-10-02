@@ -273,6 +273,34 @@ export async function createQuestionAction(
   return { ok: true, data: { id: question.id } };
 }
 
+export async function updateQuestionAction(questionId: string, formData: FormData): Promise<ActionResult> {
+  const instructorId = await requireInstructor();
+  const parsed = z.object({
+    questionText: z.string().trim().min(5).max(1000),
+    explanation: z.string().trim().max(2000),
+    topic: z.string().trim().max(200),
+    correctOptionId: z.string().min(1),
+  }).safeParse(Object.fromEntries(["questionText", "explanation", "topic", "correctOptionId"].map(key => [key, formData.get(key) ?? ""])));
+  if (!parsed.success) return { ok: false, error: "أدخل نص السؤال والإجابة الصحيحة؛ الحد الأقصى للسؤال 1000 حرف وللتفسير 2000 حرف." };
+  const result = await prisma.$transaction(async tx => {
+    const question = await tx.question.findFirst({ where: { id: questionId, day: { program: { instructorId } } }, include: { options: true, day: { select: { program: { select: { language: true } } } } } });
+    if (!question) return { ok: false as const, error: "السؤال غير موجود أو لا تملك صلاحية تعديله." };
+    if (await tx.sessionQuestion.count({ where: { questionId, session: { status: { not: "DRAFT" } } } })) return { ok: false as const, error: "استُخدم هذا السؤال في جلسة بدأت بالفعل؛ لا يمكن تغيير إجاباته حفاظاً على نتائج المتدربين." };
+    if (!question.options.some(o => o.id === parsed.data.correctOptionId)) return { ok: false as const, error: "اختر إجابة صحيحة من خيارات هذا السؤال." };
+    const options = question.options.map(o => ({ id: o.id, text: String(formData.get(`option-${o.id}`) ?? "").trim() }));
+    if (options.length < 2 || options.some(o => !o.text || o.text.length > 500)) return { ok: false as const, error: "أدخل جميع خيارات الإجابة، بحد أقصى 500 حرف لكل خيار." };
+    const arabic = /[\u0600-\u06FF]/;
+    if (question.day.program.language === "AR" && [parsed.data.questionText, ...options.map(o => o.text)].some(text => !arabic.test(text))) return { ok: false as const, error: "البرنامج مضبوط على العربية؛ يجب أن يكون نص السؤال وجميع الخيارات باللغة العربية." };
+    for (const option of options) await tx.questionOption.update({ where: { id: option.id }, data: { optionText: option.text } });
+    await tx.question.update({ where: { id: question.id }, data: { ...parsed.data, topic: parsed.data.topic || null, explanation: parsed.data.explanation || null, status: "DRAFT" } });
+    return { ok: true as const, programId: question.programId, dayId: question.dayId };
+  }, { isolationLevel: "Serializable" });
+  if (!result.ok) return result;
+  revalidatePath("/questions"); revalidatePath("/google-forms"); revalidatePath("/final-exam");
+  revalidatePath(`/programs/${result.programId}/manage`); revalidatePath(`/programs/${result.programId}/days/${result.dayId}`);
+  return { ok: true, data: undefined };
+}
+
 export async function deleteQuestionAction(questionId: string): Promise<ActionResult> {
   const instructorId = await requireInstructor();
   const question = await prisma.question.findFirst({

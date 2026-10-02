@@ -1,3 +1,4 @@
+import QuestionEditor from "@/components/platform/QuestionEditor";
 import { approveQuestion } from "./actions";
 import Link from "next/link";
 import { questionDirectory } from "@/lib/question-directory";
@@ -20,6 +21,7 @@ export default async function QuestionsPage({ searchParams }: { searchParams: Pr
       {day.questions.map((q, i) => <article className="platform-question" key={q.id}>
         <h3>{i + 1}. {q.questionText}</h3><p>{statuses[q.status] ?? q.status}{q.sourcePageStart ? ` · صفحة المصدر ${q.sourcePageStart}` : ""}</p>
         <ol>{q.options.map(o => <li key={o.id}>{o.optionText}{o.id === q.correctOptionId && <strong> — الإجابة الصحيحة ✓</strong>}</li>)}</ol>
+        <QuestionEditor question={q}/>
         {q.status === "DRAFT" && <form action={approveQuestion}><input type="hidden" name="questionId" value={q.id}/><button className="brand-btn brand-btn-primary" type="submit">اعتماد السؤال</button></form>}
         {q.explanation && <p>التفسير: {q.explanation}</p>}
       </article>)}

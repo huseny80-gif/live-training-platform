@@ -12,7 +12,7 @@ export async function questionDirectory(programId?: string) {
     where: { id: selected, instructorId: session.user.id },
     select: { id: true, title: true, days: { orderBy: { dayNumber: "asc" }, select: { dayNumber: true, title: true, questions: {
       where: { status: { not: "REJECTED" } }, orderBy: { questionOrder: "asc" },
-      select: { id: true, questionText: true, status: true, explanation: true, correctOptionId: true, sourcePageStart: true,
+      select: { id: true, questionText: true, status: true, topic: true, explanation: true, correctOptionId: true, sourcePageStart: true,
         options: { orderBy: { displayOrder: "asc" }, select: { id: true, optionLabel: true, optionText: true } } },
     } } } },
   }) : null;
