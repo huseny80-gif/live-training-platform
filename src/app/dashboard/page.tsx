@@ -6,7 +6,23 @@ import { listOwnedPrograms } from "@/app/actions/programs";
 import Link from "next/link";
 import { brand } from "@/lib/brand";
 
-const PROGRAM_COVERS = {\n  survey: "/program-covers/survey-program.webp",\n  gis: "/program-covers/gis-program.webp",\n} as const;\n\nfunction programCover(title: string) {\n  const normalized = title.toLowerCase();\n  if (normalized.includes("الجغرافية") || normalized.includes("gis")) return { src: PROGRAM_COVERS.gis, kind: "gis" as const, subtitle: "Geographic Information Systems - Level 1" };\n  if (normalized.includes("المساحة") || normalized.includes("seismic") || normalized.includes("survey")) return { src: PROGRAM_COVERS.survey, kind: "survey" as const, subtitle: "Positioning on a Land Seismic Crews" };\n  return null;\n}\n\nconst STATUS_LABEL: Record<string, string> = {
+const PROGRAM_COVERS = {
+  survey: "/program-covers/survey-program.webp",
+  gis: "/program-covers/gis-program.webp",
+} as const;
+
+function programCover(title: string) {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("الجغرافية") || normalized.includes("gis")) {
+    return { src: PROGRAM_COVERS.gis, kind: "gis" as const, subtitle: "Geographic Information Systems - Level 1" };
+  }
+  if (normalized.includes("المساحة") || normalized.includes("seismic") || normalized.includes("survey")) {
+    return { src: PROGRAM_COVERS.survey, kind: "survey" as const, subtitle: "Positioning on a Land Seismic Crews" };
+  }
+  return null;
+}
+
+const STATUS_LABEL: Record<string, string> = {
   DRAFT: "مسودة",
   ACTIVE: "نشط",
   ARCHIVED: "مؤرشف",
