@@ -16,7 +16,7 @@ import {
 } from "@/lib/language";
 
 const MODEL_ID = process.env.OPENAI_MODEL || "gpt-6-luna";
-const MAX_GENERATION_ATTEMPTS = 2;
+const MAX_GENERATION_ATTEMPTS = 4;
 
 type OpenAIResponse = {
   output_text?: string;
@@ -125,7 +125,7 @@ export class OpenAIAdapter implements AIAdapter {
     }
 
     const questions: GeneratedQuestion[] = [];
-    const QUESTION_CONCURRENCY = 5;
+    const QUESTION_CONCURRENCY = 2;
 
     const generateDayQuestions = async (
       day: GeneratedDayPlan,
@@ -233,8 +233,8 @@ export class OpenAIAdapter implements AIAdapter {
       };
     };
 
-    // Two days at a time keeps the total generation under serverless time
-    // limits while staying conservative with provider rate limits. Each batch
+    // Two days at a time keeps provider pressure low and prevents one 429
+    // burst from invalidating the full 50-question bank. Each batch
     // still sees all questions accepted by earlier batches, preserving the
     // duplicate-avoidance context across the course.
     for (let index = 0; index < days.length; index += QUESTION_CONCURRENCY) {
