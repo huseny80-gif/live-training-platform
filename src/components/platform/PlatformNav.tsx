@@ -1,13 +1,14 @@
 "use client";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import PlatformLogo from "./PlatformLogo";
 import { brand } from "@/lib/brand";
 export default function PlatformNav({ isInstructor = false }: { isInstructor?: boolean }) {
   const pathname = usePathname();
   if (/^\/(join|session)(\/|$)/.test(pathname)) return null;
   return <header className="platform-bar">
     <Link href={isInstructor ? "/dashboard" : "/about"} className="platform-identity" aria-label={brand.nameAr}>
-      <svg viewBox="0 0 48 48" width="42" height="42" role="img" aria-label="شعار المنصة"><rect width="48" height="48" rx="12" fill="#0F766E"/><path d="M9 17l15-7 15 7-15 7zM14 24v9c6 5 14 5 20 0v-9M39 18v14" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinejoin="round"/></svg>
+      <PlatformLogo />
       <span><strong>{brand.nameAr}</strong><small>{brand.nameEn}</small></span>
     </Link>
     <nav aria-label="أقسام المنصة">

@@ -141,3 +141,8 @@ input[type="email"],input[type="password"]{direction:ltr;text-align:left}
 .about-contacts > * { max-width: 100%; overflow-wrap: anywhere; }
 .about-notice { border-inline-start: 4px solid #C6A15B; border-radius: .5rem; padding: 1rem; background: #fffbeb; color: #713f12; }
 @media (max-width: 560px) { .about-profile { grid-template-columns: minmax(0, 1fr); } .about-contacts { flex-direction: column; align-items: stretch; } .about-contacts a { flex-wrap: wrap; } }
+
+/* Original surveying logo: keep the asset alpha and its full aspect ratio. */
+.platform-logo{display:block;object-fit:contain;flex-shrink:0;background:transparent}
+.platform-logo-form{margin:0 auto 12px}
+@media(max-width:560px){.platform-identity>.platform-logo,.dlp-brand>.platform-logo{width:52px;height:52px}}

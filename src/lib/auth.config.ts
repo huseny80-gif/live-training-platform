@@ -14,6 +14,7 @@ export const authConfig: NextAuthConfig = {
       const isPublic =
         nextUrl.pathname === "/about" ||
         nextUrl.pathname === "/hussein-profile.webp" ||
+        nextUrl.pathname === "/training-logo.webp" ||
         nextUrl.pathname.startsWith("/login") ||
         nextUrl.pathname.startsWith("/api/auth") ||
         nextUrl.pathname.startsWith("/join") ||

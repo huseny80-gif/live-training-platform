@@ -1,3 +1,4 @@
+import PlatformLogo from "@/components/platform/PlatformLogo";
 import { prisma } from "@/lib/prisma";
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -45,7 +46,7 @@ export default async function DashboardPage() {
       <header className="dlp-header">
         <div className="dlp-header-inner">
           <div className="dlp-brand">
-            <div className="dlp-logo">ح</div>
+            <PlatformLogo />
             <div>
               <h1>{brand.nameAr}</h1>
               <p>{brand.nameEn}</p>

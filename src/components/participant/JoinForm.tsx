@@ -1,5 +1,6 @@
 "use client";
 
+import PlatformLogo from "@/components/platform/PlatformLogo";
 import { useActionState } from "react";
 import { joinSessionAction } from "@/app/actions/sessions";
 import { brand } from "@/lib/brand";
@@ -36,7 +37,7 @@ export default function JoinForm({ code = "" }: { code?: string }) {
     <main className="dlp-participant-page">
       <section className="brand-card dlp-join-card">
         <header className="tp-form-heading">
-          <div className="tp-brand-mark" aria-hidden="true">ح</div>
+          <PlatformLogo size={96} className="platform-logo-form" />
           <h1>{brand.nameAr}</h1>
           <p>{sessionCode ? "أدخل اسمك الثلاثي للانضمام إلى الاختبار" : "أدخل رمز الجلسة واسمك الثلاثي للانضمام"}</p>
         </header>

@@ -5,6 +5,7 @@ import "./portfolio-ui.css";
 import "./brand-tokens.css";
 
 export const metadata: Metadata = {
+  icons: { icon: { url: "/training-logo.webp", type: "image/webp" } },
   title: "الحقيبة التدريبية",
   description: "منصة التدريب المباشر والاختبارات التفاعلية",
 };

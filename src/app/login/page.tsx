@@ -1,5 +1,6 @@
 "use client";
 
+import PlatformLogo from "@/components/platform/PlatformLogo";
 import { useActionState } from "react";
 import { loginAction } from "./actions";
 import { useRouter } from "next/navigation";
@@ -22,7 +23,7 @@ export default function LoginPage() {
   return (
     <main className="dlp-participant-page">
       <div className="brand-card dlp-join-card">
-        <header className="tp-form-heading"><div className="tp-brand-mark" aria-hidden="true">ح</div><h1>الحقيبة التدريبية</h1><p>تسجيل دخول المدرب</p></header>
+        <header className="tp-form-heading"><PlatformLogo size={96} className="platform-logo-form" /><h1>الحقيبة التدريبية</h1><p>تسجيل دخول المدرب</p></header>
         <form action={dispatch} className="tp-form">
           <div>
             <label htmlFor="email" className="tp-block tp-text-sm tp-font-medium tp-text-gray-700">
