@@ -7,8 +7,8 @@ import Link from "next/link";
 import { brand } from "@/lib/brand";
 
 const PROGRAM_COVERS = {
-  survey: "https://raw.githubusercontent.com/huseny80-gif/live-training-platform/claude/live-training-quiz-platform-gm1orm/public/program-covers/survey-program-v2.webp",
-  gis: "https://raw.githubusercontent.com/huseny80-gif/live-training-platform/claude/live-training-quiz-platform-gm1orm/public/program-covers/gis-program-v2.webp",
+  survey: "https://raw.githubusercontent.com/huseny80-gif/live-training-platform/claude/live-training-quiz-platform-gm1orm/public/program-covers/survey-program-v3.webp",
+  gis: "https://raw.githubusercontent.com/huseny80-gif/live-training-platform/claude/live-training-quiz-platform-gm1orm/public/program-covers/gis-program-v3.webp",
 } as const;
 
 function programCover(title: string) {
