@@ -274,7 +274,12 @@ export async function POST(
     const error = generationErrorToArabic(rawError);
     await prisma.trainingDocument.update({
       where: { id: selected.id },
-      data: { extractionStatus: "FAILED", extractionNotes: rawError },
+      data: {
+        extractionStatus: "COMPLETED",
+        extractionNotes:
+          `REAL_SOURCE_READY · GENERATION_FAILED · ${rawError}`,
+        extractedAt: new Date(),
+      },
     });
 
     return NextResponse.json(
@@ -295,8 +300,10 @@ export async function POST(
     await prisma.trainingDocument.update({
       where: { id: selected.id },
       data: {
-        extractionStatus: "FAILED",
-        extractionNotes: rawError,
+        extractionStatus: "COMPLETED",
+        extractionNotes:
+          `REAL_SOURCE_READY · ACCEPTANCE_FAILED · ${rawError}`,
+        extractedAt: new Date(),
       },
     });
 
