@@ -7,8 +7,8 @@ import Link from "next/link";
 import { brand } from "@/lib/brand";
 
 const PROGRAM_COVERS = {
-  survey: "/program-covers/survey-program.webp",
-  gis: "/program-covers/gis-program.webp",
+  survey: "/program-covers/survey-program-v2.webp",
+  gis: "/program-covers/gis-program-v2.webp",
 } as const;
 
 function programCover(title: string) {

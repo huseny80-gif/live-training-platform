@@ -329,11 +329,11 @@ a.about-contact-card:hover{transform:translateY(-2px);border-color:color-mix(in 
 .dlp-program-showcase{display:flex;flex-direction:column;min-width:0;overflow:hidden;border:1px solid color-mix(in srgb,var(--brand-primary) 18%,var(--brand-border));border-radius:22px;background:var(--brand-surface);color:var(--brand-text);text-decoration:none;box-shadow:0 10px 28px rgb(18 60 58 / .09);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
 .dlp-program-showcase:hover{transform:translateY(-4px);border-color:color-mix(in srgb,#b08a45 55%,var(--brand-border));box-shadow:0 18px 42px rgb(18 60 58 / .15)}
 .dlp-program-showcase:focus-visible{outline:3px solid color-mix(in srgb,var(--brand-primary) 75%,white);outline-offset:4px}
-.dlp-program-cover{position:relative;aspect-ratio:16/9;overflow:hidden;background:linear-gradient(135deg,#0f766e,#123c3a)}
-.dlp-program-cover img{width:100%;height:100%;display:block;object-fit:cover;transition:transform .45s ease}
+.dlp-program-cover{position:relative;aspect-ratio:16/9;overflow:hidden;background:color-mix(in srgb,var(--brand-primary) 5%,#fff)}
+.dlp-program-cover img{position:relative;z-index:1;width:100%;height:100%;display:block;object-fit:contain;object-position:center;padding:10px;transition:transform .45s ease}
 .dlp-program-showcase:hover .dlp-program-cover img{transform:scale(1.025)}
-.dlp-cover-shade{position:absolute;inset:0;background:linear-gradient(to top,rgb(5 42 40 / .28),transparent 45%)}
-.dlp-cover-icon{position:absolute;inset:auto 18px 14px auto;width:48px;height:48px;display:grid;place-items:center;border:2px solid rgb(255 255 255 / .82);border-radius:999px;background:rgb(15 118 110 / .9);color:#fff;font-size:25px;box-shadow:0 7px 18px rgb(0 0 0 / .18);backdrop-filter:blur(4px)}
+.dlp-cover-shade{position:absolute;z-index:2;inset:0;background:linear-gradient(to top,rgb(5 42 40 / .10),transparent 38%);pointer-events:none}
+.dlp-cover-icon{position:absolute;z-index:3;inset:auto 18px 14px auto;width:48px;height:48px;display:grid;place-items:center;border:2px solid rgb(255 255 255 / .82);border-radius:999px;background:rgb(15 118 110 / .9);color:#fff;font-size:25px;box-shadow:0 7px 18px rgb(0 0 0 / .18);backdrop-filter:blur(4px)}
 .dlp-program-cover.fallback{display:grid;place-items:center}.dlp-program-cover.fallback img{width:110px;height:110px;object-fit:contain}
 .dlp-program-body{display:flex;flex:1;flex-direction:column;gap:13px;padding:18px}
 .dlp-program-heading h3{margin:9px 0 0;font-size:1.15rem;line-height:1.75;color:#123c3a}
