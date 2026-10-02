@@ -450,6 +450,51 @@ async function generateValidatedBatch(params: {
   );
 }
 
+async function generateArabicSummary(
+  source: string,
+  programTitle: string,
+  requireArabic: boolean,
+): Promise<string> {
+  const languageRule = requireArabic
+    ? "اكتب الملخص بالعربية حتى لو كان المصدر إنجليزيًا."
+    : "Write the summary in English.";
+
+  let previousFailure = "";
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const prompt = `لخص المادة التدريبية بعنوان "${programTitle}" اعتمادًا حصراً على SOURCE.
+${languageRule}
+أعد JSON فقط بالشكل: {"summary":"..."}
+يجب أن يكون الملخص مركزًا ويغطي المحاور الرئيسية دون إضافة معرفة خارجية.
+${previousFailure ? `المحاولة السابقة فشلت: ${previousFailure}` : ""}
+
+SOURCE START
+${source}
+SOURCE END`;
+
+    const response = await requestFinalExam(prompt);
+    if (!response.ok) throw new Error(response.error);
+
+    try {
+      const parsed = JSON.parse(extractJson(response.text)) as { summary?: string };
+      const summary = parsed.summary?.trim() ?? "";
+      if (summary.length < 40) {
+        previousFailure = "الملخص قصير أو مفقود.";
+        continue;
+      }
+      if (requireArabic && !isPredominantlyArabic(summary)) {
+        previousFailure = "الملخص ليس بالعربية.";
+        continue;
+      }
+      return summary;
+    } catch (error) {
+      previousFailure =
+        error instanceof Error ? error.message : "JSON غير صالح.";
+    }
+  }
+
+  throw new Error(`FINAL_SUMMARY_VALIDATION_FAILED: ${previousFailure}`);
+}
+
 export async function generateFinalQuestions(
   programId: string,
   _prev: FinalQuestionsState | null,
@@ -524,45 +569,93 @@ export async function generateFinalQuestions(
     };
   }
 
-  const source = usable
-    .map((page) => {
-      const text = (page.extractedText ?? "").trim().slice(0, 1400);
-      return `[PAGE ${page.pageNumber}${page.title ? ` — ${page.title}` : ""}]\n${text}`;
-    })
-    .join("\n\n");
+  const formatPages = (
+    pageSet: typeof usable,
+    charsPerPage: number,
+  ) =>
+    pageSet
+      .map((page) => {
+        const text = (page.extractedText ?? "").trim().slice(0, charsPerPage);
+        return `[PAGE ${page.pageNumber}${page.title ? ` — ${page.title}` : ""}]\n${text}`;
+      })
+      .join("\n\n");
+
+  // Keep the summary representative of the whole file while keeping the
+  // question-generation prompts small enough for a single serverless request.
+  const summarySource = formatPages(usable, 650);
+
+  // Four disjoint page groups reduce prompt size and duplicate-question risk.
+  const pageGroups = [0, 1, 2, 3].map((offset) =>
+    usable.filter((_, index) => index % 4 === offset),
+  );
 
   const requireArabic = program.language === "AR";
   const validPages = new Set(usable.map((page) => page.pageNumber));
 
   try {
-    const mcq = await generateValidatedBatch({
-      source,
-      programTitle: program.title,
-      requireArabic,
-      type: "MCQ",
-      count: 10,
-      includeSummary: true,
-      validPages,
-    });
+    const [summary, mcqA, mcqB, tfA, tfB] = await Promise.all([
+      generateArabicSummary(summarySource, program.title, requireArabic),
+      generateValidatedBatch({
+        source: formatPages(pageGroups[0], 900),
+        programTitle: program.title,
+        requireArabic,
+        type: "MCQ",
+        count: 5,
+        includeSummary: false,
+        validPages,
+      }),
+      generateValidatedBatch({
+        source: formatPages(pageGroups[1], 900),
+        programTitle: program.title,
+        requireArabic,
+        type: "MCQ",
+        count: 5,
+        includeSummary: false,
+        validPages,
+      }),
+      generateValidatedBatch({
+        source: formatPages(pageGroups[2], 900),
+        programTitle: program.title,
+        requireArabic,
+        type: "TF",
+        count: 10,
+        includeSummary: false,
+        validPages,
+      }),
+      generateValidatedBatch({
+        source: formatPages(pageGroups[3], 900),
+        programTitle: program.title,
+        requireArabic,
+        type: "TF",
+        count: 10,
+        includeSummary: false,
+        validPages,
+      }),
+    ]);
 
-    const tf = await generateValidatedBatch({
-      source,
-      programTitle: program.title,
-      requireArabic,
-      type: "TF",
-      count: 20,
-      includeSummary: false,
-      validPages,
-    });
+    const questions = [
+      ...mcqA.questions,
+      ...mcqB.questions,
+      ...tfA.questions,
+      ...tfB.questions,
+    ];
 
-    const questions = [...mcq.questions, ...tf.questions];
     if (questions.length !== 30) {
       throw new Error(`FINAL_QUESTION_TOTAL_MISMATCH: ${questions.length}`);
     }
 
+    const normalized = new Set<string>();
+    for (const [index, question] of questions.entries()) {
+      const key = question.text.trim().toLocaleLowerCase("ar").replace(/\s+/g, " ");
+      if (normalized.has(key)) {
+        throw new Error(`FINAL_DUPLICATE_QUESTION_AT_${index + 1}`);
+      }
+      normalized.add(key);
+    }
+
     return {
       ok: true,
-      summary: mcq.summary ?? "",
+      summary,
       questions,
       googleAppsScript: buildGoogleAppsScript(program.title, questions),
       sourceFileName: sourceDocument.fileName,
