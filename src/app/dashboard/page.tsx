@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma";
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { listOwnedPrograms } from "@/app/actions/programs";
@@ -14,6 +15,10 @@ const navItems = [
   { label: "الرئيسية", icon: "⌂", href: "/dashboard", active: true },
   { label: "البرامج التدريبية", icon: "▣", href: "#programs" },
   { label: "الجلسات والنتائج", icon: "◉", href: "#sessions" },
+  { label: "الأسئلة النهائية", icon: "✓", href: "/final-exam" },
+  { label: "مولد Google Forms", icon: "▤", href: "/google-forms" },
+  { label: "من نحن", icon: "ⓘ", href: "/about" },
+  { label: "الإعدادات", icon: "⚙", href: "/settings" },
   { label: "إنشاء برنامج", icon: "+", href: "/programs/new" },
 ];
 async function logout() {
@@ -32,7 +37,8 @@ export default async function DashboardPage() {
     0
   );
   const totalSessions = programs.reduce((s, p) => s + p._count.sessions, 0);
-  const displayName = session.user.name ?? session.user.email ?? "المدرب";
+  const account = await prisma.instructor.findUnique({ where: { id: session.user.id }, select: { name: true } });
+  const displayName = account?.name ?? session.user.name ?? session.user.email ?? "المدرب";
 
   return (
     <main className="dlp-shell">

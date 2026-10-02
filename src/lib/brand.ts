@@ -1,5 +1,6 @@
 export const brand = {
   productionUrl: "https://live-training-platform.vercel.app",
+  trainerName: "Eng.Husen Yasen",
   nameAr: "الحقيبة التدريبية",
   nameEn: "Training Portfolio",
   taglineAr: "محتوى تدريبي ذكي من المصدر إلى التقييم",

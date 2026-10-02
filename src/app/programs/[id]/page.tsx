@@ -33,6 +33,10 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="tp-min-h-screen tp-bg-gray-50">
+      <nav className="tp-flex tp-gap-3 tp-flex-wrap tp-p-4" aria-label="أقسام البرنامج">
+        <Link className="brand-btn brand-btn-secondary" href={`/final-exam?programId=${id}`}>الأسئلة النهائية</Link>
+        <Link className="brand-btn brand-btn-secondary" href={`/google-forms?programId=${id}`}>مولد Google Forms</Link>
+      </nav>
       <header className="tp-bg-white tp-border-b tp-px-6 tp-py-4 tp-flex tp-items-center tp-justify-between">
         <div className="tp-flex tp-items-center tp-gap-3">
           <Link href="/dashboard" className="tp-text-sm tp-text-gray-500 tp-hover-text-gray-800">

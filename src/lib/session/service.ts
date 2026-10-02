@@ -2,6 +2,7 @@
 // Correct answers, scoring, and leaderboard are computed here (server-side only).
 // correctOptionId is NEVER returned to participants.
 
+import { selectFinalQuestions } from "@/lib/final-exam";
 import { prisma } from "@/lib/prisma";
 import { issueGuestToken, verifyGuestToken, hashToken } from "./guest-token";
 import { randomBytes } from "crypto";
@@ -76,6 +77,25 @@ export async function createSession(
   }
 
   return session;
+}
+
+/** A separate cross-course assessment. dayNumber 0 denotes the final exam, not a training day. */
+export async function createFinalSession(programId: string, instructorId: string, count: number) {
+  const program = await prisma.trainingProgram.findFirst({ where: { id: programId, instructorId }, include: {
+    days: { orderBy: { dayNumber: "asc" }, include: { questions: { where: { status: { in: ["APPROVED", "USED"] } }, orderBy: { questionOrder: "asc" }, include: { options: true } } } },
+  } });
+  if (!program) throw new Error("PROGRAM_NOT_FOUND");
+  const arabic = /[\u0600-\u06FF]/;
+  const selected = selectFinalQuestions(program.days.map(day => ({ questions: day.questions.filter(q =>
+    q.questionText.trim() && q.options.length >= 2 && q.options.every(o => o.optionText.trim()) && q.options.some(o => o.id === q.correctOptionId) &&
+    (program.language !== "AR" || (arabic.test(q.questionText) && q.options.every(o => arabic.test(o.optionText))))
+  ) })), count);
+  const sessionCode = await generateUniqueCode();
+  return prisma.liveSession.create({ data: {
+    programId, instructorId, sessionCode, dayNumber: 0, title: `${program.title} — الاختبار النهائي`,
+    scoringConfig: { assessmentType: "FINAL" },
+    sessionQuestions: { create: selected.map((q, i) => ({ questionId: q.id, questionOrder: i + 1, status: "DRAFT" })) },
+  } });
 }
 
 async function generateUniqueCode(): Promise<string> {
