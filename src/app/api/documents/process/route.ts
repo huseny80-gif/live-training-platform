@@ -82,8 +82,10 @@ export async function POST(req: NextRequest) {
         await prisma.trainingDocument.update({
           where: { id: documentId },
           data: {
-            extractionStatus: "FAILED",
-            extractionNotes: generation.errorMessage ?? "Content generation failed",
+            extractionStatus: "COMPLETED",
+            extractionNotes:
+              `REAL_SOURCE_READY · GENERATION_FAILED · ${generation.errorMessage ?? "Content generation failed"}`,
+            extractedAt: new Date(),
           },
         });
         return;
