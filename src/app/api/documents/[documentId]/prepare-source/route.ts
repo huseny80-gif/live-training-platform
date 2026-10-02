@@ -8,14 +8,13 @@ import { representativePageOrder } from "@/lib/extraction/page-sampling";
 
 export const maxDuration = 300;
 
-const EXTRACTION_BATCH_SIZE = 20;
+const BATCH_SIZE = 20;
 
-async function getCoverage(documentId: string) {
-  const doc = await prisma.trainingDocument.findUnique({
+async function readCoverage(documentId: string) {
+  const document = await prisma.trainingDocument.findUnique({
     where: { id: documentId },
     select: {
       id: true,
-      programId: true,
       fileName: true,
       pageCount: true,
       pages: {
@@ -29,29 +28,26 @@ async function getCoverage(documentId: string) {
     },
   });
 
-  if (!doc) return null;
+  if (!document) return null;
 
-  const totalPages = Math.max(
-    doc.pageCount ?? 0,
-    ...doc.pages.map((page) => page.pageNumber),
-    1,
+  const highestPage = document.pages.reduce(
+    (max, page) => Math.max(max, page.pageNumber),
+    0,
   );
+  const totalPages = Math.max(document.pageCount ?? 0, highestPage, 1);
   const requiredPages = requiredReadablePages(totalPages);
 
-  const readablePageNumbers = new Set(
-    doc.pages
-      .filter(
-        (page) =>
-          page.extractionStatus === "COMPLETED" &&
-          page.extractionMethod !== null &&
-          page.extractionMethod !== "MOCK" &&
-          (page.extractedText?.trim().length ?? 0) > 20,
-      )
-      .map((page) => page.pageNumber),
+  const readable = document.pages.filter(
+    (page) =>
+      page.extractionStatus === "COMPLETED" &&
+      page.extractionMethod !== null &&
+      page.extractionMethod !== "MOCK" &&
+      (page.extractedText?.trim().length ?? 0) > 20,
   );
 
-  const attemptedPageNumbers = new Set(
-    doc.pages
+  const readableNumbers = new Set(readable.map((page) => page.pageNumber));
+  const attemptedNumbers = new Set(
+    document.pages
       .filter(
         (page) =>
           page.extractionMethod !== "MOCK" &&
@@ -63,40 +59,50 @@ async function getCoverage(documentId: string) {
   );
 
   return {
-    ...doc,
+    id: document.id,
+    fileName: document.fileName,
     totalPages,
     requiredPages,
-    completedPages: readablePageNumbers.size,
-    readablePageNumbers,
-    attemptedPageNumbers,
+    completedPages: readableNumbers.size,
+    readableNumbers,
+    attemptedNumbers,
   };
 }
 
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ documentId: string }> },
+  context: { params: Promise<{ documentId: string }> },
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ stage: "FAILED", error: "UNAUTHORIZED" }, { status: 401 });
+    return NextResponse.json(
+      { stage: "FAILED", error: "UNAUTHORIZED" },
+      { status: 401 },
+    );
   }
 
-  const { documentId } = await params;
+  const { documentId } = await context.params;
+
   const owned = await prisma.trainingDocument.findFirst({
-    where: { id: documentId, program: { instructorId: session.user.id } },
+    where: {
+      id: documentId,
+      program: { instructorId: session.user.id },
+    },
     select: { id: true },
   });
-
   if (!owned) {
     return NextResponse.json(
-      { stage: "FAILED", error: "المادة التدريبية غير موجودة أو لا تملك صلاحية الوصول إليها." },
+      { stage: "FAILED", error: "المادة التدريبية غير موجودة." },
       { status: 404 },
     );
   }
 
-  let coverage = await getCoverage(documentId);
+  let coverage = await readCoverage(documentId);
   if (!coverage) {
-    return NextResponse.json({ stage: "FAILED", error: "تعذر قراءة حالة المادة." }, { status: 404 });
+    return NextResponse.json(
+      { stage: "FAILED", error: "تعذر قراءة حالة المادة." },
+      { status: 404 },
+    );
   }
 
   if (coverage.completedPages >= coverage.requiredPages) {
@@ -120,42 +126,30 @@ export async function POST(
     });
   }
 
-  const pageOrder = representativePageOrder(coverage.totalPages);
-  const unattempted = pageOrder.filter(
-    (pageNumber) => !coverage!.attemptedPageNumbers.has(pageNumber),
+  const orderedPages = representativePageOrder(coverage.totalPages);
+  const unattempted = orderedPages.filter(
+    (page) => !coverage!.attemptedNumbers.has(page),
   );
-  const retryUnreadable = pageOrder.filter(
-    (pageNumber) =>
-      coverage!.attemptedPageNumbers.has(pageNumber) &&
-      !coverage!.readablePageNumbers.has(pageNumber),
+  const retry = orderedPages.filter(
+    (page) =>
+      coverage!.attemptedNumbers.has(page) &&
+      !coverage!.readableNumbers.has(page),
   );
-  const targetPages = [...unattempted, ...retryUnreadable].slice(
-    0,
-    EXTRACTION_BATCH_SIZE,
-  );
+  const targetPages = [...unattempted, ...retry].slice(0, BATCH_SIZE);
 
   if (targetPages.length === 0) {
     return NextResponse.json(
       {
         stage: "FAILED",
         documentId,
+        error: "لا توجد صفحات إضافية قابلة للمعالجة مع بقاء المصدر غير مكتمل.",
         completedPages: coverage.completedPages,
         requiredPages: coverage.requiredPages,
         totalPages: coverage.totalPages,
-        error: "لا توجد صفحات إضافية قابلة للمعالجة، وما زالت تغطية المصدر الحقيقي غير كافية.",
       },
       { status: 422 },
     );
   }
-
-  await prisma.trainingDocument.update({
-    where: { id: documentId },
-    data: {
-      extractionStatus: "PROCESSING",
-      extractionNotes:
-        `PREPARING_REAL_SOURCE ${coverage.completedPages}/${coverage.requiredPages}`,
-    },
-  });
 
   const extraction = await extractionService.processDocument(
     documentId,
@@ -163,9 +157,12 @@ export async function POST(
     targetPages,
   );
 
-  coverage = await getCoverage(documentId);
+  coverage = await readCoverage(documentId);
   if (!coverage) {
-    return NextResponse.json({ stage: "FAILED", error: "تعذر تحديث حالة المادة." }, { status: 500 });
+    return NextResponse.json(
+      { stage: "FAILED", error: "تعذر تحديث حالة المصدر." },
+      { status: 500 },
+    );
   }
 
   if (coverage.completedPages >= coverage.requiredPages) {
@@ -194,17 +191,16 @@ export async function POST(
       {
         stage: "FAILED",
         documentId,
+        error: extractionErrorToArabic(extraction.errorMessage),
+        rawError: extraction.errorMessage,
         completedPages: coverage.completedPages,
         requiredPages: coverage.requiredPages,
         totalPages: coverage.totalPages,
-        error: extractionErrorToArabic(extraction.errorMessage),
-        rawError: extraction.errorMessage,
       },
       { status: 422 },
     );
   }
 
-  // Partial real extraction is progress, not a document failure.
   await prisma.trainingDocument.update({
     where: { id: documentId },
     data: {
