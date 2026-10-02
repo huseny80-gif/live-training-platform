@@ -153,8 +153,7 @@ export default async function DashboardPage() {
                       return cover ? (
                         <div className={`dlp-program-cover ${cover.kind}`}>
                           <img src={cover.src} alt={`واجهة البرنامج التدريبي — ${p.title}`} />
-                          <span className="dlp-cover-shade" aria-hidden="true" />
-                          <span className="dlp-cover-icon" aria-hidden="true">{cover.kind === "gis" ? "◎" : "⌖"}</span>
+                          <span className="dlp-cover-ring" aria-hidden="true" />
                         </div>
                       ) : <div className="dlp-program-cover fallback"><PlatformLogo /></div>;
                     })()}
