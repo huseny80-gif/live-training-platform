@@ -10,10 +10,13 @@ async function run() {
   const request = { pages: [{ pageId: "test-page", pageNumber: 1, extractedText: "المعلومات الجغرافية تعتمد على الإحداثيات والتحليل المكاني وتساعد على تحديد المواقع." }], language: "AR" as const, programTitle: "اختبار محلي", totalDays: 10, questionsPerDay: 5 };
   function responses(planText: string, questionText: string) {
     let calls = 0;
-    globalThis.fetch = async (input) => {
+    globalThis.fetch = async (input, init) => {
       const url = input instanceof Request ? input.url : String(input);
       assert.equal(new URL(url).origin, "https://api.anthropic.com");
-      const text = calls++ === 0 ? planText : questionText;
+      calls++;
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.output_config.format.type, "json_schema");
+      const text = body.output_config.format.schema.properties.days ? planText : questionText;
       return new Response(JSON.stringify({ id: "msg_test", type: "message", role: "assistant", model: "test", content: [{ type: "text", text }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200, headers: { "content-type": "application/json" } });
     };
     return () => calls;
@@ -36,7 +39,35 @@ async function run() {
     responses(JSON.stringify({ days }), JSON.stringify({ questions: wrong }));
     await assert.rejects(new ClaudeAIAdapter().generate(request), /AI_INVALID_CONTENT/);
     console.log("PASS: invalid correct labels cannot silently become A");
-    console.log("Claude output validation: 4 passed, 0 failed (transport fixtures, no live API calls)");
+    const incomplete = structuredClone(questions).slice(0, 4);
+    let repaired = false;
+    const baseResponses = responses(JSON.stringify({ days }), JSON.stringify({ questions }));
+    const validFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.output_config.format.schema.properties.questions && !repaired) {
+        repaired = true;
+        const response = await validFetch(input, init);
+        const data = await response.json();
+        data.content[0].text = JSON.stringify({ questions: incomplete });
+        return new Response(JSON.stringify(data), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return validFetch(input, init);
+    };
+    const corrected = await new ClaudeAIAdapter().generate(request);
+    assert.equal(corrected.questions.length, 50);
+    assert.equal(baseResponses(), 12);
+    console.log("PASS: incomplete question output is corrected once before returning all 50 questions");
+    const invalidSources = structuredClone(questions); invalidSources[0].sourcePageNumber = 999;
+    responses(JSON.stringify({ days }), JSON.stringify({ questions: invalidSources }));
+    await assert.rejects(new ClaudeAIAdapter().generate(request), /AI_INVALID_SOURCE_PAGE/);
+    console.log("PASS: invalid source pages remain rejected after bounded correction");
+    const repeatedOrder = structuredClone(questions); repeatedOrder.forEach(q => { q.questionOrder = 1; });
+    responses(JSON.stringify({ days }), JSON.stringify({ questions: repeatedOrder }));
+    const ordered = await new ClaudeAIAdapter().generate(request);
+    assert.deepEqual(ordered.questions.slice(0, 5).map(q => q.questionOrder), [1, 2, 3, 4, 5]);
+    console.log("PASS: question order is assigned from the validated array without changing answers");
+    console.log("Claude output validation: 7 passed, 0 failed (transport fixtures, no live API calls)");
   } finally {
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;

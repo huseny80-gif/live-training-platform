@@ -1,7 +1,7 @@
 // Versioned prompt templates — bump PROMPT_VERSION when changing prompts
 // so aiPromptVersion on Question tracks which prompt produced each question.
 
-export const PROMPT_VERSION = "v1.0";
+export const PROMPT_VERSION = "v1.1";
 
 export function buildDayPlanPrompt(
   pages: Array<{ pageNumber: number; title?: string | null; extractedText: string }>,
@@ -42,6 +42,7 @@ ${pageList}
 
 قواعد صارمة:
 - أعد JSON فقط، لا شرح ولا تعليق
+- المثال يوضح عنصراً واحداً فقط؛ يجب إرجاع العدد المطلوب كاملاً، وليس عنصر المثال وحده
 - يجب أن تغطي الأيام جميع الصفحات المتاحة بالتساوي تقريباً
 - كل يوم يجب أن يحتوي على 2-4 أهداف
 - كل يوم يجب أن يحتوي على موضوعين على الأقل
@@ -98,6 +99,7 @@ ${pageContent}
 
 قواعد صارمة:
 - أعد JSON فقط، لا شرح ولا تعليق
+- المثال يوضح عنصراً واحداً فقط؛ يجب إرجاع العدد المطلوب كاملاً، وليس عنصر المثال وحده
 - كل سؤال يجب أن يحتوي على 4 خيارات (A, B, C, D)
 - إجابة صحيحة واحدة فقط لكل سؤال
 - correctLabel يجب أن يكون A أو B أو C أو D

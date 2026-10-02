@@ -8,6 +8,25 @@ import { buildDayPlanPrompt, buildQuestionsPrompt, PROMPT_VERSION } from "../pro
 
 const MODEL_ID = "claude-haiku-4-5-20251001";
 
+const stringField = { type: "string" };
+const integerField = { type: "integer" };
+const strings = { type: "array", items: stringField };
+function objectSchema(properties: Record<string, unknown>) {
+  return { type: "object", properties, required: Object.keys(properties), additionalProperties: false };
+}
+const dayPlanSchema = objectSchema({ days: { type: "array", items: objectSchema({
+  dayNumber: integerField, title: stringField, objectives: strings, contentSummary: stringField,
+  topics: strings, pageRangeStart: integerField, pageRangeEnd: integerField,
+  sourcePages: { type: "array", items: integerField },
+}) } });
+const questionSchema = objectSchema({ questions: { type: "array", items: objectSchema({
+  questionText: stringField,
+  options: { type: "array", items: objectSchema({ label: { type: "string", enum: ["A", "B", "C", "D"] }, text: stringField }) },
+  correctLabel: { type: "string", enum: ["A", "B", "C", "D"] }, explanation: stringField,
+  questionOrder: integerField, sourcePageNumber: integerField, topic: stringField,
+  difficulty: { type: "string", enum: ["EASY", "MEDIUM", "HARD"] },
+}) } });
+
 export class ClaudeAIAdapter implements AIAdapter {
   readonly name = "CLAUDE";
   readonly modelId = MODEL_ID;
@@ -30,21 +49,31 @@ export class ClaudeAIAdapter implements AIAdapter {
       req.totalDays
     );
 
-    const dayPlanResponse = await client.messages.create({
-      model: MODEL_ID,
-      max_tokens: 8192,
-      messages: [{ role: "user", content: dayPlanPrompt }],
-    }, { signal: deadline });
-
-    totalInputTokens += dayPlanResponse.usage.input_tokens;
-    totalOutputTokens += dayPlanResponse.usage.output_tokens;
-
-    const dayPlanText = dayPlanResponse.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("");
-
-    const days = parseDayPlans(dayPlanText, req.totalDays, req.pages);
+    async function requestValidated<T>(prompt: string, schema: Record<string, unknown>, maxTokens: number, parse: (text: string) => T, stage: string): Promise<T> {
+      let feedback = "";
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await client.messages.create({
+          model: MODEL_ID,
+          max_tokens: maxTokens,
+          output_config: { format: { type: "json_schema", schema } },
+          messages: [{ role: "user", content: prompt + feedback }],
+        }, { signal: deadline });
+        totalInputTokens += response.usage.input_tokens;
+        totalOutputTokens += response.usage.output_tokens;
+        try {
+          if (response.stop_reason === "max_tokens") throw new Error("AI_OUTPUT_TRUNCATED");
+          if (response.stop_reason === "refusal") throw new Error("AI_OUTPUT_REFUSED");
+          return parse(response.content.filter(b => b.type === "text").map(b => b.text).join(""));
+        } catch (error) {
+          if (attempt === 1 || response.stop_reason === "refusal") throw new Error(`${error instanceof Error ? error.message : "AI_INVALID_CONTENT"}:${stage}`);
+          const code = error instanceof Error ? error.message : "AI_INVALID_CONTENT";
+          console.warn("[generation] correcting provider output", { code });
+          feedback = `\nالمحاولة السابقة لم تجتز التحقق (${code}). أعد النتيجة كاملة وفق العدد والحقول ومراجع الصفحات واللغة المحددة. لا تختصر العدد ولا تترك حقولاً فارغة.`;
+        }
+      }
+      throw new Error("AI_INVALID_CONTENT");
+    }
+    const days = await requestValidated(dayPlanPrompt, dayPlanSchema, 8192, text => parseDayPlans(text, req.totalDays, req.pages), "PLAN");
 
     // ── Step 2: Generate questions for each day ───────────────────────────────
 
@@ -63,21 +92,12 @@ export class ClaudeAIAdapter implements AIAdapter {
           existingTexts
         );
 
-        const qResponse = await client.messages.create({
-          model: MODEL_ID,
-          max_tokens: 4096,
-          messages: [{ role: "user", content: qPrompt }],
-        }, { signal: deadline });
-
-        totalInputTokens += qResponse.usage.input_tokens;
-        totalOutputTokens += qResponse.usage.output_tokens;
-
-        const qText = qResponse.content
-          .filter((b) => b.type === "text")
-          .map((b) => (b as { type: "text"; text: string }).text)
-          .join("");
-
-        const dayQuestions = parseQuestions(qText, day.dayNumber, req.questionsPerDay);
+        const dayQuestions = await requestValidated(qPrompt, questionSchema, 8192, text => {
+          const questions = parseQuestions(text, day.dayNumber, req.questionsPerDay);
+          if (questions.some(q => !day.sourcePages.includes(q.sourcePageNumber))) throw new Error("AI_INVALID_SOURCE_PAGE");
+          if (req.language === "AR" && questions.some(q => !/[\u0600-\u06FF]/.test(q.questionText) || q.options.some(o => !/[\u0600-\u06FF]/.test(o.text)))) throw new Error("AI_LANGUAGE_MISMATCH_AR");
+          return questions;
+        }, `DAY_${day.dayNumber}`);
         return dayQuestions;
       }));
       allQuestions.push(...batch.flat());
@@ -150,6 +170,8 @@ function parseDayPlans(
     };
   });
 
+  const available = new Set(pages.map(p => p.pageNumber));
+  if (days.some((day, i) => day.dayNumber !== i + 1 || !day.title.trim() || !day.sourcePages.length || day.sourcePages.some(n => !available.has(n)))) throw new Error("AI_INVALID_DAY_PLAN");
   return days;
 }
 
@@ -178,7 +200,8 @@ function parseQuestions(
       const options = Array.isArray(item.options) ? item.options as Array<Record<string, string>> : [];
       if (options.length !== 4 || new Set(options.map(o => o.label)).size !== 4 ||
           options.some(o => !validLabels.has(o.label) || typeof o.text !== "string" || !o.text.trim()) ||
-          !validLabels.has(item.correctLabel as string) || typeof item.sourcePageNumber !== "number") {
+          !validLabels.has(item.correctLabel as string) || !Number.isInteger(item.sourcePageNumber) ||
+          typeof item.questionText !== "string" || !item.questionText.trim() || typeof item.explanation !== "string" || !item.explanation.trim()) {
         throw new Error("AI_INVALID_CONTENT");
       }
       const correctLabel = item.correctLabel as "A" | "B" | "C" | "D";
@@ -192,7 +215,7 @@ function parseQuestions(
         correctLabel,
         explanation: typeof item.explanation === "string" ? item.explanation : "",
         dayNumber,
-        questionOrder: typeof item.questionOrder === "number" ? item.questionOrder : i + 1,
+        questionOrder: i + 1,
         sourcePageNumber: typeof item.sourcePageNumber === "number" ? item.sourcePageNumber : 1,
         topic: typeof item.topic === "string" ? item.topic : undefined,
         difficulty: validDifficulties.has(item.difficulty as string)
