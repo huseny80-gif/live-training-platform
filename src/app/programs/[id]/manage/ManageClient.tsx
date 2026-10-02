@@ -11,6 +11,7 @@ import {
   updateTopicAction,
   deleteTopicAction,
   createQuestionAction,
+  updateQuestionAction,
   deleteQuestionAction,
   deleteSessionAction,
   deleteNonArabicQuestionsAction,
@@ -29,6 +30,7 @@ interface Question {
   questionText: string;
   questionOrder: number;
   topic: string | null;
+  explanation: string | null;
   status: string;
   correctOptionId: string | null;
   options: Option[];
@@ -111,7 +113,7 @@ function Badge({ text, color }: { text: string; color: string }) {
 
 export default function ManageClient({ program }: { program: Program }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"days" | "sessions">("days");
+  const [activeTab, setActiveTab] = useState<"days" | "questions" | "sessions">("days");
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [showAddDay, setShowAddDay] = useState(false);
   const [editingDayId, setEditingDayId] = useState<string | null>(null);
@@ -226,7 +228,7 @@ export default function ManageClient({ program }: { program: Program }) {
     <div className="space-y-4">
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
-        {(["days", "sessions"] as const).map((tab) => (
+        {(["days", "questions", "sessions"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -234,7 +236,11 @@ export default function ManageClient({ program }: { program: Program }) {
               activeTab === tab ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {tab === "days" ? `الأيام والأسئلة (${program.days.length})` : `الجلسات (${program.sessions.length})`}
+            {tab === "days"
+              ? `الأيام والمحتوى (${program.days.length})`
+              : tab === "questions"
+              ? `الأسئلة (${totalQuestions})`
+              : `الجلسات (${program.sessions.length})`}
           </button>
         ))}
       </div>
@@ -488,6 +494,48 @@ export default function ManageClient({ program }: { program: Program }) {
         </div>
       )}
 
+      {/* ── Questions Tab ───────────────────────────────────────────────────── */}
+      {activeTab === "questions" && (
+        <div className="space-y-4">
+          <div className="brand-card p-4">
+            <h2 className="font-semibold text-gray-800">بنك الأسئلة</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              يمكن للمدرب تعديل نص السؤال، الخيارات، الإجابة الصحيحة والتفسير قبل استخدام السؤال في جلسة جديدة.
+              الأسئلة التي استُخدمت سابقًا تُحفظ تاريخيًا ويُنشأ لها إصدار جديد عند التعديل.
+            </p>
+          </div>
+
+          {program.days.every((day) => day.questions.length === 0) ? (
+            <div className="text-center py-10 text-gray-400 bg-white rounded-2xl border">
+              لا توجد أسئلة بعد.
+            </div>
+          ) : null}
+
+          {program.days.map((day) =>
+            day.questions.length > 0 ? (
+              <section key={day.id} className="brand-card p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <strong className="text-gray-800">اليوم {day.dayNumber}: {day.title}</strong>
+                    <p className="text-xs text-gray-500 mt-1">{day.questions.length} سؤال</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {day.questions.map((question) => (
+                    <QuestionRow
+                      key={question.id}
+                      question={question}
+                      onDelete={() => handleDeleteQuestion(question.id)}
+                      isPending={isPending}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null
+          )}
+        </div>
+      )}
+
       {/* ── Sessions Tab ────────────────────────────────────────────────────── */}
       {activeTab === "sessions" && (
         <div className="space-y-3">
@@ -668,9 +716,20 @@ function QuestionRow({
   onDelete: () => void;
   isPending: boolean;
 }) {
+  const [editing, setEditing] = useState(false);
   const correctOpt = question.options.find((o) => o.id === question.correctOptionId);
+
+  if (editing) {
+    return (
+      <EditQuestionForm
+        question={question}
+        onClose={() => setEditing(false)}
+      />
+    );
+  }
+
   return (
-    <div className="bg-white border rounded-xl px-3 py-2.5 space-y-1">
+    <div className="bg-white border rounded-xl px-3 py-2.5 space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <span className="font-mono text-xs text-gray-400 ml-1">Q{question.questionOrder}</span>
@@ -679,14 +738,25 @@ function QuestionRow({
             <span className="mr-2 text-xs bg-purple-50 text-purple-600 px-1.5 rounded">{question.topic}</span>
           )}
         </div>
-        <button
-          onClick={onDelete}
-          disabled={isPending}
-          className="text-xs px-2 py-0.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
-        >
-          حذف
-        </button>
+        <div className="flex gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-xs px-2 py-1 text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100"
+          >
+            تعديل السؤال والإجابة
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isPending}
+            className="text-xs px-2 py-1 text-red-500 hover:bg-red-50 rounded"
+          >
+            حذف
+          </button>
+        </div>
       </div>
+
       <div className="flex flex-wrap gap-1.5">
         {question.options.map((o) => (
           <span
@@ -698,13 +768,160 @@ function QuestionRow({
             }`}
           >
             {o.optionLabel}: {o.optionText}
+            {o.id === question.correctOptionId ? " ✓" : ""}
           </span>
         ))}
         {!correctOpt && (
           <span className="text-xs text-red-500">⚠ لم تُحدد الإجابة الصحيحة</span>
         )}
       </div>
+
+      {question.explanation ? (
+        <p className="text-xs text-gray-500">
+          <strong>التفسير:</strong> {question.explanation}
+        </p>
+      ) : null}
     </div>
+  );
+}
+
+function EditQuestionForm({
+  question,
+  onClose,
+}: {
+  question: Question;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const optionValue = (label: string) =>
+    question.options.find((option) => option.optionLabel === label)?.optionText ?? "";
+
+  const correctLabel =
+    question.options.find((option) => option.id === question.correctOptionId)?.optionLabel ?? "A";
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    setError(null);
+
+    startTransition(async () => {
+      const result = await updateQuestionAction(question.id, formData);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      if (result.data.versioned) {
+        alert("تم حفظ التعديل كنسخة جديدة للسؤال. بقيت النسخة القديمة محفوظة للجلسات السابقة.");
+      }
+
+      onClose();
+      router.refresh();
+    });
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-teal-900">تعديل السؤال والإجابة</h3>
+        <span className="text-xs text-teal-700">Q{question.questionOrder}</span>
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-700 mb-1 block">نص السؤال *</label>
+        <textarea
+          name="questionText"
+          required
+          minLength={5}
+          rows={3}
+          defaultValue={question.questionText}
+          className="w-full rounded-lg border px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        {["A", "B", "C", "D"].map((label, index) => (
+          <div key={label}>
+            <label className="text-xs text-gray-700 mb-1 block">
+              خيار {label}{index < 2 ? " *" : ""}
+            </label>
+            <input
+              name={`option${label}`}
+              required={index < 2}
+              defaultValue={optionValue(label)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-gray-700 mb-1 block">الإجابة الصحيحة *</label>
+          <select
+            name="correctLabel"
+            required
+            defaultValue={correctLabel}
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+          >
+            {["A", "B", "C", "D"].map((label) => (
+              <option key={label} value={label}>{label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-700 mb-1 block">الموضوع</label>
+          <input
+            name="topic"
+            defaultValue={question.topic ?? ""}
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-700 mb-1 block">التفسير / ملاحظة المدرب</label>
+        <textarea
+          name="explanation"
+          rows={2}
+          defaultValue={question.explanation ?? ""}
+          className="w-full rounded-lg border px-3 py-2 text-sm"
+          placeholder="يمكن تعديل تفسير الإجابة أو تركه فارغًا"
+        />
+      </div>
+
+      {error ? (
+        <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={isPending}
+          className="flex-1 py-2 rounded-lg border bg-white text-sm"
+        >
+          إلغاء
+        </button>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="flex-1 py-2 rounded-lg bg-teal-700 text-white text-sm font-semibold disabled:opacity-50"
+        >
+          {isPending ? "جارٍ الحفظ…" : "حفظ التعديلات"}
+        </button>
+      </div>
+    </form>
   );
 }
 
