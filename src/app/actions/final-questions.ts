@@ -621,8 +621,15 @@ export async function generateFinalQuestions(
   const validPages = new Set(usable.map((page) => page.pageNumber));
 
   try {
-    const [summary, mcqA, mcqB, tfA, tfB] = await Promise.all([
-      generateArabicSummary(summarySource, program.title, requireArabic),
+    // Keep provider concurrency bounded. Five large simultaneous requests were
+    // prone to provider rate limits and left the user with no final exam.
+    const summary = await generateArabicSummary(
+      summarySource,
+      program.title,
+      requireArabic,
+    );
+
+    const [mcqA, mcqB] = await Promise.all([
       generateValidatedBatch({
         source: formatPages(pageGroups[0], 900),
         programTitle: program.title,
@@ -641,6 +648,9 @@ export async function generateFinalQuestions(
         includeSummary: false,
         validPages,
       }),
+    ]);
+
+    const [tfA, tfB] = await Promise.all([
       generateValidatedBatch({
         source: formatPages(pageGroups[2], 900),
         programTitle: program.title,

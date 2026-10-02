@@ -7,6 +7,8 @@ import {
   type FinalQuestionsState,
 } from "@/app/actions/final-questions";
 import { runDocumentSourcePreparation } from "@/lib/client/document-source";
+import { runProgramRebuild } from "@/lib/client/program-rebuild";
+import { getProgramQuestionStats } from "@/app/actions/generation";
 import CopyCodeButton from "@/components/CopyCodeButton";
 
 export default function FinalQuestionsClient({ programId }: { programId: string }) {
@@ -23,6 +25,50 @@ export default function FinalQuestionsClient({ programId }: { programId: string 
     setProgress("جارٍ التحقق من المصدر الحقيقي…");
 
     try {
+      // Final questions are allowed only after the daily bank is complete.
+      // This gives the platform one canonical recovery path:
+      // real PDF source -> 10 Arabic days -> 50 daily questions -> final exam.
+      const stats = await getProgramQuestionStats(programId);
+      const completeDailyBank =
+        stats.totalDays === 10 &&
+        stats.totalQuestions === 50 &&
+        stats.byDay.length === 10 &&
+        stats.byDay.every((day) => day.questionCount === 5);
+
+      if (!completeDailyBank) {
+        setProgress(
+          "بنك الأيام غير مكتمل. جارٍ أولًا اعتماد المصدر وإنشاء 10 أيام و50 سؤالًا (5 لكل يوم)…"
+        );
+
+        const rebuilt = await runProgramRebuild({
+          programId,
+          onProgress: (message) => setProgress(message),
+        });
+
+        if (
+          rebuilt.daysGenerated !== 10 ||
+          rebuilt.questionsGenerated !== 50
+        ) {
+          throw new Error(
+            `لم يكتمل بنك الأيام: ${rebuilt.daysGenerated} أيام و${rebuilt.questionsGenerated} سؤالًا.`
+          );
+        }
+
+        const verified = await getProgramQuestionStats(programId);
+        const persisted =
+          verified.totalDays === 10 &&
+          verified.totalQuestions === 50 &&
+          verified.byDay.length === 10 &&
+          verified.byDay.every((day) => day.questionCount === 5);
+
+        if (!persisted) {
+          throw new Error(
+            "فشل تحقق الحفظ النهائي: يجب أن يحتوي كل يوم على 5 أسئلة قبل إنشاء الامتحان النهائي."
+          );
+        }
+      }
+
+      setProgress("اكتمل بنك الأيام. جارٍ إنشاء الملخص و30 سؤالًا نهائيًا من المصدر الحقيقي…");
       let result = await generateFinalQuestions(programId, null, new FormData());
 
       if (!result.ok && result.code === "SOURCE_NOT_READY") {

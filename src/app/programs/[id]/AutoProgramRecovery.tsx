@@ -16,11 +16,8 @@ export default function AutoProgramRecovery({
   const [status, setStatus] = useState<"idle" | "running" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    if (!enabled || started.current) return;
-    started.current = true;
-
-    async function recover() {
+  async function recover() {
+      if (!enabled || status === "running") return;
       setStatus("running");
       setMessage(
         "تم اكتشاف بنك أسئلة فارغ. جارٍ إصلاح مصدر PDF الحقيقي تلقائيًا ثم إنشاء 10 أيام و50 سؤالًا بالعربية…"
@@ -51,8 +48,14 @@ export default function AutoProgramRecovery({
       }
     }
 
+  useEffect(() => {
+    if (!enabled || started.current) return;
+    started.current = true;
     void recover();
-  }, [enabled, programId, router]);
+    // recover is intentionally triggered once automatically; manual retries use
+    // the explicit button below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled]);
 
   if (!enabled && status === "idle") return null;
   if (status === "idle") return null;
@@ -71,6 +74,15 @@ export default function AutoProgramRecovery({
           : "تعذر الإصلاح التلقائي"}
       </strong>
       <p>{message}</p>
+      {status === "error" ? (
+        <button
+          type="button"
+          className="dlp-control-button primary"
+          onClick={() => void recover()}
+        >
+          إعادة المحاولة الآن
+        </button>
+      ) : null}
     </section>
   );
 }
