@@ -8,10 +8,11 @@ import type { Material, Guide, SourcePage } from "@/lib/exam-material/grounding"
 import { studentMaterial } from "@/lib/exam-material/grounding";
 import { SummaryView, ConceptView, CitationView } from "./MaterialView";
 import { GenerationControls, PublishControls } from "./AdminControls";
+import ArchiveControls from "./ArchiveControls";
 import "./exam-material.css";
 
 export const dynamic = "force-dynamic";
-export default async function ExamMaterialPage({ searchParams }: { searchParams: Promise<{ programId?: string; batchId?: string; tab?: string }> }) {
+export default async function ExamMaterialPage({ searchParams }: { searchParams: Promise<{ programId?: string; batchId?: string; tab?: string; deleted?: string }> }) {
   const user = await auth(); if (!user?.user?.id) redirect("/login");
   const query = await searchParams;
   const programs = await prisma.trainingProgram.findMany({ where: { instructorId: user.user.id }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } });
@@ -19,29 +20,33 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
   if (query.programId && !program) notFound();
   await recoverMaterialJobs(user.user.id);
   const lectures = program ? await prisma.trainingDocument.findMany({ where: { programId: program.id, archivedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, fileName: true, extractionStatus: true, pages: { select: { extractionMethod: true, extractionStatus: true, extractedText: true } } } }) : [];
-  const archive = program ? await prisma.examMaterialBatch.findMany({ where: { programId: program.id }, select: { id: true, createdAt: true, status: true, publishedAt: true }, orderBy: { createdAt: "desc" } }) : [];
+  const allArchives = program ? await prisma.examMaterialBatch.findMany({ where: { programId: program.id }, select: { id: true, createdAt: true, status: true, publishedAt: true, title: true, questionCount: true, deletedAt: true }, orderBy: { createdAt: "desc" } }) : [];
+  const deleted = query.deleted === "true";
+  const archive = allArchives.filter(a => Boolean(a.deletedAt) === deleted);
   const batchId = query.batchId ?? archive[0]?.id;
-  const batch = batchId && program ? await prisma.examMaterialBatch.findFirst({ where: { id: batchId, programId: program.id } }) : null;
+  const batch = batchId && program ? await prisma.examMaterialBatch.findFirst({ where: { id: batchId, programId: program.id, deletedAt: deleted ? { not: null } : null } }) : null;
   if (query.batchId && !batch) notFound();
   const content = batch?.content as unknown as Material | null;
   const guide = batch?.instructorGuide as unknown as Guide | null;
   const tabs = [["summary", "الملخص"], ["map", "خريطة المفاهيم"], ["quiz", "الاختبار"], ["guide", "دليل المناقشة — للمدير"]];
   const tab = tabs.some(([id]) => id === query.tab) ? query.tab : "summary";
-  const url = (id: string, nextTab = "summary") => `/exam-material?${new URLSearchParams({ programId: program!.id, batchId: id, tab: nextTab })}`;
+  const url = (id: string, nextTab = "summary") => `/exam-material?${new URLSearchParams({ programId: program!.id, batchId: id, tab: nextTab, ...(deleted ? { deleted: "true" } : {}) })}`;
   return <main dir="rtl" lang="ar" className="em-page"><div className="em-container em-stack">
     <header className="em-hero"><span className="em-kicker">منصة الحقيبة التدريبية</span><h1>المادة الامتحانية</h1><p>من نص المحاضرة إلى مراجعة موثقة، وتقييم يكشف مواضع الحاجة إلى التعلم.</p><Link href="/dashboard">→ لوحة المدرب</Link></header>
     <nav className="em-tabs" aria-label="البرامج">{programs.map(p => <Link className={p.id === program?.id ? "active" : ""} key={p.id} href={`/exam-material?programId=${p.id}`}>{p.title}</Link>)}</nav>
     {!program && <p className="em-glass em-pad">أنشئ برنامجًا وارفع محاضراته أولاً.</p>}
     {program && <Link className="em-button em-secondary" href={`/programs/${program.id}/lectures`}>إدارة المحاضرات: إضافة، تعديل، حذف</Link>}
-    {program && <GenerationControls key={program.id} programId={program.id} generating={archive.some(a => a.status === "GENERATING")} lectures={lectures.map(l => ({ id: l.id, fileName: l.fileName, pages: l.pages.length, eligible: l.extractionStatus === "COMPLETED" && l.pages.length > 0 && l.pages.every(p => p.extractionMethod === "NATIVE_TEXT" && p.extractionStatus === "COMPLETED") && l.pages.some(p => p.extractedText?.trim()) }))}/>}
+    {program && <GenerationControls key={program.id} programId={program.id} generating={allArchives.some(a => a.status === "GENERATING")} lectures={lectures.map(l => ({ id: l.id, fileName: l.fileName, pages: l.pages.length, eligible: l.extractionStatus === "COMPLETED" && l.pages.length > 0 && l.pages.every(p => p.extractionMethod === "NATIVE_TEXT" && p.extractionStatus === "COMPLETED") && l.pages.some(p => p.extractedText?.trim()) }))}/>}
+    {program && <nav className="em-tabs" aria-label="حالة الأرشيف"><Link className={!deleted ? "active" : ""} href={`/exam-material?programId=${program.id}`}>عمليات التوليد ({allArchives.filter(a => !a.deletedAt).length})</Link><Link className={deleted ? "active" : ""} href={`/exam-material?programId=${program.id}&deleted=true`}>المحذوفات ({allArchives.filter(a => a.deletedAt).length})</Link></nav>}
     <section className="em-stack"><h2>أرشيف عمليات التوليد</h2><nav className="em-tabs em-archive" aria-label="عمليات التوليد المحفوظة">
-      {archive.map((a, i) => <Link aria-current={a.id === batch?.id ? "page" : undefined} className={a.id === batch?.id ? "active" : ""} key={a.id} href={url(a.id)}>المادة {archive.length - i} · {a.createdAt.toLocaleString("ar-IQ", { timeZone: "Asia/Baghdad" })}<small>{a.status === "GENERATING" ? "جارٍ التوليد" : a.status === "FAILED" ? "تعذّر التوليد" : a.publishedAt ? "منشورة" : "جاهزة للمراجعة"}</small></Link>)}
+      {archive.map((a, i) => <Link aria-current={a.id === batch?.id ? "page" : undefined} className={a.id === batch?.id ? "active" : ""} key={a.id} href={url(a.id)}>{a.title ?? `المادة ${archive.length - i}`} · {a.createdAt.toLocaleString("ar-IQ", { timeZone: "Asia/Baghdad" })}<small>{a.status === "GENERATING" ? "جارٍ التوليد" : a.status === "FAILED" ? "تعذّر التوليد" : a.publishedAt ? "منشورة" : "جاهزة للمراجعة"}</small></Link>)}
     </nav>{archive.length === 0 && <p className="em-muted">ستظهر هنا كل عملية توليد جديدة مع ملخصها وخريطتها واختبارها.</p>}</section>
+    {batch && <ArchiveControls key={batch.id} batch={{ id: batch.id, programId: batch.programId, title: batch.title, questionCount: batch.questionCount, deleted: Boolean(batch.deletedAt), generating: batch.status === "GENERATING" }}/> }
     {batch?.status === "GENERATING" && <p className="em-glass em-pad" role="status">جارٍ اختيار المقاطع والتحقق الحرفي منها… يمكنك مغادرة الصفحة والعودة إلى الأرشيف.</p>}
     {batch?.status === "FAILED" && <p className="em-error em-glass em-pad" role="alert">{materialError[batch.errorCode ?? ""] ?? materialError.GENERATION_FAILED}</p>}
     {batch?.status === "READY" && content && <>
       <p className="em-muted">المحاضرات المحددة: {[...new Set((batch.sources as unknown as SourcePage[]).map(p => p.fileName))].join(" · ")}</p>
-      <PublishControls id={batch.id} token={batch.shareToken}/>
+      {!batch.deletedAt && <PublishControls id={batch.id} token={batch.shareToken}/>}
       <nav className="em-tabs" aria-label="أقسام المادة">{tabs.map(([key, label]) => <Link aria-current={key === tab ? "page" : undefined} className={key === tab ? "active" : ""} key={key} href={url(batch.id, key)}>{label}</Link>)}</nav>
       {tab === "summary" && <SummaryView content={studentMaterial(content)} token={batch.shareToken}/>}
       {tab === "map" && <ConceptView content={studentMaterial(content)} token={batch.shareToken}/>}

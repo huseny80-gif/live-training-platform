@@ -1,3 +1,5 @@
+import { z } from "zod";
+import { validMaterialCount } from "./limits";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
@@ -13,10 +15,11 @@ export async function recoverMaterialJobs(instructorId: string) {
 }
 export async function reserveMaterial(instructorId: string, programId: string, documentIds: string[], count: number) {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("AI_NOT_CONFIGURED");
+  if (!validMaterialCount(count)) throw new Error("INVALID_QUESTION_COUNT");
   return prisma.$transaction(async tx => {
     const program = await tx.trainingProgram.findFirst({ where: { id: programId, instructorId } });
     if (!program) throw new Error("NOT_FOUND");
-    if (await tx.examMaterialBatch.count({ where: { programId, status: "GENERATING" } })) throw new Error("GENERATION_BUSY");
+    if (await tx.examMaterialBatch.count({ where: { programId, deletedAt: null, status: "GENERATING" } })) throw new Error("GENERATION_BUSY");
     if (await tx.examMaterialBatch.count({ where: { program: { instructorId }, createdAt: { gt: new Date(Date.now() - 15 * 60_000) } } }) >= 5) throw new Error("GENERATION_RATE_LIMIT");
     const documents = await tx.trainingDocument.findMany({ where: { id: { in: documentIds }, programId, archivedAt: null, extractionStatus: "COMPLETED" },
       include: { pages: { orderBy: { pageNumber: "asc" } } } });
@@ -30,33 +33,33 @@ export async function reserveMaterial(instructorId: string, programId: string, d
       pages.push(...textPages.map(p => ({ id: p.id, documentId: doc.id, fileName: doc.fileName, pageNumber: p.pageNumber, text: p.extractedText! })));
     }
     if (pages.reduce((n, p) => n + p.text.length, 0) > 120_000) throw new Error("SOURCE_TOO_LARGE");
-    return tx.examMaterialBatch.create({ data: { programId, sources: json(pages) } });
+    return tx.examMaterialBatch.create({ data: { programId, sources: json(pages), questionCount: count } });
   }, { isolationLevel: "Serializable", timeout: 15000 });
 }
 export async function runMaterialJob(id: string, count: number) {
   try {
-    const batch = await prisma.examMaterialBatch.findFirst({ where: { id, status: "GENERATING" } });
+    const batch = await prisma.examMaterialBatch.findFirst({ where: { id, deletedAt: null, status: "GENERATING" } });
     if (!batch) return;
     const generated = await generateGroundedMaterial(batch.sources as unknown as SourcePage[], count);
-    await prisma.examMaterialBatch.updateMany({ where: { id, status: "GENERATING" }, data: {
+    await prisma.examMaterialBatch.updateMany({ where: { id, deletedAt: null, status: "GENERATING" }, data: {
       content: json(generated.content), instructorGuide: json(generated.instructorGuide), status: "READY", completedAt: new Date(),
     } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "GENERATION_FAILED";
     const known = ["AI_NOT_CONFIGURED", "INSUFFICIENT_SOURCE", "SOURCE_TOO_LARGE", "GROUNDING_REJECTED", "AI_INCOMPLETE"];
-    await prisma.examMaterialBatch.updateMany({ where: { id, status: "GENERATING" }, data: {
+    await prisma.examMaterialBatch.updateMany({ where: { id, deletedAt: null, status: "GENERATING" }, data: {
       status: "FAILED", errorCode: known.includes(code) ? code : "GENERATION_FAILED", completedAt: new Date(),
     } });
   }
 }
 export async function publishMaterial(id: string, instructorId: string, publish: boolean) {
-  const result = await prisma.examMaterialBatch.updateMany({ where: { id, status: "READY", program: { instructorId } },
+  const result = await prisma.examMaterialBatch.updateMany({ where: { id, deletedAt: null, status: "READY", program: { instructorId } },
     data: publish ? { publishedAt: new Date(), shareToken: randomBytes(24).toString("hex") } : { publishedAt: null, shareToken: null } });
   if (!result.count) throw new Error("NOT_FOUND");
 }
 export async function publishedMaterial(token: string) {
   if (!/^[a-f0-9]{48}$/.test(token)) return null;
-  return prisma.examMaterialBatch.findFirst({ where: { shareToken: token, publishedAt: { not: null }, status: "READY" } });
+  return prisma.examMaterialBatch.findFirst({ where: { shareToken: token, deletedAt: null, publishedAt: { not: null }, status: "READY" } });
 }
 export async function publicMaterial(token: string) {
   const batch = await publishedMaterial(token);
@@ -66,7 +69,7 @@ export async function publicMaterial(token: string) {
 }
 export async function submitMaterial(token: string, tokenHash: string, answers: Record<string, number>) {
   return prisma.$transaction(async tx => {
-    const batch = await tx.examMaterialBatch.findFirst({ where: { shareToken: token, status: "READY", publishedAt: { not: null } } });
+    const batch = await tx.examMaterialBatch.findFirst({ where: { shareToken: token, deletedAt: null, status: "READY", publishedAt: { not: null } } });
     if (!batch?.content) throw new Error("NOT_FOUND");
     const attempt = await tx.examMaterialAttempt.findFirst({ where: { batchId: batch.id, tokenHash, createdAt: { gt: new Date(Date.now() - 12 * 60 * 60_000) } } });
     if (!attempt) throw new Error("UNAUTHORIZED");
@@ -75,4 +78,25 @@ export async function submitMaterial(token: string, tokenHash: string, answers: 
     await tx.examMaterialAttempt.update({ where: { id: attempt.id }, data: { answers: json(answers), report: json(report), completedAt: new Date() } });
     return report;
   }, { isolationLevel: "Serializable" });
+}
+
+export async function manageMaterialArchive(id: string, instructorId: string, action: "delete" | "restore" | "rename", title?: string) {
+  const name = action === "rename" ? z.string().trim().min(3).max(120).parse(title) : undefined;
+  const result = await prisma.examMaterialBatch.updateMany({ where: { id, program: { instructorId }, status: { not: "GENERATING" } }, data:
+    action === "rename" ? { title: name } : action === "delete" ? { deletedAt: new Date(), publishedAt: null, shareToken: null } : { deletedAt: null }
+  });
+  if (!result.count) throw new Error("ARCHIVE_UNAVAILABLE");
+}
+export async function regenerateMaterial(id: string, instructorId: string, count: number) {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error("AI_NOT_CONFIGURED");
+  if (!validMaterialCount(count)) throw new Error("INVALID_QUESTION_COUNT");
+  return prisma.$transaction(async tx => {
+    const original = await tx.examMaterialBatch.findFirst({ where: { id, deletedAt: null, program: { instructorId }, status: { not: "GENERATING" } } });
+    if (!original) throw new Error("ARCHIVE_UNAVAILABLE");
+    if (await tx.examMaterialBatch.count({ where: { programId: original.programId, deletedAt: null, status: "GENERATING" } })) throw new Error("GENERATION_BUSY");
+    if (await tx.examMaterialBatch.count({ where: { program: { instructorId }, createdAt: { gt: new Date(Date.now() - 15 * 60_000) } } }) >= 5) throw new Error("GENERATION_RATE_LIMIT");
+    const pages = original.sources as unknown as SourcePage[];
+    if (new Set(pages.map(p => p.documentId)).size > count) throw new Error("INVALID_LECTURES");
+    return tx.examMaterialBatch.create({ data: { programId: original.programId, questionCount: count, sources: json(pages), title: original.title ? `${original.title.slice(0, 100)} — إعادة توليد` : null } });
+  }, { isolationLevel: "Serializable", timeout: 15000 });
 }

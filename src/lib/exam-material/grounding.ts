@@ -9,7 +9,7 @@ const planSchema = z.object({
   summary: z.array(z.string()).min(3).max(18),
   concepts: z.array(z.object({ spanId: z.string(), label: string }).strict()).min(3).max(12),
   links: z.array(z.object({ from: z.number().int().nonnegative(), to: z.number().int().nonnegative(), spanId: z.string() }).strict()).min(1).max(20),
-  questions: z.array(z.object({ spanId: z.string(), answer: string, distractors: z.array(z.object({ spanId: z.string(), text: string }).strict()).length(3) }).strict()).min(5).max(15),
+  questions: z.array(z.object({ spanId: z.string(), answer: string, distractors: z.array(z.object({ spanId: z.string(), text: string }).strict()).length(3) }).strict()).min(1).max(50),
   debrief: z.array(z.object({ spanId: z.string(), focus: string, kind: z.enum(["EXPLAIN", "COMPARE", "APPLY"]) }).strict()).min(2).max(8),
 }).strict();
 export type SelectionPlan = z.infer<typeof planSchema>;

@@ -559,6 +559,9 @@ model ExamMaterialBatch {
   programId       String @map("program_id")
   status          String @default("GENERATING")
   sources         Json
+  title           String?
+  questionCount   Int @default(10) @map("question_count")
+  deletedAt       DateTime? @map("deleted_at")
   content         Json?
   instructorGuide Json? @map("instructor_guide")
   errorCode       String? @map("error_code")
@@ -569,6 +572,7 @@ model ExamMaterialBatch {
   program         TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
   attempts        ExamMaterialAttempt[]
   @@index([programId, createdAt])
+  @@index([programId, deletedAt])
   @@map("exam_material_batches")
 }
 

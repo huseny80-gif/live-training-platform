@@ -6,7 +6,8 @@ type Lecture = { id: string; fileName: string; eligible: boolean; pages: number 
 export function GenerationControls({ programId, lectures, generating }: { programId: string; lectures: Lecture[]; generating: boolean }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
-  const [count, setCount] = useState(10);
+  const [countText, setCountText] = useState("10");
+  const count = Number(countText);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => { if (!generating) return; const timer = setInterval(() => router.refresh(), 4000); return () => clearInterval(timer); }, [generating, router]);
@@ -30,8 +31,9 @@ export function GenerationControls({ programId, lectures, generating }: { progra
         <span><strong>{l.fileName}</strong><small>{l.pages} صفحة · {l.eligible ? "جاهزة للتوليد الحرفي" : "تحتاج إلى استخراج نص أصلي مكتمل"}</small></span>
       </label>)}
     </fieldset>
-    <label className="em-count">عدد الأسئلة <input type="number" min={Math.max(5, selected.length)} max={15} value={count} disabled={busy || generating} onChange={e => setCount(Number(e.target.value))}/></label>
-    <div className="em-actions"><span>{selected.length} محاضرة محددة</span><button className="em-button" disabled={busy || generating || !selected.length || selected.length > 10 || selected.length > count || count < 5 || count > 15} onClick={generate}>{busy ? "بدء التوليد…" : generating ? "التوليد جارٍ — يتم تحديث الحالة تلقائيًا" : "توليد المحتوى الامتحاني"}</button></div>
+    <label className="em-count">عدد الأسئلة <input type="number" min={Math.max(1, selected.length)} max={50} step={1} value={countText} inputMode="numeric" aria-label="عدد الأسئلة" disabled={busy || generating} onChange={e => setCountText(e.target.value)}/></label>
+    <p className="em-muted">يمكنك اختيار ١–٥٠ سؤالًا. العدد الأدنى يساوي عدد المحاضرات المختارة، والتوليد يتطلب نصًا كافيًا لهذا العدد.</p>
+    <div className="em-actions"><span>{selected.length} محاضرة محددة</span><button className="em-button" disabled={busy || generating || !selected.length || selected.length > 10 || selected.length > count || !Number.isInteger(count) || count < 1 || count > 50} onClick={generate}>{busy ? "بدء التوليد…" : generating ? "التوليد جارٍ — يتم تحديث الحالة تلقائيًا" : "توليد المحتوى الامتحاني"}</button></div>
     {error && <p className="em-error" role="alert">{error}</p>}
   </section>;
 }
