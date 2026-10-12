@@ -158,6 +158,7 @@ model TrainingProgram {
   documents    TrainingDocument[]
   days         TrainingDay[]
   sessions     LiveSession[]
+  examMaterials ExamMaterialBatch[]
 
   @@index([instructorId])
   @@index([status])
@@ -548,4 +549,36 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// Immutable source snapshots and separate instructor-only analysis.
+model ExamMaterialBatch {
+  id              String @id @default(uuid())
+  programId       String @map("program_id")
+  status          String @default("GENERATING")
+  sources         Json
+  content         Json?
+  instructorGuide Json? @map("instructor_guide")
+  errorCode       String? @map("error_code")
+  shareToken      String? @unique @map("share_token")
+  publishedAt     DateTime? @map("published_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+  program         TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  attempts        ExamMaterialAttempt[]
+  @@index([programId, createdAt])
+  @@map("exam_material_batches")
+}
+
+model ExamMaterialAttempt {
+  id          String @id @default(uuid())
+  batchId     String @map("batch_id")
+  tokenHash   String @unique @map("token_hash")
+  answers     Json?
+  report      Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  batch       ExamMaterialBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  @@index([batchId])
+  @@map("exam_material_attempts")
 }

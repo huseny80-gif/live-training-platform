@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { compileGroundedMaterial, sourceSpans, gradeMaterial, studentMaterial, sha } from "../src/lib/exam-material/grounding";
+import { sameOrigin } from "../src/lib/exam-material/http";
+import { pages, plan } from "./fixtures/exam-material";
+const generated = compileGroundedMaterial(plan, pages, 5);
+assert.equal(generated.content.questions.length, 5);
+for (const item of generated.content.summary) {
+  assert.equal(pages[0].text.slice(item.start, item.end), item.text);
+  assert.equal(item.pageHash, sha(pages[0].text));
+}
+assert.equal(generated.content.questions[4].citation.lineStart, 5);
+assert.equal(generated.content.questions[0].options[generated.content.questions[0].correctIndex].text, plan.questions[0].answer);
+const alter = (mutate: (value: typeof plan) => void) => { const copy = structuredClone(plan); mutate(copy); return copy; };
+assert.throws(() => compileGroundedMaterial(alter(p => { p.summary[0] = "unselected-page:0"; }), pages, 5), /GROUNDING_UNKNOWN_SOURCE/);
+assert.throws(() => compileGroundedMaterial(alter(p => { p.questions[0].answer = "إجابة من خارج المحاضرات"; }), pages, 5), /GROUNDING_NOT_LITERAL/);
+assert.throws(() => compileGroundedMaterial(alter(p => { p.questions[0].distractors[1] = p.questions[0].distractors[0]; }), pages, 5), /GROUNDING_AMBIGUOUS_OPTIONS/);
+assert.throws(() => compileGroundedMaterial(alter(p => { p.links[0].to = 20; }), pages, 5), /GROUNDING_INVALID_LINK/);
+assert.throws(() => compileGroundedMaterial(alter(p => { p.debrief[0].focus = "معلومة غير موجودة"; }), pages, 5), /GROUNDING_NOT_LITERAL/);
+assert.throws(() => compileGroundedMaterial(plan, [...pages, { ...pages[0], id: "other-page", documentId: "other-lecture" }], 5), /GROUNDING_MISSING_LECTURE/);
+assert.throws(() => compileGroundedMaterial(plan, pages, 10), /GROUNDING_INVALID_COUNT/);
+const submitted = Object.fromEntries(generated.content.questions.map(q => [q.id, q.correctIndex]));
+submitted.q2 = (submitted.q2 + 1) % 4;
+const report = gradeMaterial(generated.content, submitted);
+assert.equal(report.correct, 4); assert.equal(report.gaps.length, 1); assert.equal(report.gaps[0].citation.lineStart, 2);
+assert.equal(report.gaps[0].citation.text, sourceSpans(pages)[1].text);
+assert.throws(() => gradeMaterial(generated.content, { ...submitted, q2: 4 }), /INVALID_ANSWERS/);
+assert.throws(() => gradeMaterial(generated.content, { q1: 0 }), /INVALID_ANSWERS/);
+const safe = studentMaterial(generated.content);
+assert.ok(!JSON.stringify(safe.questions).includes("correctIndex"));
+assert.ok(!JSON.stringify(safe.questions).includes("citation"));
+assert.ok(!("instructorGuide" in safe));
+assert.ok(sameOrigin(new Request("https://example.com/api", { headers: { origin: "https://example.com" } })));
+assert.ok(!sameOrigin(new Request("https://example.com/api", { headers: { origin: "https://other.com" } })));
+console.log("PASS: literal extracts/offsets/hashes; foreign and invented sources rejected; coverage/count/option/link validation; precise gap grading; student answer/guide whitelist; origin checks.");

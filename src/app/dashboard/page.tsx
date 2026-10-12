@@ -29,6 +29,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const navItems = [
+  { label: "المادة الامتحانية", icon: "▤", href: "/exam-material" },
   { label: "الرئيسية", icon: "⌂", href: "/dashboard", active: true },
   { label: "البرامج التدريبية", icon: "▣", href: "#programs" },
   { label: "الجلسات والنتائج", icon: "◉", href: "#sessions" },

@@ -18,7 +18,9 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/login") ||
         nextUrl.pathname.startsWith("/api/auth") ||
         nextUrl.pathname.startsWith("/join") ||
-        nextUrl.pathname.startsWith("/session") ||
+        (nextUrl.pathname === "/session" || nextUrl.pathname.startsWith("/session/")) ||
+        nextUrl.pathname.startsWith("/study/") ||
+        nextUrl.pathname.startsWith("/api/study/") ||
         nextUrl.pathname.startsWith("/api/session");
       if (!isLoggedIn && !isPublic) return false;
       if (isLoggedIn && nextUrl.pathname === "/login") {
