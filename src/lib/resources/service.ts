@@ -5,6 +5,7 @@ import { defaultCategories, resourceMimeTypes, maxResourceSize } from "./types";
 export const titleSchema = z.string().trim().min(3).max(160);
 export const reserveSchema = z.object({ programId: z.string().uuid(), categoryKey: z.string().min(1).max(80), title: titleSchema, fileName: z.string().min(1).max(240).refine(v => !/[\u0000-\u001f\u007f/\\]/u.test(v)), sizeBytes: z.number().int().min(1).max(maxResourceSize) }).strict();
 export async function reserveResource(owner: string, raw: unknown) {
+  if (typeof owner !== "string" || !owner) throw new Error("NOT_FOUND");
   const input = reserveSchema.parse(raw);
   const extension = input.fileName.split(".").at(-1)?.toLowerCase() ?? "";
   const mimeType = resourceMimeTypes[extension]; if (!mimeType) throw new Error("UNSUPPORTED_FILE");
@@ -22,6 +23,7 @@ export async function reserveResource(owner: string, raw: unknown) {
   }, { isolationLevel: "Serializable" });
 }
 export async function resourceForOwner(id: string, owner: string) {
+  if (typeof id !== "string" || !id || typeof owner !== "string" || !owner) throw new Error("NOT_FOUND");
   const file = await prisma.resourceFile.findFirst({ where: { id, program: { instructorId: owner } } });
   if (!file) throw new Error("NOT_FOUND"); return file;
 }
@@ -48,6 +50,7 @@ export async function manageResource(id: string, owner: string, action: "delete"
   if (!updated.count) throw new Error("NOT_FOUND");
 }
 export async function addCategory(owner: string, programId: string, name: string) {
+  if (typeof owner !== "string" || !owner) throw new Error("NOT_FOUND");
   const title = titleSchema.parse(name);
   return prisma.$transaction(async tx => {
     if (!await tx.trainingProgram.findFirst({ where: { id: programId, instructorId: owner } })) throw new Error("NOT_FOUND");

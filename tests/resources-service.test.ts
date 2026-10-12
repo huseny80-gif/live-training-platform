@@ -27,6 +27,8 @@ async function run() {
   const reserved = await reserveResource("owner", input); assert.equal(files.length, 1); assert.ok(reserved.pathname.startsWith(`resources/${programId}/${reserved.id}`));
   assert.equal(categories[0].name, defaultCategories.find(c => c.key === "docs")!.name);
   await assert.rejects(resourceForOwner(reserved.id, "other"), /NOT_FOUND/);
+  await assert.rejects(resourceForOwner(reserved.id, undefined as unknown as string), /NOT_FOUND/);
+  await assert.rejects(reserveResource(undefined as unknown as string, input), /NOT_FOUND/);
   await assert.rejects(manageResource(reserved.id, "owner", "rename", "عنوان جديد"), /NOT_FOUND/);
   files[0].status = "READY";
   await manageResource(reserved.id, "owner", "rename", "عنوان جديد"); assert.equal(files[0].title, "عنوان جديد");
