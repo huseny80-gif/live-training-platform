@@ -50,6 +50,3 @@ coverage/
 # Browser test artifacts
 /test-results/
 /playwright-report/
-
-# Generated during a scoped production recovery; contains status/counts only.
-/public/exam-material-recovery.json

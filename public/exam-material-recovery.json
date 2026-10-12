@@ -1,0 +1,18 @@
+{
+  "release": "cd93f03df8da9a1d710dc0a5a86c8c924773a509",
+  "status": "READY",
+  "jobsAttempted": 1,
+  "matchingDocuments": 1,
+  "matchingCourses": 1,
+  "requestedCount": 10,
+  "extractedPages": 24,
+  "ocrAttempted": true,
+  "stage": "COMPLETE",
+  "storageBackend": "BLOB",
+  "ocrPages": 24,
+  "availableCandidates": 548,
+  "questionCount": 10,
+  "selectionMethod": "SOURCE_ONLY",
+  "requiresSourceReview": true,
+  "reportType": "COMPLETED_OPERATION_RECEIPT"
+}
