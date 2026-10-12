@@ -18,7 +18,7 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
   const program = query.programId ? programs.find(p => p.id === query.programId) : programs[0];
   if (query.programId && !program) notFound();
   await recoverMaterialJobs(user.user.id);
-  const lectures = program ? await prisma.trainingDocument.findMany({ where: { programId: program.id }, orderBy: { createdAt: "asc" }, select: { id: true, fileName: true, extractionStatus: true, pages: { select: { extractionMethod: true, extractionStatus: true, extractedText: true } } } }) : [];
+  const lectures = program ? await prisma.trainingDocument.findMany({ where: { programId: program.id, archivedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, fileName: true, extractionStatus: true, pages: { select: { extractionMethod: true, extractionStatus: true, extractedText: true } } } }) : [];
   const archive = program ? await prisma.examMaterialBatch.findMany({ where: { programId: program.id }, select: { id: true, createdAt: true, status: true, publishedAt: true }, orderBy: { createdAt: "desc" } }) : [];
   const batchId = query.batchId ?? archive[0]?.id;
   const batch = batchId && program ? await prisma.examMaterialBatch.findFirst({ where: { id: batchId, programId: program.id } }) : null;
@@ -32,6 +32,7 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
     <header className="em-hero"><span className="em-kicker">منصة الحقيبة التدريبية</span><h1>المادة الامتحانية</h1><p>من نص المحاضرة إلى مراجعة موثقة، وتقييم يكشف مواضع الحاجة إلى التعلم.</p><Link href="/dashboard">→ لوحة المدرب</Link></header>
     <nav className="em-tabs" aria-label="البرامج">{programs.map(p => <Link className={p.id === program?.id ? "active" : ""} key={p.id} href={`/exam-material?programId=${p.id}`}>{p.title}</Link>)}</nav>
     {!program && <p className="em-glass em-pad">أنشئ برنامجًا وارفع محاضراته أولاً.</p>}
+    {program && <Link className="em-button em-secondary" href={`/programs/${program.id}/lectures`}>إدارة المحاضرات: إضافة، تعديل، حذف</Link>}
     {program && <GenerationControls key={program.id} programId={program.id} generating={archive.some(a => a.status === "GENERATING")} lectures={lectures.map(l => ({ id: l.id, fileName: l.fileName, pages: l.pages.length, eligible: l.extractionStatus === "COMPLETED" && l.pages.length > 0 && l.pages.every(p => p.extractionMethod === "NATIVE_TEXT" && p.extractionStatus === "COMPLETED") && l.pages.some(p => p.extractedText?.trim()) }))}/>}
     <section className="em-stack"><h2>أرشيف عمليات التوليد</h2><nav className="em-tabs em-archive" aria-label="عمليات التوليد المحفوظة">
       {archive.map((a, i) => <Link aria-current={a.id === batch?.id ? "page" : undefined} className={a.id === batch?.id ? "active" : ""} key={a.id} href={url(a.id)}>المادة {archive.length - i} · {a.createdAt.toLocaleString("ar-IQ", { timeZone: "Asia/Baghdad" })}<small>{a.status === "GENERATING" ? "جارٍ التوليد" : a.status === "FAILED" ? "تعذّر التوليد" : a.publishedAt ? "منشورة" : "جاهزة للمراجعة"}</small></Link>)}

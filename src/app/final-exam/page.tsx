@@ -8,7 +8,7 @@ import { createFinalExam } from "./actions";
 export default async function FinalExamPage({ searchParams }: { searchParams: Promise<{ programId?: string; error?: string }> }) {
   const query = await searchParams;
   const { programs, program, instructorId } = await questionDirectory(query.programId, "final");
-  const directory = await prisma.trainingProgram.findMany({ where: { instructorId }, orderBy: { createdAt: "desc" }, select: { id: true, title: true, documents: { where: { extractionStatus: "COMPLETED" }, orderBy: { createdAt: "desc" }, select: { id: true, fileName: true } } } });
+  const directory = await prisma.trainingProgram.findMany({ where: { instructorId }, orderBy: { createdAt: "desc" }, select: { id: true, title: true, documents: { where: { archivedAt: null, extractionStatus: "COMPLETED" }, orderBy: { createdAt: "desc" }, select: { id: true, fileName: true } } } });
   const generationPrograms = await Promise.all(directory.map(async p => { const status = await finalJobStatus(p.id, instructorId); return { ...p, questions: status?.questions ?? 0, state: status?.state ?? { status: "idle" as const } }; }));
   const available = program?.days.flatMap(d => d.questions).filter(q => (q.status === "APPROVED" || q.status === "USED") && q.options.length >= 2 && q.options.some(o => o.id === q.correctOptionId)).length ?? 0;
   const exams = program ? await prisma.liveSession.findMany({ where: { programId: program.id, dayNumber: 0 }, select: { id: true, title: true, _count: { select: { sessionQuestions: true } } }, orderBy: { createdAt: "desc" } }) : [];

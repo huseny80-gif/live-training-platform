@@ -54,7 +54,7 @@ export class ContentGenerationService {
     if (!program) throw new Error("PROGRAM_NOT_FOUND");
 
     const document = await prisma.trainingDocument.findFirst({
-      where: { id: documentId, programId },
+      where: { id: documentId, programId, archivedAt: null },
     });
     if (!document) throw new Error("DOCUMENT_NOT_FOUND");
 

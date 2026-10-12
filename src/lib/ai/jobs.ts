@@ -22,7 +22,7 @@ export class GenerationJobs {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await prisma.$transaction(async tx => {
-          const document = await tx.trainingDocument.findFirst({ where: { id: documentId, programId, program: { instructorId } } });
+          const document = await tx.trainingDocument.findFirst({ where: { id: documentId, programId, archivedAt: null, program: { instructorId } } });
           if (!document) return { status: "NOT_FOUND" };
           if (document.extractionStatus !== "COMPLETED") return { status: "EXTRACTION_REQUIRED" };
           const occupied = await tx.trainingProgram.count({ where: { id: programId, OR: [{ days: { some: { dayNumber: { gt: 0 }, questions: { some: {} } } } }, { sessions: { some: { dayNumber: { gt: 0 } } } }] } });
@@ -46,7 +46,7 @@ export class GenerationJobs {
   async run(documentId: string, programId: string, instructorId: string, runId: string) {
     const lease = `${PREFIX}${runId}:`;
     const update = async (notes: string) => prisma.trainingDocument.updateMany({
-      where: { id: documentId, programId, program: { instructorId }, extractionStatus: "COMPLETED", extractionNotes: { startsWith: lease } },
+      where: { id: documentId, programId, archivedAt: null, program: { instructorId }, extractionStatus: "COMPLETED", extractionNotes: { startsWith: lease } },
       data: { extractionNotes: notes },
     });
     try {

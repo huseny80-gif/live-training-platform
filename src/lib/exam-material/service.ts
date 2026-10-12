@@ -18,7 +18,7 @@ export async function reserveMaterial(instructorId: string, programId: string, d
     if (!program) throw new Error("NOT_FOUND");
     if (await tx.examMaterialBatch.count({ where: { programId, status: "GENERATING" } })) throw new Error("GENERATION_BUSY");
     if (await tx.examMaterialBatch.count({ where: { program: { instructorId }, createdAt: { gt: new Date(Date.now() - 15 * 60_000) } } }) >= 5) throw new Error("GENERATION_RATE_LIMIT");
-    const documents = await tx.trainingDocument.findMany({ where: { id: { in: documentIds }, programId, extractionStatus: "COMPLETED" },
+    const documents = await tx.trainingDocument.findMany({ where: { id: { in: documentIds }, programId, archivedAt: null, extractionStatus: "COMPLETED" },
       include: { pages: { orderBy: { pageNumber: "asc" } } } });
     if (documents.length !== documentIds.length || documents.length > count) throw new Error("INVALID_LECTURES");
     // No OCR/vision/mock generated text can satisfy the literal-native-source contract.

@@ -55,6 +55,7 @@ export class DocumentExtractionService {
     const doc = await prisma.trainingDocument.findFirst({
       where: {
         id: documentId,
+        archivedAt: null,
         program: { instructorId },
       },
     });
@@ -137,7 +138,7 @@ export class DocumentExtractionService {
     instructorId: string
   ): Promise<ExtractedPage | null> {
     const doc = await prisma.trainingDocument.findFirst({
-      where: { id: documentId, program: { instructorId } },
+      where: { id: documentId, archivedAt: null, program: { instructorId } },
     });
     if (!doc) throw new Error("NOT_FOUND");
 

@@ -18,7 +18,7 @@ const cookieName = (id: string) => `exam_attempt_${id}`;
 export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const material = await publicMaterial(token);
-  if (!material) return NextResponse.json({ error: "المادة غير متاحة." }, { status: 404 });
+  if (!material) return NextResponse.json({ error: "المادة غير متاحة." }, { status: 404, headers: { "X-Training-Revision": process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? "local" } });
   const secret = (await cookies()).get(cookieName(material.id))?.value;
   const attempt = secret ? await prisma.examMaterialAttempt.findFirst({ where: { batchId: material.id, tokenHash: sha(secret), createdAt: { gt: new Date(Date.now() - 12 * 60 * 60_000) } }, select: { report: true } }) : null;
   return NextResponse.json({ ...material, report: attempt?.report ?? null, hasAttempt: Boolean(attempt) }, { headers: { "Cache-Control": "private, no-store" } });

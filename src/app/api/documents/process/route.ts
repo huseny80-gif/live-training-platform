@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   // Verify ownership
   const doc = await prisma.trainingDocument.findFirst({
-    where: { id: documentId, programId, program: { instructorId } },
+    where: { id: documentId, programId, archivedAt: null, program: { instructorId } },
     select: { id: true, extractionStatus: true },
   });
   if (!doc) {
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   // Extraction is independent per file and never starts question generation.
   const claimed = await prisma.trainingDocument.updateMany({
-    where: { id: documentId, programId, program: { instructorId }, extractionStatus: { in: ["PENDING", "FAILED", "OCR_REQUIRED"] } },
+    where: { id: documentId, programId, archivedAt: null, program: { instructorId }, extractionStatus: { in: ["PENDING", "FAILED", "OCR_REQUIRED"] } },
     data: { extractionStatus: "PROCESSING", extractionNotes: "PROCESSING_EXTRACTING" },
   });
   if (claimed.count === 0) {

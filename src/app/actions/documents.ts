@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { extractionService } from "@/lib/extraction/service";
 import { storage } from "@/lib/storage";
+import { renameLecture, archiveLecture, replaceLecture } from "@/lib/lectures/service";
 import { inspectPdf } from "@/lib/extraction/pdf-inspector";
 
 async function requireInstructor(): Promise<string> {
@@ -14,7 +15,7 @@ async function requireInstructor(): Promise<string> {
 }
 
 /** List documents for a program (ownership enforced) */
-export async function listDocuments(programId: string) {
+export async function listDocuments(programId: string, includeArchived = false) {
   const instructorId = await requireInstructor();
 
   const program = await prisma.trainingProgram.findFirst({
@@ -23,7 +24,7 @@ export async function listDocuments(programId: string) {
   if (!program) throw new Error("PROGRAM_NOT_FOUND");
 
   return prisma.trainingDocument.findMany({
-    where: { programId },
+    where: { programId, ...(includeArchived ? {} : { archivedAt: null }) },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -33,6 +34,7 @@ export async function listDocuments(programId: string) {
       contentType: true,
       extractionStatus: true,
       createdAt: true,
+      archivedAt: true,
     },
   });
 }
@@ -237,22 +239,32 @@ export async function markDocumentFailed(documentId: string) {
   return { success: true };
 }
 
-/** Delete a document and its stored file */
+function refreshLectures(programId: string) {
+  revalidatePath(`/programs/${programId}`);
+  revalidatePath(`/programs/${programId}/lectures`);
+  revalidatePath(`/programs/${programId}/manage`);
+  revalidatePath("/exam-material");
+  revalidatePath("/final-exam");
+}
+
+/** Remove from active lecture selection; historical sources/files remain intact. */
 export async function deleteDocument(documentId: string) {
-  const instructorId = await requireInstructor();
-
-  const doc = await prisma.trainingDocument.findFirst({
-    where: { id: documentId, program: { instructorId } },
-  });
-  if (!doc) throw new Error("NOT_FOUND");
-
-  // Delete file from storage (best-effort)
-  try {
-    await storage.delete(doc.storagePath);
-  } catch {
-    // Storage delete failure should not block DB cleanup
-  }
-
-  await prisma.trainingDocument.delete({ where: { id: documentId } });
+  const programId = await archiveLecture(documentId, await requireInstructor(), true);
+  refreshLectures(programId);
+  return { success: true };
+}
+export async function restoreDocument(documentId: string) {
+  const programId = await archiveLecture(documentId, await requireInstructor(), false);
+  refreshLectures(programId);
+  return { success: true };
+}
+export async function updateDocumentName(documentId: string, name: string) {
+  const programId = await renameLecture(documentId, await requireInstructor(), name);
+  refreshLectures(programId);
+  return { success: true };
+}
+export async function replaceDocument(oldDocumentId: string, newDocumentId: string) {
+  const programId = await replaceLecture(oldDocumentId, newDocumentId, await requireInstructor());
+  refreshLectures(programId);
   return { success: true };
 }

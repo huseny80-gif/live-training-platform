@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorLabel } from "@/lib/labels";
 import { documentErrorLabel } from "@/lib/document-errors";
-import { completeBlobUpload } from "@/app/actions/documents";
+import { completeBlobUpload, replaceDocument } from "@/app/actions/documents";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 const POLL_INTERVAL_MS = 4000;
@@ -20,12 +20,26 @@ async function safeJson(res: Response): Promise<{ ok: true; data: unknown } | { 
   }
 }
 
-export default function DocumentUpload({ programId }: { programId: string }) {
+export default function DocumentUpload({ programId, replaceDocumentId }: { programId: string; replaceDocumentId?: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "busy" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [documentId, setDocumentId] = useState("");
+
+  async function acceptUpload(docId: string) {
+    if (replaceDocumentId) {
+      try { await replaceDocument(replaceDocumentId, docId); }
+      catch {
+        router.refresh();
+        throw new Error("تم قبول الملف الجديد، لكن تعذّر استبدال المحاضرة السابقة. بقي الملفان محفوظين؛ راجعهما من إدارة المحاضرات.");
+      }
+      router.replace(`/programs/${programId}/lectures?documentId=${docId}`);
+    }
+    setMessage(replaceDocumentId ? "تم قبول النسخة الجديدة واستبدال المحاضرة. النسخة السابقة محفوظة في الأرشيف." : "تم قبول الملف وحفظه واستخراج نصه بنجاح.");
+    setStatus("success");
+    router.refresh();
+  }
 
   /** Poll /api/documents/status until COMPLETED or FAILED */
   async function pollUntilDone(docId: string): Promise<void> {
@@ -52,9 +66,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
       const s = data.extractionStatus as string;
 
       if (s === "COMPLETED") {
-        setMessage("تم قبول الملف وحفظه واستخراج نصه بنجاح.");
-        setStatus("success");
-        router.refresh();
+        await acceptUpload(docId);
         return;
       }
 
@@ -101,9 +113,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
     if (pipelineStatus === "COMPLETED") {
       // Document was already processed (idempotent path)
-      setMessage("تم قبول هذا المستند واستخراج نصه سابقاً.");
-      setStatus("success");
-      router.refresh();
+      await acceptUpload(docId);
       return;
     }
 
@@ -191,7 +201,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
 
     setMessage("جاري إكمال الرفع…");
 
-    const doc = await completeBlobUpload(programId, blob.url, safeName);
+    const doc = await completeBlobUpload(programId, blob.url, file.name);
 
     await startPipeline(doc.id, doc.fileName, doc.pageCount ?? undefined);
   }
@@ -214,13 +224,18 @@ export default function DocumentUpload({ programId }: { programId: string }) {
   return (
     <section className="tp-bg-white tp-rounded-xl tp-border tp-p-6 tp-space-y-4">
       <div>
-        <h2 className="tp-text-lg tp-font-semibold">المستند التدريبي</h2>
+        <h2 className="tp-text-lg tp-font-semibold">{replaceDocumentId ? "رفع نسخة محدّثة للمحاضرة" : "إضافة محاضرة تدريبية"}</h2>
         <p className="tp-text-sm tp-text-gray-500 tp-mt-1">
-          ارفع مستند PDF لحفظه واستخراج نصه والتحقق من صفحاته.
+          {replaceDocumentId ? "اختر ملف PDF المعدّل. تُعتمد النسخة الجديدة بعد نجاح استخراج نصها، مع حفظ النسخة السابقة ومراجعها." : "ارفع محاضرة PDF لحفظها واستخراج نصها والتحقق من صفحاتها."}
         </p>
       </div>
 
       <div
+        role="button"
+        tabIndex={busy ? -1 : 0}
+        aria-disabled={busy}
+        aria-label={replaceDocumentId ? "اختيار نسخة محاضرة محدّثة" : "اختيار محاضرة PDF جديدة"}
+        onKeyDown={e => { if (!busy && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); inputRef.current?.click(); } }}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         onClick={() => !busy && inputRef.current?.click()}
@@ -237,6 +252,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
         <input
           ref={inputRef}
           type="file"
+          aria-label={replaceDocumentId ? "ملف المحاضرة المحدّث" : "ملف المحاضرة الجديدة"}
           accept="application/pdf,.pdf"
           disabled={busy}
           onChange={handleChange}
@@ -244,7 +260,7 @@ export default function DocumentUpload({ programId }: { programId: string }) {
         />
       </div>
 
-      {documentId && (
+      {documentId && status === "busy" && (
         <p className="tp-text-xs tp-text-gray-500">
           تم رفع المستند وجاري متابعة حالته.
         </p>

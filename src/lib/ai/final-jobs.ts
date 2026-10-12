@@ -23,7 +23,7 @@ export class FinalGenerationJobs {
     await recoverFinalJob(programId, instructorId);
     for (let attempt = 0; attempt < 5; attempt++) {
       try { return await prisma.$transaction(async tx => {
-        const document = await tx.trainingDocument.findFirst({ where: { id: documentId, programId, program: { instructorId } }, select: { extractionStatus: true } });
+        const document = await tx.trainingDocument.findFirst({ where: { id: documentId, programId, archivedAt: null, program: { instructorId } }, select: { extractionStatus: true } });
         if (!document) return { status: "NOT_FOUND" };
         if (document.extractionStatus !== "COMPLETED") return { status: "EXTRACTION_REQUIRED" };
         const day = await tx.trainingDay.findUnique({ where: { programId_dayNumber: { programId, dayNumber: 0 } }, include: { _count: { select: { questions: true } } } });

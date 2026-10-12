@@ -102,6 +102,7 @@ export async function getProgram(programId: string) {
         orderBy: { createdAt: "desc" },
       },
       documents: {
+        where: { archivedAt: null },
         select: {
           id: true,
           fileName: true,

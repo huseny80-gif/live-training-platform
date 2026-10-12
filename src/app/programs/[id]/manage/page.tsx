@@ -48,6 +48,8 @@ export default async function ManageProgramPage({
           </div>
         </div>
 
+        <Link className="brand-btn brand-btn-primary" href={`/programs/${id}/lectures`}>إدارة المحاضرات: إضافة، تعديل، حذف</Link>
+
         <ManageClient program={program as Parameters<typeof ManageClient>[0]["program"]} />
       </div>
     </main>

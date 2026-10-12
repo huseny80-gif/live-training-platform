@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const { documentId, programId } = body;
   if (typeof documentId !== "string" || typeof programId !== "string" || !documentId || !programId) return NextResponse.json({ error: "MISSING_PARAMS" }, { status: 400 });
   const instructorId = session.user.id;
-  const owned = await prisma.trainingDocument.count({ where: { id: documentId, programId, program: { instructorId } } });
+  const owned = await prisma.trainingDocument.count({ where: { id: documentId, programId, archivedAt: null, program: { instructorId } } });
   if (!owned) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "ANTHROPIC_API_KEY" }, { status: 503 });
   const claim = await generationJobs.claim(documentId, programId, instructorId);
