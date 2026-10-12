@@ -24,10 +24,17 @@ export async function extractPdfOcr(buffer: Buffer, pages: SourcePage[]) {
       const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
       const context = canvas.getContext("2d");
       await page.render({ canvas: canvas as unknown as HTMLCanvasElement, canvasContext: context as unknown as CanvasRenderingContext2D, viewport }).promise;
-      const { data } = await worker.recognize(canvas.toBuffer("image/png"));
+      const { data } = await worker.recognize(canvas.toBuffer("image/png"), {}, { text: true, blocks: true });
+      const confidences = new Map<string, number>();
+      const confidenceKey = (text: string) => text.replace(/\p{Cf}/gu, "").trim();
+      for (const block of data.blocks ?? []) for (const paragraph of block.paragraphs) for (const line of paragraph.lines) for (const word of line.words) {
+        const text = confidenceKey(word.text);
+        if (text) confidences.set(text, Math.min(word.confidence, confidences.get(text) ?? 100));
+      }
+      const uncertainRanges = [...data.text.matchAll(/\S+/gu)].filter(token => confidenceKey(token[0]) && (confidences.get(confidenceKey(token[0])) ?? 0) < 80).map(token => ({ start: token.index!, end: token.index! + token[0].length }));
       // Keep recognised source text as-is; do not ask a language model to fill unreadable regions.
       output.push(data.confidence >= 40 && data.text.trim().length >= 25
-        ? { ...source, text: data.text, extractionMethod: "TESSERACT_OCR", documentHash: sha(buffer) }
+        ? { ...source, text: data.text, extractionMethod: "TESSERACT_OCR", documentHash: sha(buffer), ocrQuality: { version: 1, uncertainRanges } }
         : { ...source, extractionMethod: source.extractionMethod ?? "NATIVE_TEXT", documentHash: sha(buffer) });
       page.cleanup();
       canvas.width = 1; canvas.height = 1;

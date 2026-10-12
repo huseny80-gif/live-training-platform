@@ -9,6 +9,10 @@ import { studentMaterial } from "@/lib/exam-material/grounding";
 import { SummaryView, ConceptView, CitationView } from "./MaterialView";
 import { GenerationControls, PublishControls } from "./AdminControls";
 import ArchiveControls from "./ArchiveControls";
+import VideoControls from "./VideoControls";
+import { formatTimestamp, captionTimestamp } from "@/lib/exam-material/timestamps";
+import type { VideoCue } from "@/lib/exam-material/video-transcript";
+import { validateMaterialSources } from "@/lib/exam-material/source-quality";
 import "./exam-material.css";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +24,12 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
   if (query.programId && !program) notFound();
   await recoverMaterialJobs(user.user.id);
   const lectures = program ? await prisma.trainingDocument.findMany({ where: { programId: program.id, archivedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, fileName: true, extractionStatus: true, pages: { select: { extractionMethod: true, extractionStatus: true, extractedText: true } } } }) : [];
+  const videos = program ? await prisma.trainingVideo.findMany({ where: { programId: program.id }, orderBy: { createdAt: "asc" } }) : [];
+  const videoItems = videos.map(video => {
+    const cues = video.transcript as unknown as VideoCue[];
+    return { id: video.id, title: video.title, mediaUrl: video.mediaUrl, archived: Boolean(video.archivedAt), cues: cues.length,
+      duration: formatTimestamp(cues.at(-1)?.endSeconds), transcript: cues.map((c, i) => `${i + 1}\n${captionTimestamp(c.startSeconds)} --> ${captionTimestamp(c.endSeconds)}\n${c.text}`).join("\n\n") };
+  });
   const allArchives = program ? await prisma.examMaterialBatch.findMany({ where: { programId: program.id }, select: { id: true, createdAt: true, status: true, publishedAt: true, title: true, questionCount: true, deletedAt: true }, orderBy: { createdAt: "desc" } }) : [];
   const deleted = query.deleted === "true";
   const archive = allArchives.filter(a => Boolean(a.deletedAt) === deleted);
@@ -27,6 +37,8 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
   const batch = batchId && program ? await prisma.examMaterialBatch.findFirst({ where: { id: batchId, programId: program.id, deletedAt: deleted ? { not: null } : null } }) : null;
   if (query.batchId && !batch) notFound();
   const content = batch?.content as unknown as Material | null;
+  let qualityRejected = false;
+  if (content && batch) { try { validateMaterialSources(content, batch.sources as unknown as SourcePage[]); } catch { qualityRejected = true; } }
   const guide = batch?.instructorGuide as unknown as Guide | null;
   const tabs = [["summary", "الملخص"], ["map", "خريطة المفاهيم"], ["quiz", "الاختبار"], ["guide", "دليل المناقشة — للمدير"]];
   const tab = tabs.some(([id]) => id === query.tab) ? query.tab : "summary";
@@ -36,7 +48,8 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
     <nav className="em-tabs" aria-label="البرامج">{programs.map(p => <Link className={p.id === program?.id ? "active" : ""} key={p.id} href={`/exam-material?programId=${p.id}`}>{p.title}</Link>)}</nav>
     {!program && <p className="em-glass em-pad">أنشئ برنامجًا وارفع محاضراته أولاً.</p>}
     {program && <Link className="em-button em-secondary" href={`/programs/${program.id}/lectures`}>إدارة المحاضرات: إضافة، تعديل، حذف</Link>}
-    {program && <GenerationControls key={program.id} programId={program.id} generating={allArchives.some(a => a.status === "GENERATING")} lectures={lectures.map(l => ({ id: l.id, fileName: l.fileName, pages: l.pages.length, eligible: l.extractionStatus === "COMPLETED" && l.pages.length > 0 && l.pages.every(p => p.extractionMethod === "NATIVE_TEXT" && p.extractionStatus === "COMPLETED") && l.pages.some(p => p.extractedText?.trim()) }))}/>}
+    {program && <GenerationControls key={`${program.id}:${videoItems.filter(v => !v.archived).map(v => v.id).join(":")}`} programId={program.id} videos={videoItems.filter(v => !v.archived)} generating={allArchives.some(a => a.status === "GENERATING")} lectures={lectures.map(l => ({ id: l.id, fileName: l.fileName, pages: l.pages.length, eligible: l.extractionStatus === "COMPLETED" && l.pages.length > 0 && l.pages.every(p => p.extractionMethod === "NATIVE_TEXT" && p.extractionStatus === "COMPLETED") && l.pages.some(p => p.extractedText?.trim()) }))}/>}
+    {program && <VideoControls key={program.id} programId={program.id} videos={videoItems}/>}
     {program && <nav className="em-tabs" aria-label="حالة الأرشيف"><Link className={!deleted ? "active" : ""} href={`/exam-material?programId=${program.id}`}>عمليات التوليد ({allArchives.filter(a => !a.deletedAt).length})</Link><Link className={deleted ? "active" : ""} href={`/exam-material?programId=${program.id}&deleted=true`}>المحذوفات ({allArchives.filter(a => a.deletedAt).length})</Link></nav>}
     <section className="em-stack"><h2>أرشيف عمليات التوليد</h2><nav className="em-tabs em-archive" aria-label="عمليات التوليد المحفوظة">
       {archive.map((a, i) => <Link aria-current={a.id === batch?.id ? "page" : undefined} className={a.id === batch?.id ? "active" : ""} key={a.id} href={url(a.id)}>{a.title ?? `المادة ${archive.length - i}`} · {a.createdAt.toLocaleString("ar-IQ", { timeZone: "Asia/Baghdad" })}<small>{a.status === "GENERATING" ? "جارٍ التوليد" : a.status === "FAILED" ? "تعذّر التوليد" : a.publishedAt ? "منشورة" : "جاهزة للمراجعة"}</small></Link>)}
@@ -44,9 +57,10 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
     {batch && <ArchiveControls key={batch.id} batch={{ id: batch.id, programId: batch.programId, title: batch.title, questionCount: batch.questionCount, deleted: Boolean(batch.deletedAt), generating: batch.status === "GENERATING" }}/> }
     {batch?.status === "GENERATING" && <p className="em-glass em-pad" role="status">جارٍ اختيار المقاطع والتحقق الحرفي منها… يمكنك مغادرة الصفحة والعودة إلى الأرشيف.</p>}
     {batch?.status === "FAILED" && <p className="em-error em-glass em-pad" role="alert">{materialError[batch.errorCode ?? ""] ?? materialError.GENERATION_FAILED}</p>}
-    {batch?.status === "READY" && content && <>
-      {content.requiresSourceReview && <section className="em-glass em-pad em-stack"><p>استُخرجت نصوص من صور صفحات PDF باستخدام OCR. راجع الاقتباسات والإجابات مقابل الملف الأصلي قبل تأكيد النشر.</p><div className="em-actions">{[...new Map((batch.sources as unknown as SourcePage[]).map(p => [p.documentId, p.fileName])).entries()].map(([id, name]) => <a key={id} className="em-button em-secondary" href={`/api/documents/${id}/file`} target="_blank" rel="noreferrer">عرض PDF الأصلي — {name}</a>)}</div></section>}
-      {content.selectionMethod === "SOURCE_ONLY" && <p className="em-glass em-pad">تم استخراج محتوى حرفي من المحاضرات بعد تعذّر اختيار الذكاء الاصطناعي. راجع جودة الأسئلة وخريطة المفاهيم قبل الاعتماد. دليل المدرّب هنا مستخرج آليًا من النص وليس تحليلًا من نموذج ذكاء اصطناعي.</p>}
+    {batch?.status === "READY" && qualityRejected && <p role="alert" className="em-glass em-pad em-error">{materialError.SOURCE_QUALITY_REJECTED}</p>}
+    {batch?.status === "READY" && content && !qualityRejected && <>
+      {content.requiresSourceReview && <section className="em-glass em-pad em-stack"><p>{(batch.sources as unknown as SourcePage[]).some(p => p.extractionMethod === "VERIFIED_PDF_TRANSCRIPT") ? "هذه مقاطع محددة قورنت بصريًا بصفحات PDF الأصلية مع الحفاظ على الكلمات ولغتها؛ لا تشمل كل نصوص الملف. راجعها قبل تأكيد النشر." : "استُخرجت نصوص من صور صفحات PDF باستخدام OCR، واستُبعدت المقاطع غير الموثوقة. راجع الاقتباسات والإجابات مقابل الملف الأصلي قبل تأكيد النشر."}</p><div className="em-actions">{[...new Map((batch.sources as unknown as SourcePage[]).filter(p => p.sourceKind !== "VIDEO").map(p => [p.documentId, p.fileName])).entries()].map(([id, name]) => <a key={id} className="em-button em-secondary" href={`/api/documents/${id}/file`} target="_blank" rel="noreferrer">عرض PDF الأصلي — {name}</a>)}</div></section>}
+      {content.selectionMethod === "SOURCE_ONLY" && <p className="em-glass em-pad">اختير المحتوى من نصوص المصادر حصراً. راجع ملاءمة الأسئلة وخريطة المفاهيم قبل الاعتماد. دليل المدرّب هنا مبني على المقاطع المحددة وقوالب للنقاش؛ لا يمثل تحليلًا من نموذج ذكاء اصطناعي.</p>}
       <p className="em-muted">المحاضرات المحددة: {[...new Set((batch.sources as unknown as SourcePage[]).map(p => p.fileName))].join(" · ")}</p>
       {!batch.deletedAt && <PublishControls key={batch.id} id={batch.id} token={batch.shareToken} requiresSourceReview={content.requiresSourceReview} sourceReviewed={content.sourceReviewed}/>}
       <nav className="em-tabs" aria-label="أقسام المادة">{tabs.map(([key, label]) => <Link aria-current={key === tab ? "page" : undefined} className={key === tab ? "active" : ""} key={key} href={url(batch.id, key)}>{label}</Link>)}</nav>

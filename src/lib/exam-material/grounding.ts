@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { sourceQuality } from "./source-quality";
 
-export type SourcePage = { id: string; documentId: string; fileName: string; pageNumber: number; text: string; extractionMethod?: string; documentHash?: string };
+export type SourcePage = { id: string; documentId: string; fileName: string; pageNumber: number; text: string; extractionMethod?: string; documentHash?: string;
+  ocrQuality?: { version: 1; uncertainRanges: { start: number; end: number }[] };
+  sourceKind?: "VIDEO"; startSeconds?: number; endSeconds?: number; mediaUrl?: string };
 export type Span = { id: string; pageId: string; text: string; start: number; end: number; lineStart: number; lineEnd: number };
-export type Citation = Span & { fileName: string; pageNumber: number; documentId: string; pageHash: string; extractionMethod?: string; documentHash?: string };
+export type Citation = Span & { fileName: string; pageNumber: number; documentId: string; pageHash: string; extractionMethod?: string; documentHash?: string; sourceKind?: "VIDEO"; startSeconds?: number; endSeconds?: number; mediaUrl?: string };
 const string = z.string().min(2).max(180);
 const planSchema = z.object({
   summary: z.array(z.string()).min(3).max(18),
@@ -43,7 +46,7 @@ export function sourceSpans(pages: SourcePage[]): Span[] {
   // Add contiguous page blocks without inventing spaces, joining pages, or changing text.
   for (const page of pages) {
     const lines = [...page.text.matchAll(/[^\n]+/gu)];
-    if (lines.filter(line => line[0].trim().length > 0 && line[0].trim().length < 25).length < 2) continue;
+    if (page.extractionMethod !== "VERIFIED_PDF_TRANSCRIPT" && lines.filter(line => line[0].trim().length > 0 && line[0].trim().length < 25).length < 2) continue;
     let start = 0;
     while (start < page.text.length) {
       let stop = Math.min(start + 650, page.text.length);
@@ -72,12 +75,14 @@ export function compileGroundedMaterial(raw: unknown, pages: SourcePage[], count
   if (plan.questions.length !== count) throw new Error("GROUNDING_INVALID_COUNT");
   const spans = new Map(sourceSpans(pages).map(s => [s.id, s]));
   const source = new Map(pages.map(p => [p.id, p]));
+  const quality = sourceQuality(pages);
   function cite(id: string): Citation {
     const span = spans.get(id);
     if (!span) throw new Error("GROUNDING_UNKNOWN_SOURCE");
+    if (quality(span)) throw new Error("SOURCE_QUALITY_REJECTED");
     const page = source.get(span.pageId)!;
     if (page.text.slice(span.start, span.end) !== span.text) throw new Error("GROUNDING_CHANGED_SOURCE");
-    return { ...span, fileName: page.fileName, documentId: page.documentId, pageNumber: page.pageNumber, pageHash: sha(page.text), ...(page.extractionMethod ? { extractionMethod: page.extractionMethod } : {}), ...(page.documentHash ? { documentHash: page.documentHash } : {}) };
+    return { ...span, fileName: page.fileName, documentId: page.documentId, pageNumber: page.pageNumber, pageHash: sha(page.text), ...(page.extractionMethod ? { extractionMethod: page.extractionMethod } : {}), ...(page.documentHash ? { documentHash: page.documentHash } : {}), ...(page.sourceKind === "VIDEO" ? { sourceKind: page.sourceKind, startSeconds: page.startSeconds, endSeconds: page.endSeconds, ...(page.mediaUrl ? { mediaUrl: page.mediaUrl } : {}) } : {}) };
   }
   function literal(id: string, value: string) {
     const citation = cite(id);
@@ -114,7 +119,7 @@ export function compileGroundedMaterial(raw: unknown, pages: SourcePage[], count
     if (!summary.some(c => c.documentId === documentId) || !questions.some(q => q.citation.documentId === documentId)) throw new Error("GROUNDING_MISSING_LECTURE");
   }
   const instructorGuide = plan.debrief.map(d => ({ focus: d.focus, kind: d.kind, citation: literal(d.spanId, d.focus) }));
-  return { content: { version: 1, selectionMethod, requiresSourceReview: pages.some(p => p.extractionMethod === "TESSERACT_OCR"), sourceReviewed: false, summary, concepts, links, questions }, instructorGuide };
+  return { content: { version: 1, selectionMethod, requiresSourceReview: pages.some(p => ["TESSERACT_OCR", "VERIFIED_PDF_TRANSCRIPT"].includes(p.extractionMethod ?? "")), sourceReviewed: false, summary, concepts, links, questions }, instructorGuide };
 }
 export type Material = ReturnType<typeof compileGroundedMaterial>["content"];
 export type Guide = ReturnType<typeof compileGroundedMaterial>["instructorGuide"];

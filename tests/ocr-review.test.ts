@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { compileGroundedMaterial } from "../src/lib/exam-material/grounding";
 import { pages, plan } from "./fixtures/exam-material";
 async function run() {
-  const generated = compileGroundedMaterial(plan, pages.map(p => ({ ...p, extractionMethod: "TESSERACT_OCR", documentHash: "hash" })), 5, "SOURCE_ONLY");
-  const batch = { id: "batch", content: generated.content, publishedAt: new Date() as Date | null, shareToken: "a".repeat(48) as string | null };
+  const sources = pages.map(p => ({ ...p, extractionMethod: "TESSERACT_OCR", documentHash: "hash", ocrQuality: { version: 1 as const, uncertainRanges: [] } }));
+  const generated = compileGroundedMaterial(plan, sources, 5, "SOURCE_ONLY");
+  const batch = { id: "batch", sources, content: generated.content, publishedAt: new Date() as Date | null, shareToken: "a".repeat(48) as string | null };
   let writes = 0;
   Object.assign(globalThis, { prisma: { examMaterialBatch: {
     findFirst: async ({ where }: { where: { program?: { instructorId: string } } }) => where.program && where.program.instructorId !== "owner" ? null : batch,

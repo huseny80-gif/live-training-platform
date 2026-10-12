@@ -3,9 +3,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Lecture = { id: string; fileName: string; eligible: boolean; pages: number };
-export function GenerationControls({ programId, lectures, generating }: { programId: string; lectures: Lecture[]; generating: boolean }) {
+type Video = { id: string; title: string; duration: string; cues: number };
+export function GenerationControls({ programId, lectures, videos = [], generating }: { programId: string; lectures: Lecture[]; videos?: Video[]; generating: boolean }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
+  const total = selected.length + selectedVideos.length;
   const [countText, setCountText] = useState("10");
   const count = Number(countText);
   const [busy, setBusy] = useState(false);
@@ -14,7 +17,7 @@ export function GenerationControls({ programId, lectures, generating }: { progra
   async function generate() {
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/exam-material", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "generate", programId, documentIds: selected, count }) });
+      const response = await fetch("/api/exam-material", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "generate", programId, documentIds: selected, videoIds: selectedVideos, count }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       router.push(`/exam-material?programId=${programId}&batchId=${data.id}`);
@@ -23,7 +26,8 @@ export function GenerationControls({ programId, lectures, generating }: { progra
     finally { setBusy(false); }
   }
   return <section className="em-glass em-pad em-stack" aria-label="اختيار المحاضرات">
-    <div><span className="em-kicker">تحكم المدير</span><h2>اختر المادة التي سيُبنى عليها الاختبار</h2><p className="em-muted">تُقبل المحاضرات المكتملة ذات النص الأصلي فقط. كل عملية جديدة تبقى محفوظة في الأرشيف.</p></div>
+    <div><span className="em-kicker">تحكم المدير</span><h2>إدارة ومزامنة المحتوى: النصوص والفيديو</h2><p className="em-muted">اختر المحاضرات وتفريغات الفيديو المعتمدة. يبقى كل اقتباس مرتبطًا بصفحته أو توقيته، وكل عملية محفوظة في الأرشيف.</p></div>
+    <div className="em-source-grid">
     <fieldset disabled={busy || generating} className="em-lectures"><legend>المحاضرات</legend>
       {lectures.length === 0 && <p>ارفع المحاضرات إلى البرنامج واستخرج نصها أولاً.</p>}
       {lectures.map(l => <label key={l.id} className={`em-lecture ${!l.eligible ? "em-disabled" : ""}`}>
@@ -31,9 +35,11 @@ export function GenerationControls({ programId, lectures, generating }: { progra
         <span><strong>{l.fileName}</strong><small>{l.pages} صفحة · {l.eligible ? "جاهزة للتوليد الحرفي" : "تحتاج إلى استخراج نص أصلي مكتمل"}</small></span>
       </label>)}
     </fieldset>
-    <label className="em-count">عدد الأسئلة <input type="number" min={Math.max(1, selected.length)} max={50} step={1} value={countText} inputMode="numeric" aria-label="عدد الأسئلة" disabled={busy || generating} onChange={e => setCountText(e.target.value)}/></label>
-    <p className="em-muted">يمكنك اختيار ١–٥٠ سؤالًا. العدد الأدنى يساوي عدد المحاضرات المختارة، والتوليد يتطلب نصًا كافيًا لهذا العدد.</p>
-    <div className="em-actions"><span>{selected.length} محاضرة محددة</span><button className="em-button" disabled={busy || generating || !selected.length || selected.length > 10 || selected.length > count || !Number.isInteger(count) || count < 1 || count > 50} onClick={generate}>{busy ? "بدء التوليد…" : generating ? "التوليد جارٍ — يتم تحديث الحالة تلقائيًا" : "توليد المحتوى الامتحاني"}</button></div>
+    <fieldset disabled={busy || generating} className="em-lectures"><legend>مقاطع الفيديو التدريبية</legend>{!videos.length && <p className="em-muted">أضف تفريغ فيديو معتمدًا من قسم إدارة الفيديوهات أدناه.</p>}{videos.map(v => <label className="em-lecture" key={v.id}><input type="checkbox" checked={selectedVideos.includes(v.id)} onChange={e => setSelectedVideos(old => e.target.checked ? [...old, v.id] : old.filter(id => id !== v.id))}/><span><strong>{v.title}</strong><small>{v.cues} مقطعًا · {v.duration} · تفريغ معتمد</small></span></label>)}</fieldset>
+    </div>
+    <label className="em-count">عدد الأسئلة <input type="number" min={Math.max(1, total)} max={50} step={1} value={countText} inputMode="numeric" aria-label="عدد الأسئلة" disabled={busy || generating} onChange={e => setCountText(e.target.value)}/></label>
+    <p className="em-muted">يمكنك اختيار ١–٥٠ سؤالًا ومن مصدر واحد إلى ١٠ مصادر. العدد الأدنى يساوي عدد المصادر المختارة، والتوليد يتطلب نصًا مناسبًا كافيًا.</p>
+    <div className="em-actions"><span>{selected.length} محاضرة · {selectedVideos.length} فيديو محدد</span><button className="em-button" disabled={busy || generating || !total || total > 10 || total > count || !Number.isInteger(count) || count < 1 || count > 50} onClick={generate}>{busy ? "بدء التوليد…" : generating ? "التوليد جارٍ — يتم تحديث الحالة تلقائيًا" : "توليد المحتوى الامتحاني"}</button></div>
     {error && <p className="em-error" role="alert">{error}</p>}
   </section>;
 }

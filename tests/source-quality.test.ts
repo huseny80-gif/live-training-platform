@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import { sourceSpans, compileGroundedMaterial } from "../src/lib/exam-material/grounding";
+import { sourceQuality, validateMaterialSources } from "../src/lib/exam-material/source-quality";
+import { buildGroundedCatalog } from "../src/lib/exam-material/catalog";
+import { pages, plan } from "./fixtures/exam-material";
+const damaged = Array.from({ length: 4 }, (_, i) => ({ ...pages[0], id: `p${i}`, pageNumber: i + 1,
+  text: `HEE دورة نظم المعلومات الجغرافية (GIS) / المستوى الاول\nIraqi Oil Exploration Company\n${pages[0].text.replaceAll(".", ` المقطع${i}.`)}\nنص طويل يحتوي RL وكلمات عربية لا يُعتمد عليها المقطع${i}.` }));
+const check = sourceQuality(damaged);
+const spans = sourceSpans(damaged);
+assert.equal(check(spans.find(s => s.text.startsWith("HEE"))!), "BOILERPLATE");
+assert.equal(check(spans.find(s => s.text.includes("RL"))!), "SUSPECT_OCR_TOKEN");
+assert.ok(buildGroundedCatalog(damaged).sources.every(s => !/HEE|RL|Iraqi Oil/.test(s.span.text)));
+assert.ok(buildGroundedCatalog(damaged).questions.length > 0);
+const ocr = [{ ...pages[0], extractionMethod: "TESSERACT_OCR", ocrQuality: { version: 1 as const, uncertainRanges: [{ start: 10, end: 20 }] } }];
+assert.equal(sourceQuality(ocr)(sourceSpans(ocr)[0]), "OCR_UNCERTAIN");
+assert.throws(() => compileGroundedMaterial(plan, ocr, 5), /SOURCE_QUALITY_REJECTED/);
+const original = compileGroundedMaterial(plan, pages, 5).content;
+assert.throws(() => validateMaterialSources(original, [{ ...pages[0], text: "different" }]), /SOURCE_QUALITY_REJECTED/);
+assert.throws(() => validateMaterialSources(original, pages.map(p => ({ ...p, extractionMethod: "TESSERACT_OCR" }))), /SOURCE_QUALITY_REJECTED/);
+const accepted = [{ ...pages[0], extractionMethod: "TESSERACT_OCR", ocrQuality: { version: 1 as const, uncertainRanges: [] } }];
+const result = compileGroundedMaterial(plan, accepted, 5);
+assert.equal(result.content.requiresSourceReview, true);
+for (const reference of result.content.summary) assert.equal(accepted[0].text.slice(reference.start, reference.end), reference.text);
+console.log("PASS: screenshot noise, repeated headings/footer and uncertain OCR rejected; legacy drafts rechecked; source spelling and offsets unchanged; confidence never replaces instructor review.");

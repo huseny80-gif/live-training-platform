@@ -13,6 +13,8 @@ async function run() {
   assert.equal(result.length, 1); assert.equal(result[0].extractionMethod, "TESSERACT_OCR");
   assert.match(result[0].text, /Input Features/); assert.match(result[0].text, /Buffer Tools/);
   assert.equal(result[0].documentHash?.length, 64);
+  assert.equal(result[0].ocrQuality?.version, 1);
+  for (const range of result[0].ocrQuality!.uncertainRanges) assert.ok(range.start >= 0 && range.end <= result[0].text.length && range.end > range.start);
   console.log("PASS: real PDF rasterisation and local bilingual OCR; source text recovered; original PDF hash retained; no network/provider calls.");
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

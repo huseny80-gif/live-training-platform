@@ -1,11 +1,16 @@
 import Link from "next/link";
 import type { Citation, StudentMaterial } from "@/lib/exam-material/grounding";
+import { formatTimestamp, videoAtTime } from "@/lib/exam-material/timestamps";
 
 export function CitationView({ citation, token }: { citation: Citation; token?: string | null }) {
-  const label = `${citation.extractionMethod === "TESSERACT_OCR" ? "نص OCR · " : ""}${citation.fileName} · صفحة ${citation.pageNumber} · أسطر النص ${citation.lineStart}–${citation.lineEnd}`;
+  const video = citation.sourceKind === "VIDEO";
+  const atTime = video && citation.mediaUrl ? videoAtTime(citation.mediaUrl, citation.startSeconds ?? 0) : null;
+  const label = `${citation.extractionMethod === "TESSERACT_OCR" ? "نص OCR · " : citation.extractionMethod === "VERIFIED_PDF_TRANSCRIPT" ? "تفريغ مقارن بالمصدر · " : ""}${citation.fileName} · ${video ? `التوقيت ${formatTimestamp(citation.startSeconds)}–${formatTimestamp(citation.endSeconds)}` : `صفحة ${citation.pageNumber}`} · أسطر النص ${citation.lineStart}–${citation.lineEnd}`;
   return <details className="em-citation"><summary>{label}</summary>
     <blockquote>{citation.text}</blockquote>
     {token && <Link href={`/study/${token}/source/${citation.pageId}?citation=${encodeURIComponent(citation.id)}#L${citation.lineStart}`}>مراجعة الفقرة في المحاضرة ←</Link>}
+    {!token && !video && <a href={`/api/documents/${citation.documentId}/file#page=${citation.pageNumber}`} target="_blank" rel="noreferrer">مطابقة الاقتباس بصفحة PDF الأصلية ←</a>}
+    {atTime && <a href={atTime} target="_blank" rel="noreferrer">مراجعة المقطع في الفيديو ←</a>}
   </details>;
 }
 export function SummaryView({ content, token }: { content: StudentMaterial; token?: string | null }) {

@@ -159,10 +159,28 @@ model TrainingProgram {
   days         TrainingDay[]
   sessions     LiveSession[]
   examMaterials ExamMaterialBatch[]
+  videos        TrainingVideo[]
 
   @@index([instructorId])
   @@index([status])
   @@map("training_programs")
+}
+
+model TrainingVideo {
+  id                String   @id @default(uuid())
+  programId         String   @map("program_id")
+  title             String
+  mediaUrl          String?  @map("media_url")
+  transcript        Json
+  transcriptHash    String   @map("transcript_hash")
+  sourceReviewedAt  DateTime @map("source_reviewed_at")
+  archivedAt        DateTime? @map("archived_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  program           TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([programId, archivedAt])
+  @@map("training_videos")
 }
 
 // ─────────────────────────────────────────────

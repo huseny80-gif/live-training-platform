@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { sourceSpans, compileGroundedMaterial, type SourcePage, type Span, type SelectionPlan } from "./grounding";
+import { sourceQuality } from "./source-quality";
 
 const stopWords = new Set("في من على إلى عن مع بين هذا هذه هو هي أن أو التي الذي يتم يمكن كما عند بعد قبل the and for with from into this that are was have has of to in is a an".split(" "));
 function phrases(text: string) {
@@ -20,7 +21,8 @@ function phrases(text: string) {
 }
 export type GroundedCatalog = ReturnType<typeof buildGroundedCatalog>;
 export function buildGroundedCatalog(pages: SourcePage[]) {
-  const spans = sourceSpans(pages);
+  const check = sourceQuality(pages);
+  const spans = sourceSpans(pages).filter(span => !check(span));
   const sources = spans.map((span, i) => ({ id: `S${i + 1}`, span, documentId: pages.find(p => p.id === span.pageId)!.documentId }));
   const phrasesBySpan = new Map(spans.map(span => [span.id, phrases(span.text)]));
   const candidates = spans.flatMap(span => (phrasesBySpan.get(span.id) ?? []).slice(0, 5).map(p => ({ spanId: span.id, text: p.text })));
