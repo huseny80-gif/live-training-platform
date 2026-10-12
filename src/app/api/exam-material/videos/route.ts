@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     const messages: Record<string, string> = {
       INVALID_TRANSCRIPT: "استخدم SRT أو VTT بنص عادي ومقاطع زمنية مرتبة دون تداخل أو وسوم؛ راجعه مقابل الفيديو قبل الحفظ.",
       INVALID_VIDEO_URL: "أدخل رابط HTTPS مباشرًا لفيديو YouTube أو Vimeo، أو اترك الرابط فارغًا.",
+      INVALID_LIBRARY_VIDEO: "الفيديو غير متاح في مكتبة هذا البرنامج؛ تحقق من اكتمال رفعه وعدم حذفه.",
       VIDEO_LIMIT: "بلغ البرنامج الحد الأقصى: ١٠٠ فيديو.",
     };
     return NextResponse.json({ error: messages[code] ?? "تعذّر الحفظ؛ تحقق من البيانات والصلاحيات وتأكيد مراجعة النص." }, { status: 400 });

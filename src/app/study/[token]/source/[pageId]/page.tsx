@@ -1,3 +1,4 @@
+import { videoReviewUrl } from "@/lib/exam-material/library-video";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { publishedMaterial } from "@/lib/exam-material/service";
@@ -24,6 +25,6 @@ export default async function SourcePageView({ params, searchParams }: {
     return <div className="em-source-line" id={`L${i + 1}`} key={i}><span className="em-line-number">{i + 1}</span><span>{right > left ? <>{line.slice(0, left)}<mark>{line.slice(left, right)}</mark>{line.slice(right)}</> : line || " "}</span></div>;
   });
   const video = page.sourceKind === "VIDEO";
-  const videoLink = video && page.mediaUrl ? videoAtTime(page.mediaUrl, page.startSeconds ?? 0) : null;
-  return <main className="em-page" dir="rtl" lang="ar"><div className="em-container em-stack"><Link href={`/study/${token}`}>→ العودة للمادة الامتحانية</Link><h1>{page.fileName}</h1><p>{video ? `التوقيت ${formatTimestamp(page.startSeconds)}–${formatTimestamp(page.endSeconds)}` : `صفحة ${page.pageNumber}`} · أسطر النص {reference.lineStart}–{reference.lineEnd}</p><p className="em-muted">{video ? "هذا نص المقطع المؤقت كما راجعه المدرب وحُفظ عند التوليد." : "هذا نص المصدر المحفوظ عند التوليد. الأسطر تشير إلى النص المستخرج وقد تختلف عن تنسيق أسطر PDF."}</p>{videoLink && <a href={videoLink} target="_blank" rel="noreferrer">فتح المقطع في الفيديو ←</a>}<section className="em-glass em-pad em-source">{lines}</section></div></main>;
+  const videoLink = video && page.mediaUrl ? (videoReviewUrl(page.mediaUrl, page.startSeconds ?? 0, token) ?? videoAtTime(page.mediaUrl, page.startSeconds ?? 0)) : null;
+  return <main className="em-page" dir="rtl" lang="ar"><div className="em-container em-stack"><Link href={`/study/${token}`}>→ العودة للمادة الامتحانية</Link><h1>{page.fileName}</h1><p>{video ? `التوقيت ${formatTimestamp(page.startSeconds)}–${formatTimestamp(page.endSeconds)}` : `صفحة ${page.pageNumber}`} · أسطر النص {reference.lineStart}–{reference.lineEnd}</p><p className="em-muted">{video ? "هذا نص المقطع المؤقت كما راجعه المدرب وحُفظ عند التوليد." : "هذا نص المصدر المحفوظ عند التوليد. الأسطر تشير إلى النص المستخرج وقد تختلف عن تنسيق أسطر PDF."}</p>{videoLink && <a href={videoLink} target="_blank" rel="noreferrer">فتح المقطع في الفيديو ←</a>}{videoLink && page.mediaUrl && videoReviewUrl(page.mediaUrl, page.startSeconds ?? 0, token) && <video controls preload="metadata" src={videoLink} style={{ width: "100%", maxHeight: 480 }} aria-label="المقطع الأصلي للمراجعة"/>}<section className="em-glass em-pad em-source">{lines}</section></div></main>;
 }

@@ -3,7 +3,10 @@ import { pages } from "./fixtures/exam-material";
 async function run() {
   const programId = "10000000-0000-4000-8000-000000000001", videoId = "10000000-0000-4000-8000-000000000002";
   const state: { video?: Record<string, unknown>; snapshots: Record<string, unknown>[] } = { snapshots: [] };
+  let resourceAvailable = true;
+  const resourceId = "10000000-0000-4000-8000-000000000003";
   const tx = {
+    resourceFile: { findFirst: async ({ where }: any) => resourceAvailable && where.id === resourceId && where.programId === programId && where.status === "READY" && where.archivedAt === null ? { id: resourceId } : null, findMany: async ({ where }: any) => resourceAvailable && where.id.in.includes(resourceId) && where.programId === programId ? [{ id: resourceId }] : [] },
     trainingProgram: { findFirst: async ({ where }: { where: { id: string; instructorId: string } }) => where.id === programId && where.instructorId === "owner" ? { id: programId } : null },
     trainingDocument: { findMany: async () => [] },
     trainingVideo: {
@@ -40,6 +43,10 @@ async function run() {
   await archiveVideo("owner", videoId, false);
   await reserveMaterial("owner", programId, [], 3, [videoId]);
   assert.equal(state.snapshots.length, 2);
+  const linked = { ...input, id: videoId, mediaUrl: `/api/resources/${resourceId}/file` };
+  resourceAvailable = false; await assert.rejects(saveVideo("owner", linked), /INVALID_LIBRARY_VIDEO/);
+  resourceAvailable = true; await saveVideo("owner", linked); await reserveMaterial("owner", programId, [], 3, [videoId]);
+  resourceAvailable = false; await assert.rejects(reserveMaterial("owner", programId, [], 3, [videoId]), /INVALID_LECTURES/);
   console.log("PASS: video ownership and transcript attestation enforced; foreign/archived IDs rejected; edit and soft deletion preserve prior exam snapshots; restore enables selection (mock DB).");
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

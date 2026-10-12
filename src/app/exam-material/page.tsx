@@ -25,6 +25,7 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
   await recoverMaterialJobs(user.user.id);
   const lectures = program ? await prisma.trainingDocument.findMany({ where: { programId: program.id, archivedAt: null }, orderBy: { createdAt: "asc" }, select: { id: true, fileName: true, extractionStatus: true, pages: { select: { extractionMethod: true, extractionStatus: true, extractedText: true } } } }) : [];
   const videos = program ? await prisma.trainingVideo.findMany({ where: { programId: program.id }, orderBy: { createdAt: "asc" } }) : [];
+  const libraryVideos = program ? await prisma.resourceFile.findMany({ where: { programId: program.id, status: "READY", archivedAt: null, mimeType: { in: ["video/mp4", "video/webm"] } }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } }) : [];
   const videoItems = videos.map(video => {
     const cues = video.transcript as unknown as VideoCue[];
     return { id: video.id, title: video.title, mediaUrl: video.mediaUrl, archived: Boolean(video.archivedAt), cues: cues.length,
@@ -49,7 +50,7 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
     {!program && <p className="em-glass em-pad">أنشئ برنامجًا وارفع محاضراته أولاً.</p>}
     {program && <Link className="em-button em-secondary" href={`/programs/${program.id}/lectures`}>إدارة المحاضرات: إضافة، تعديل، حذف</Link>}
     {program && <GenerationControls key={`${program.id}:${videoItems.filter(v => !v.archived).map(v => v.id).join(":")}`} programId={program.id} videos={videoItems.filter(v => !v.archived)} generating={allArchives.some(a => a.status === "GENERATING")} lectures={lectures.map(l => ({ id: l.id, fileName: l.fileName, pages: l.pages.length, eligible: l.extractionStatus === "COMPLETED" && l.pages.length > 0 && l.pages.every(p => p.extractionMethod === "NATIVE_TEXT" && p.extractionStatus === "COMPLETED") && l.pages.some(p => p.extractedText?.trim()) }))}/>}
-    {program && <VideoControls key={program.id} programId={program.id} videos={videoItems}/>}
+    {program && <VideoControls key={program.id} programId={program.id} videos={videoItems} libraryVideos={libraryVideos}/>}
     {program && <nav className="em-tabs" aria-label="حالة الأرشيف"><Link className={!deleted ? "active" : ""} href={`/exam-material?programId=${program.id}`}>عمليات التوليد ({allArchives.filter(a => !a.deletedAt).length})</Link><Link className={deleted ? "active" : ""} href={`/exam-material?programId=${program.id}&deleted=true`}>المحذوفات ({allArchives.filter(a => a.deletedAt).length})</Link></nav>}
     <section className="em-stack"><h2>أرشيف عمليات التوليد</h2><nav className="em-tabs em-archive" aria-label="عمليات التوليد المحفوظة">
       {archive.map((a, i) => <Link aria-current={a.id === batch?.id ? "page" : undefined} className={a.id === batch?.id ? "active" : ""} key={a.id} href={url(a.id)}>{a.title ?? `المادة ${archive.length - i}`} · {a.createdAt.toLocaleString("ar-IQ", { timeZone: "Asia/Baghdad" })}<small>{a.status === "GENERATING" ? "جارٍ التوليد" : a.status === "FAILED" ? "تعذّر التوليد" : a.publishedAt ? "منشورة" : "جاهزة للمراجعة"}</small></Link>)}

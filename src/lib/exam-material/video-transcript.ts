@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { libraryVideoId } from "./library-video";
 
 export type VideoCue = { id: string; startSeconds: number; endSeconds: number; text: string };
 function seconds(value: string) {
@@ -32,6 +33,7 @@ export function parseVideoTranscript(input: string): VideoCue[] {
 
 export function safeVideoUrl(input: string) {
   if (!input) return null;
+  if (libraryVideoId(input)) return input;
   const url = new URL(input);
   if (url.protocol !== "https:" || url.username || url.password || url.port || !["www.youtube.com", "youtube.com", "youtu.be", "vimeo.com", "www.vimeo.com"].includes(url.hostname)) throw new Error("INVALID_VIDEO_URL");
   if (url.hostname.includes("youtube.com") && url.pathname !== "/watch") throw new Error("INVALID_VIDEO_URL");

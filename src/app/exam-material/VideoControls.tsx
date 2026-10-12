@@ -1,9 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
+import { libraryVideoId } from "@/lib/exam-material/library-video";
 import { useRouter } from "next/navigation";
 
 export type VideoItem = { id: string; title: string; mediaUrl: string | null; archived: boolean; cues: number; duration: string; transcript: string };
-export default function VideoControls({ programId, videos }: { programId: string; videos: VideoItem[] }) {
+export default function VideoControls({ programId, videos, libraryVideos = [] }: { programId: string; videos: VideoItem[]; libraryVideos?: { id: string; title: string }[] }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [id, setId] = useState<string | undefined>();
@@ -28,8 +29,12 @@ export default function VideoControls({ programId, videos }: { programId: string
   return <details id="video-library" className="em-glass em-pad em-stack"><summary>إدارة الفيديوهات وتفريغها النصي</summary>
     <p className="em-muted">استورد SRT أو VTT وراجعه مقابل الصوت. يُولد المحتوى من التفريغ المحفوظ حصراً مع إحالة زمنية؛ رابط الفيديو وحده لا ينتج نصاً.</p>
     <form ref={formRef} className="em-stack" onSubmit={save}>
+      <label>فيديو من مكتبة الموارد الرقمية<select className="em-share" value={libraryVideoId(mediaUrl) ?? ""} disabled={busy} onChange={e => {
+        const file = libraryVideos.find(v => v.id === e.target.value); setUrl(file ? `/api/resources/${file.id}/file` : ""); if (file) setTitle(file.title.slice(0, 120)); setReviewed(false);
+      }}><option value="">تفريغ مستقل أو رابط فيديو خارجي</option>{libraryVideos.map(v => <option key={v.id} value={v.id}>{v.title}</option>)}</select></label>
+      {libraryVideoId(mediaUrl) && <video controls preload="metadata" src={mediaUrl} style={{ width: "100%", maxHeight: 360 }} aria-label="مراجعة التفريغ مقابل الفيديو الأصلي"/>}
       <label>عنوان الفيديو<input className="em-share" value={title} onChange={e => setTitle(e.target.value)} required minLength={3} maxLength={120} disabled={busy}/></label>
-      <label>رابط YouTube أو Vimeo (اختياري)<input className="em-share" type="url" dir="ltr" value={mediaUrl} onChange={e => { setUrl(e.target.value); setReviewed(false); }} maxLength={500} disabled={busy}/></label>
+      {!libraryVideoId(mediaUrl) && <label>رابط YouTube أو Vimeo (اختياري)<input className="em-share" type="url" dir="ltr" value={mediaUrl} onChange={e => { setUrl(e.target.value); setReviewed(false); }} maxLength={500} disabled={busy}/></label>}
       <label>ملف التفريغ SRT / VTT<input type="file" accept=".srt,.vtt,text/vtt" disabled={busy} onChange={async e => {
         const file = e.target.files?.[0]; if (!file) return;
         if (file.size > 480_000) { setError("الملف كبير؛ الحد الأقصى ١٢٠ ألف حرف."); e.target.value = ""; return; }

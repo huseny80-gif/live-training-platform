@@ -1,3 +1,4 @@
+import { libraryVideoId } from "./library-video";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
@@ -11,6 +12,8 @@ export async function saveVideo(instructorId: string, raw: unknown) {
   const transcript = parseVideoTranscript(data.transcript);
   return prisma.$transaction(async tx => {
     if (!await tx.trainingProgram.findFirst({ where: { id: data.programId, instructorId } })) throw new Error("NOT_FOUND");
+    const resourceId = libraryVideoId(mediaUrl);
+    if (resourceId && !await tx.resourceFile.findFirst({ where: { id: resourceId, programId: data.programId, status: "READY", archivedAt: null, mimeType: { in: ["video/mp4", "video/webm"] } } })) throw new Error("INVALID_LIBRARY_VIDEO");
     const values = { title: data.title, mediaUrl, transcript: transcript as unknown as Prisma.InputJsonValue, transcriptHash: sha(data.transcript), sourceReviewedAt: new Date() };
     if (data.id) {
       const updated = await tx.trainingVideo.updateMany({ where: { id: data.id, programId: data.programId, archivedAt: null }, data: values });

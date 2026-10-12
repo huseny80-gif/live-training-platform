@@ -25,3 +25,5 @@ const answers = Object.fromEntries(compiled.questions.map(q => [q.id, (q.correct
 assert.ok(gradeMaterial(compiled, answers).gaps.every(g => g.citation.sourceKind === "VIDEO" && typeof g.citation.endSeconds === "number"));
 assert.ok(!JSON.stringify(studentMaterial(compiled).questions).includes("correctIndex"));
 console.log("PASS: SRT/VTT exact captions and millisecond timestamps; malformed/overlapping/HTML cues and unsafe URLs rejected; source-only quiz and knowledge gaps retain video timestamps; answers stay private.");
+
+assert.equal(safeVideoUrl("/api/resources/10000000-0000-4000-8000-000000000003/file"), "/api/resources/10000000-0000-4000-8000-000000000003/file");

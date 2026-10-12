@@ -6,7 +6,7 @@ import { chromium } from "@playwright/test";
 async function run() {
   const transcript = "1\n00:04:20,000 --> 00:04:40,000\nنص المقطع الأصلي.";
   const video = { id: "video", title: "فيديو المراجعة", mediaUrl: "https://youtu.be/abcdefghijk", archived: false, cues: 1, duration: "04:40", transcript };
-  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import VideoControls from'./src/app/exam-material/VideoControls';import{GenerationControls}from'./src/app/exam-material/AdminControls';const video=${JSON.stringify(video)};createRoot(document.getElementById('app')).render(<main className="em-page"><div className="em-container em-stack"><GenerationControls programId="program" generating={false} lectures={[]} videos={[video]}/><VideoControls programId="program" videos={[{...video,archived:location.pathname==='/trash'}]}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "router", setup(builder) { builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); builder.onLoad({ filter: /.*/, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){window.__refreshed=(window.__refreshed||0)+1},push(url){window.__nav=url}}}`, loader: "js" })); } }] });
+  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import VideoControls from'./src/app/exam-material/VideoControls';import{GenerationControls}from'./src/app/exam-material/AdminControls';const video=${JSON.stringify(video)};createRoot(document.getElementById('app')).render(<main className="em-page"><div className="em-container em-stack"><GenerationControls programId="program" generating={false} lectures={[]} videos={[video]}/><VideoControls programId="program" libraryVideos={[{id:"10000000-0000-4000-8000-000000000003",title:"GIS Library"}]} videos={[{...video,archived:location.pathname==='/trash'}]}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "router", setup(builder) { builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); builder.onLoad({ filter: /.*/, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){window.__refreshed=(window.__refreshed||0)+1},push(url){window.__nav=url}}}`, loader: "js" })); } }] });
   const calls: Record<string, unknown>[] = [], css = await fs.readFile("src/app/exam-material/exam-material.css", "utf8");
   const server = http.createServer(async (req, res) => {
     if (req.url === "/bundle.js") { res.setHeader("Content-Type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
@@ -24,6 +24,8 @@ async function run() {
     await page.waitForFunction(() => Boolean((window as unknown as { __nav: string }).__nav));
     assert.deepEqual(calls[0].videoIds, ["video"]); assert.deepEqual(calls[0].documentIds, []); assert.equal(calls[0].count, 25);
     await page.getByText("إدارة الفيديوهات وتفريغها النصي", { exact: true }).click();
+    await page.getByLabel("فيديو من مكتبة الموارد الرقمية").selectOption("10000000-0000-4000-8000-000000000003");
+    assert.equal(await page.locator("video").getAttribute("src"), "/api/resources/10000000-0000-4000-8000-000000000003/file");
     await page.getByLabel("عنوان الفيديو", { exact: true }).fill("فيديو جديد");
     await page.getByLabel("ملف التفريغ SRT / VTT").setInputFiles({ name: "captions.srt", mimeType: "application/x-subrip", buffer: Buffer.from(transcript) });
     await page.getByLabel("التفريغ النصي مع التوقيت").waitFor();
@@ -32,6 +34,7 @@ async function run() {
     await page.getByRole("checkbox", { name: /راجعت النص والتوقيت/ }).check();
     await page.getByRole("button", { name: "إضافة الفيديو وتفريغه" }).click();
     await page.waitForFunction(() => (document.querySelector("textarea") as HTMLTextAreaElement).value === "");
+    assert.equal(calls[1].mediaUrl, "/api/resources/10000000-0000-4000-8000-000000000003/file");
     assert.equal(calls[1].transcript, transcript); assert.equal(calls[1].sourceReviewed, true);
     await page.getByRole("button", { name: "تعديل", exact: true }).click();
     assert.equal(await page.getByLabel("التفريغ النصي مع التوقيت").inputValue(), transcript);

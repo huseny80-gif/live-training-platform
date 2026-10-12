@@ -1,10 +1,11 @@
+import { videoReviewUrl } from "@/lib/exam-material/library-video";
 import Link from "next/link";
 import type { Citation, StudentMaterial } from "@/lib/exam-material/grounding";
 import { formatTimestamp, videoAtTime } from "@/lib/exam-material/timestamps";
 
 export function CitationView({ citation, token }: { citation: Citation; token?: string | null }) {
   const video = citation.sourceKind === "VIDEO";
-  const atTime = video && citation.mediaUrl ? videoAtTime(citation.mediaUrl, citation.startSeconds ?? 0) : null;
+  const atTime = video && citation.mediaUrl ? (videoReviewUrl(citation.mediaUrl, citation.startSeconds ?? 0, token) ?? videoAtTime(citation.mediaUrl, citation.startSeconds ?? 0)) : null;
   const label = `${citation.extractionMethod === "TESSERACT_OCR" ? "نص OCR · " : citation.extractionMethod === "VERIFIED_PDF_TRANSCRIPT" ? "تفريغ مقارن بالمصدر · " : ""}${citation.fileName} · ${video ? `التوقيت ${formatTimestamp(citation.startSeconds)}–${formatTimestamp(citation.endSeconds)}` : `صفحة ${citation.pageNumber}`} · أسطر النص ${citation.lineStart}–${citation.lineEnd}`;
   return <details className="em-citation"><summary>{label}</summary>
     <blockquote>{citation.text}</blockquote>

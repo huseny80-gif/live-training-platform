@@ -1,3 +1,4 @@
+import { libraryVideoId } from "./library-video";
 import { z } from "zod";
 import { validMaterialCount } from "./limits";
 import { randomBytes } from "node:crypto";
@@ -41,6 +42,11 @@ export async function reserveMaterial(instructorId: string, programId: string, d
     if (videoIds.length) {
       const videos = await tx.trainingVideo.findMany({ where: { id: { in: videoIds }, programId, archivedAt: null } });
       if (videos.length !== videoIds.length) throw new Error("INVALID_LECTURES");
+      const resourceIds = videos.map(v => libraryVideoId(v.mediaUrl)).filter((id): id is string => Boolean(id));
+      if (resourceIds.length) {
+        const files = await tx.resourceFile.findMany({ where: { id: { in: resourceIds }, programId, status: "READY", archivedAt: null, mimeType: { in: ["video/mp4", "video/webm"] } }, select: { id: true } });
+        if (new Set(resourceIds).size !== files.length) throw new Error("INVALID_LECTURES");
+      }
       pages.push(...videos.flatMap(videoSources));
     }
     if (pages.reduce((n, p) => n + p.text.length, 0) > 120_000) throw new Error("SOURCE_TOO_LARGE");
