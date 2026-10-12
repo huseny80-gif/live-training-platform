@@ -13,6 +13,7 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user;
       const isPublic =
         nextUrl.pathname === "/about" ||
+        nextUrl.pathname === "/exam-material-recovery.json" ||
         nextUrl.pathname === "/hussein-profile.webp" ||
         nextUrl.pathname === "/training-logo.webp" ||
         nextUrl.pathname.startsWith("/login") ||

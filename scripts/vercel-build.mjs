@@ -13,5 +13,6 @@ if (process.env.VERCEL_ENV === "production") {
     process.exit(1);
   }
   run("db:migrate:deploy");
+  run("exam:recover");
 }
 run("build");

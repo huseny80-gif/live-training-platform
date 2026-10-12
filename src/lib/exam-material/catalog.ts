@@ -5,13 +5,13 @@ const stopWords = new Set("في من على إلى عن مع بين هذا هذ�
 function phrases(text: string) {
   const words = [...text.matchAll(/[\p{L}\p{N}]+/gu)];
   const result: { text: string; score: number }[] = [];
-  for (let size = 2; size <= 4; size++) {
+  for (let size = 1; size <= 4; size++) {
     for (let i = 0; i + size <= words.length; i++) {
       const tokens = words.slice(i, i + size);
       const first = tokens[0]; const last = tokens[tokens.length - 1];
       const value = text.slice(first.index!, last.index! + last[0].length);
       const significant = tokens.filter(t => /\p{L}/u.test(t[0]) && t[0].length >= 3 && !stopWords.has(t[0].toLowerCase()));
-      if (significant.length < 2 || stopWords.has(first[0].toLowerCase()) || stopWords.has(last[0].toLowerCase()) || value.length < 6 || value.length > 100 || value.length > text.length / 2) continue;
+      if (significant.length < (size === 1 ? 1 : 2) || (size === 1 && first[0].length < 4) || stopWords.has(first[0].toLowerCase()) || stopWords.has(last[0].toLowerCase()) || value.length < 4 || value.length > 100 || value.length > text.length / 2) continue;
       // Prefer short content phrases; retain the exact original spaces and punctuation.
       result.push({ text: value, score: significant.length * 3 - size - Math.abs(value.length - 25) / 20 });
     }
@@ -50,7 +50,7 @@ const selectionSchema = z.object({
 }).strict();
 
 /** AI chooses IDs only. Every displayed word is reconstructed from the source catalogue. */
-export function compileCatalogSelection(raw: unknown, pages: SourcePage[], catalog: GroundedCatalog, count: number) {
+export function compileCatalogSelection(raw: unknown, pages: SourcePage[], catalog: GroundedCatalog, count: number, selectionMethod: "AI_CURATED" | "SOURCE_ONLY" = "AI_CURATED") {
   const selected = selectionSchema.parse(raw);
   if (selected.questions.length !== count) throw new Error("GROUNDING_INVALID_COUNT");
   const sourceMap = new Map(catalog.sources.map(s => [s.id, s]));
@@ -72,7 +72,7 @@ export function compileCatalogSelection(raw: unknown, pages: SourcePage[], catal
     concepts, links,
     questions: selected.questions.map(id => { const q = question(id); return { spanId: q.span.id, answer: q.answer, distractors: q.distractors }; }),
     debrief: selected.debrief.map(item => { const q = question(item.questionId); return { spanId: q.span.id, focus: q.answer, kind: item.kind }; }),
-  }, pages, count);
+  }, pages, count, selectionMethod);
 }
 export const catalogSelectionSchema = {
   type: "object", additionalProperties: false, required: ["summary", "questions", "map", "debrief"],

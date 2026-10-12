@@ -14,7 +14,6 @@ export async function recoverMaterialJobs(instructorId: string) {
   }, data: { status: "FAILED", errorCode: "GENERATION_TIMEOUT", completedAt: new Date() } });
 }
 export async function reserveMaterial(instructorId: string, programId: string, documentIds: string[], count: number) {
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error("AI_NOT_CONFIGURED");
   if (!validMaterialCount(count)) throw new Error("INVALID_QUESTION_COUNT");
   return prisma.$transaction(async tx => {
     const program = await tx.trainingProgram.findFirst({ where: { id: programId, instructorId } });
@@ -88,7 +87,6 @@ export async function manageMaterialArchive(id: string, instructorId: string, ac
   if (!result.count) throw new Error("ARCHIVE_UNAVAILABLE");
 }
 export async function regenerateMaterial(id: string, instructorId: string, count: number) {
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error("AI_NOT_CONFIGURED");
   if (!validMaterialCount(count)) throw new Error("INVALID_QUESTION_COUNT");
   return prisma.$transaction(async tx => {
     const original = await tx.examMaterialBatch.findFirst({ where: { id, deletedAt: null, program: { instructorId }, status: { not: "GENERATING" } } });
@@ -99,4 +97,9 @@ export async function regenerateMaterial(id: string, instructorId: string, count
     if (new Set(pages.map(p => p.documentId)).size > count) throw new Error("INVALID_LECTURES");
     return tx.examMaterialBatch.create({ data: { programId: original.programId, questionCount: count, sources: json(pages), title: original.title ? `${original.title.slice(0, 100)} — إعادة توليد` : null } });
   }, { isolationLevel: "Serializable", timeout: 15000 });
+}
+
+export async function permanentlyDeleteMaterial(id: string, instructorId: string) {
+  const deleted = await prisma.examMaterialBatch.deleteMany({ where: { id, program: { instructorId }, deletedAt: { not: null }, status: { not: "GENERATING" }, publishedAt: null, shareToken: null } });
+  if (!deleted.count) throw new Error("ARCHIVE_UNAVAILABLE");
 }

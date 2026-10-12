@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import { build } from "esbuild";
 import { chromium } from "@playwright/test";
 async function run() {
-  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{GenerationControls}from'./src/app/exam-material/AdminControls';import ArchiveControls from'./src/app/exam-material/ArchiveControls';createRoot(document.getElementById('app')).render(<main className="em-page"><div className="em-container em-stack"><GenerationControls programId="program" generating={false} lectures={[{id:'lecture',fileName:'محاضرة مختارة.pdf',eligible:true,pages:24}]}/><ArchiveControls batch={{id:'old',programId:'program',title:'مادة سابقة',questionCount:10,deleted:location.pathname==='/trash',generating:false}}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "router", setup(builder) { builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); builder.onLoad({ filter: /.*/, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){},push(url){window.navigation=url},replace(url){window.navigation=url}}}`, loader: "js" })); } }] });
+  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import{GenerationControls}from'./src/app/exam-material/AdminControls';import ArchiveControls from'./src/app/exam-material/ArchiveControls';createRoot(document.getElementById('app')).render(<main className="em-page"><div className="em-container em-stack"><GenerationControls programId="program" generating={false} lectures={[{id:'lecture',fileName:'محاضرة مختارة.pdf',eligible:true,pages:24}]}/><ArchiveControls batch={{id:'old',programId:'program',title:'مادة سابقة',questionCount:10,deleted:location.pathname==='/trash',generating:false}}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "router", setup(builder) { builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); builder.onLoad({ filter: /.*/, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){},push(url){window.__trainingTestNavigation=url},replace(url){window.__trainingTestNavigation=url}}}`, loader: "js" })); } }] });
   const css = await fs.readFile("src/app/exam-material/exam-material.css", "utf8");
   const calls: Record<string, unknown>[] = [];
   const server = http.createServer(async (request, response) => {
@@ -27,7 +27,7 @@ async function run() {
     await count.fill(""); assert.equal(await count.inputValue(), "");
     await count.fill("25");
     await page.getByRole("button", { name: "توليد المحتوى الامتحاني", exact: true }).click();
-    await page.waitForFunction(() => (window as unknown as { navigation: string }).navigation?.includes("batchId=new"));
+    await page.waitForFunction(() => (window as unknown as { __trainingTestNavigation: string }).__trainingTestNavigation?.includes("batchId=new"));
     assert.equal(calls.find(c => c.mode === "generate")?.count, 25);
     await page.getByRole("button", { name: "إعادة توليد المحتوى", exact: true }).click();
     await page.getByLabel("عدد أسئلة النسخة الجديدة").fill("35");
@@ -44,13 +44,21 @@ async function run() {
     await page.getByRole("button", { name: "إلغاء", exact: true }).click();
     await page.getByRole("button", { name: "حذف عملية التوليد", exact: true }).click();
     await page.getByRole("button", { name: "تأكيد حذف العملية" }).click();
-    await page.waitForFunction(() => (window as unknown as { navigation: string }).navigation?.includes("deleted=true"));
+    await page.waitForFunction(() => (window as unknown as { __trainingTestNavigation: string }).__trainingTestNavigation?.includes("deleted=true"));
     assert.equal(calls.filter(c => c.action === "delete").length, 1);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.goto(`http://127.0.0.1:${address.port}/trash`);
     await page.getByRole("button", { name: "استعادة العملية" }).click();
-    await page.waitForFunction(() => (window as unknown as { navigation: string }).navigation?.includes("batchId=old"));
+    await page.waitForFunction(() => (window as unknown as { __trainingTestNavigation: string }).__trainingTestNavigation?.includes("batchId=old"));
     assert.equal(calls.filter(c => c.action === "restore").length, 1);
+    await page.goto(`http://127.0.0.1:${address.port}/trash`);
+    await page.getByRole("button", { name: "حذف نهائي من المحذوفات" }).click();
+    assert.equal(calls.filter(c => c.mode === "purge").length, 0);
+    await page.getByRole("button", { name: "إلغاء", exact: true }).click();
+    await page.getByRole("button", { name: "حذف نهائي من المحذوفات" }).click();
+    await page.getByRole("button", { name: "تأكيد الحذف النهائي" }).click();
+    await page.waitForFunction(() => (window as unknown as { __trainingTestNavigation: string }).__trainingTestNavigation?.endsWith("deleted=true"));
+    assert.equal(calls.filter(c => c.mode === "purge" && c.confirmed === true).length, 1);
     assert.deepEqual(errors, []);
     console.log("PASS: mobile editable count 25; regenerate with 35; archive rename; delete confirmation/cancel; restore; no overflow (real components, fixture API).");
   } finally { await browser.close(); await new Promise<void>(resolve => server.close(() => resolve())); }

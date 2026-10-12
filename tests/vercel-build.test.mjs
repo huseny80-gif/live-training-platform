@@ -18,7 +18,7 @@ if (process.env.BUILD_TEST_FAIL && process.argv[3] === 'db:migrate:deploy') proc
     const result = spawnSync(process.execPath, [resolve("scripts/vercel-build.mjs")], { env, encoding: "utf8" });
     return { status: result.status, commands: readFileSync(log, "utf8").trim().split("\n").filter(Boolean) };
   }
-  assert.deepEqual(execute("production", true), { status: 0, commands: ["run db:migrate:deploy", "run build"] });
+  assert.deepEqual(execute("production", true), { status: 0, commands: ["run db:migrate:deploy", "run exam:recover", "run build"] });
   assert.deepEqual(execute("preview", true), { status: 0, commands: ["run build"] });
   assert.deepEqual(execute("production", false), { status: 1, commands: [] });
   assert.deepEqual(execute("production", true, true), { status: 42, commands: ["run db:migrate:deploy"] });

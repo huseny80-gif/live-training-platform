@@ -1,4 +1,5 @@
 export const materialError: Record<string, string> = {
+  RECOVERED: "أُنشئت نسخة جديدة مكتملة لهذه المحاولة. اختر أحدث مادة جاهزة في الأرشيف لمراجعتها.",
   INVALID_QUESTION_COUNT: "اختر عددًا صحيحًا بين ١ و٥٠ سؤالًا.",
   ARCHIVE_UNAVAILABLE: "العملية غير متاحة للإدارة، أو ما زالت قيد التوليد، أو لا تملك صلاحيتها.",
   AI_NOT_CONFIGURED: "خدمة التوليد غير مضبوطة. أضف ANTHROPIC_API_KEY في إعدادات الخادم.",

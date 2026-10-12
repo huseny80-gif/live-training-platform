@@ -39,9 +39,35 @@ export function sourceSpans(pages: SourcePage[]): Span[] {
       }
     }
   }
+  // Slide PDFs often put every word or short bullet on its own extracted line.
+  // Add contiguous page blocks without inventing spaces, joining pages, or changing text.
+  for (const page of pages) {
+    const lines = [...page.text.matchAll(/[^\n]+/gu)];
+    if (lines.filter(line => line[0].trim().length > 0 && line[0].trim().length < 25).length < 2) continue;
+    let start = 0;
+    while (start < page.text.length) {
+      let stop = Math.min(start + 650, page.text.length);
+      if (stop < page.text.length) {
+        const boundary = page.text.lastIndexOf("\n", stop);
+        const space = page.text.lastIndexOf(" ", stop);
+        if (boundary > start + 100) stop = boundary;
+        else if (space > start + 100) stop = space;
+      }
+      const raw = page.text.slice(start, stop);
+      const text = raw.trim();
+      const offset = start + raw.length - raw.trimStart().length;
+      const end = offset + text.length;
+      if (text.length >= 25 && !spans.some(s => s.pageId === page.id && s.start === offset && s.end === end)) {
+        spans.push({ id: `${page.id}:${offset}:${end}`, pageId: page.id, text, start: offset, end,
+          lineStart: page.text.slice(0, offset).split("\n").length,
+          lineEnd: page.text.slice(0, end).split("\n").length });
+      }
+      start = stop;
+    }
+  }
   return spans;
 }
-export function compileGroundedMaterial(raw: unknown, pages: SourcePage[], count: number) {
+export function compileGroundedMaterial(raw: unknown, pages: SourcePage[], count: number, selectionMethod: "AI_CURATED" | "SOURCE_ONLY" = "AI_CURATED") {
   const plan = planSchema.parse(raw);
   if (plan.questions.length !== count) throw new Error("GROUNDING_INVALID_COUNT");
   const spans = new Map(sourceSpans(pages).map(s => [s.id, s]));
@@ -88,7 +114,7 @@ export function compileGroundedMaterial(raw: unknown, pages: SourcePage[], count
     if (!summary.some(c => c.documentId === documentId) || !questions.some(q => q.citation.documentId === documentId)) throw new Error("GROUNDING_MISSING_LECTURE");
   }
   const instructorGuide = plan.debrief.map(d => ({ focus: d.focus, kind: d.kind, citation: literal(d.spanId, d.focus) }));
-  return { content: { version: 1, summary, concepts, links, questions }, instructorGuide };
+  return { content: { version: 1, selectionMethod, summary, concepts, links, questions }, instructorGuide };
 }
 export type Material = ReturnType<typeof compileGroundedMaterial>["content"];
 export type Guide = ReturnType<typeof compileGroundedMaterial>["instructorGuide"];
