@@ -9,6 +9,7 @@ import { statusLabel } from "@/lib/labels";
 import DocumentUpload from "../DocumentUpload";
 import DocumentProcessing from "../DocumentProcessing";
 import LectureControls from "./LectureControls";
+import LecturePageSelector from "./LecturePageSelector";
 import "@/app/exam-material/exam-material.css";
 import "./lectures.css";
 export const dynamic = "force-dynamic";
@@ -42,8 +43,7 @@ export default async function LecturesPage({ params, searchParams }: {
         <LectureControls key={`${doc.id}:${Boolean(doc.archivedAt)}`} programId={id} document={{ id: doc.id, fileName: doc.fileName, archived: Boolean(doc.archivedAt), busy: doc.extractionStatus === "PROCESSING" || Boolean(doc.extractionNotes?.startsWith("GENERATION_PROCESSING:")) }}/>
         {!doc.archivedAt && <DocumentProcessing documentId={doc.id} programId={id} status={doc.extractionStatus} notes={doc.extractionNotes} hasContent={questionCount > 0 || program._count.sessions > 0}/>}
         <h3>نص المحاضرة المستخرج</h3><p className="em-muted">لتغيير المحتوى، ارفع نسخة PDF محدّثة. يبقى النص هنا مطابقًا للمصدر.</p>
-        {doc.pages.map(p => <details className="em-glass em-pad" key={p.id}><summary>صفحة {p.pageNumber}{p.title ? ` — ${p.title}` : ""}</summary><p className="lecture-text">{p.extractedText || "لم يُستخرج نص لهذه الصفحة بعد."}</p></details>)}
-        {!doc.pages.length && <p className="em-muted">لم تُجهّز صفحات هذه المحاضرة بعد.</p>}
+        <LecturePageSelector key={doc.id} pages={doc.pages.map(p => ({ id: p.id, pageNumber: p.pageNumber, title: p.title, extractedText: p.extractedText }))}/>
       </section>}
     </div>
   </div></main>;
