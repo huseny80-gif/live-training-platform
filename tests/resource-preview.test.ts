@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { zipSync, strToU8 } from "fflate";
+import * as XLSX from "xlsx";
+import { officePreview } from "../src/lib/resources/preview";
+const doc = Buffer.from(zipSync({ "word/document.xml": strToU8('<w:document><w:p><w:r><w:t>نص المصدر &amp; معلومات</w:t></w:r></w:p><w:p><w:r><w:t>&lt;script&gt; &quot;اقتباس&quot;</w:t></w:r></w:p></w:document>') }));
+assert.equal(officePreview(doc, "docx").text, 'نص المصدر & معلومات\n<script> "اقتباس"');
+const slides = Buffer.from(zipSync({ "ppt/slides/slide2.xml": strToU8('<a:t>الشريحة الثانية</a:t>'), "ppt/slides/slide1.xml": strToU8('<a:t>الشريحة الأولى</a:t>'), "ppt/notesSlides/notesSlide1.xml": strToU8('<a:t>ملاحظة لا تظهر في معاينة الشرائح</a:t>') }));
+assert.equal(officePreview(slides, "pptx").text, "الشريحة الأولى\n\nالشريحة الثانية");
+const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["متدرب", "نتيجة"], ["اسم الاختبار", 50]]), "النتائج");
+const sheet = officePreview(XLSX.write(book, { type: "buffer", bookType: "xlsx" }), "xlsx");
+assert.ok(sheet.text.includes("اسم الاختبار,50")); assert.equal(sheet.limited, true);
+assert.throws(() => officePreview(Buffer.alloc(11 * 1024 * 1024), "docx"), /PREVIEW_TOO_LARGE/);
+const large = Buffer.from(zipSync({ "word/document.xml": new Uint8Array(11 * 1024 * 1024) }));
+assert.ok(large.length < 1024 * 1024); assert.throws(() => officePreview(large, "docx"), /PREVIEW_TOO_LARGE/);
+console.log("PASS: actual DOCX/PPTX/XLSX archives preview source text, decode XML entities, preserve slide order and omit notes; compressed expansion and preview size bounded.");

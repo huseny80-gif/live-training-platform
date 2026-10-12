@@ -21,7 +21,7 @@ require('node:fs').appendFileSync(process.env.BUILD_TEST_LOG, process.argv.slice
     const result = spawnSync(process.execPath, [resolve("scripts/vercel-build.mjs")], { env, encoding: "utf8" });
     return { status: result.status, commands: readFileSync(log, "utf8").trim().split("\n").filter(Boolean) };
   }
-  assert.deepEqual(execute("production", true), { status: 0, commands: ["run db:migrate:deploy", "run build"] });
+  assert.deepEqual(execute("production", true), { status: 0, commands: ["run db:migrate:deploy", "tsx scripts/check-resource-storage.ts", "run build"] });
   assert.deepEqual(execute("preview", true), { status: 0, commands: ["run build"] });
   assert.deepEqual(execute("production", false), { status: 1, commands: [] });
   assert.deepEqual(execute("production", true, true), { status: 42, commands: ["run db:migrate:deploy"] });

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { storage } from "@/lib/storage";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function GET(_request: Request, { params }: { params: Promise<{ documentId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ documentId: string }> }) {
   const user = await auth();
   if (!user?.user?.id) return new Response(null, { status: 401 });
   const { documentId } = await params;
@@ -15,5 +15,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ doc
     if (offset >= bytes.length) { controller.close(); return; }
     const end = Math.min(offset + 65536, bytes.length); controller.enqueue(new Uint8Array(bytes.subarray(offset, end))); offset = end;
   } });
-  return new Response(stream, { headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(document.fileName)}`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+  return new Response(stream, { headers: { "Content-Type": "application/pdf", "Content-Disposition": `${new URL(request.url).searchParams.get("download") === "1" ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(document.fileName)}`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
 }

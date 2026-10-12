@@ -25,7 +25,7 @@ export default function VideoControls({ programId, videos }: { programId: string
     try { await send({ mode: "archive", id: video.id, archived: !video.archived }); if (video.id === id) reset(); }
     catch(e) { setError(e instanceof Error ? e.message : "تعذّر الحفظ."); } finally { setBusy(false); }
   }
-  return <details className="em-glass em-pad em-stack"><summary>إدارة الفيديوهات وتفريغها النصي</summary>
+  return <details id="video-library" className="em-glass em-pad em-stack"><summary>إدارة الفيديوهات وتفريغها النصي</summary>
     <p className="em-muted">استورد SRT أو VTT وراجعه مقابل الصوت. يُولد المحتوى من التفريغ المحفوظ حصراً مع إحالة زمنية؛ رابط الفيديو وحده لا ينتج نصاً.</p>
     <form ref={formRef} className="em-stack" onSubmit={save}>
       <label>عنوان الفيديو<input className="em-share" value={title} onChange={e => setTitle(e.target.value)} required minLength={3} maxLength={120} disabled={busy}/></label>

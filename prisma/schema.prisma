@@ -160,10 +160,44 @@ model TrainingProgram {
   sessions     LiveSession[]
   examMaterials ExamMaterialBatch[]
   videos        TrainingVideo[]
+  resourceCategories ResourceCategory[]
+  resourceFiles ResourceFile[]
 
   @@index([instructorId])
   @@index([status])
   @@map("training_programs")
+}
+
+model ResourceCategory {
+  id        String @id @default(uuid())
+  programId String @map("program_id")
+  key       String
+  name      String
+  icon      String @default("📁")
+  createdAt DateTime @default(now()) @map("created_at")
+  program   TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  files     ResourceFile[]
+  @@unique([programId, key])
+  @@map("resource_categories")
+}
+
+model ResourceFile {
+  id          String @id @default(uuid())
+  programId   String @map("program_id")
+  categoryKey String @map("category_key")
+  title       String
+  fileName    String @map("file_name")
+  mimeType    String @map("mime_type")
+  sizeBytes   Int @map("size_bytes")
+  blobPath    String @unique @map("blob_path")
+  storagePath String? @map("storage_path")
+  status      String @default("PENDING")
+  archivedAt  DateTime? @map("archived_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  program     TrainingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  category    ResourceCategory @relation(fields: [programId, categoryKey], references: [programId, key], onDelete: Cascade)
+  @@index([programId, archivedAt, status])
+  @@map("resource_files")
 }
 
 model TrainingVideo {

@@ -12,7 +12,7 @@ export default function PlatformNav({ isInstructor = false }: { isInstructor?: b
       <span><strong>{brand.nameAr}</strong><small>{brand.nameEn}</small></span>
     </Link>
     <nav aria-label="أقسام المنصة">
-      {isInstructor && <><Link href="/dashboard">لوحة المدرب</Link><Link href="/exam-material">المادة الامتحانية</Link><Link href="/final-exam">الأسئلة النهائية</Link>
+      {isInstructor && <><Link href="/dashboard">لوحة المدرب</Link><Link href="/resources">مكتبة الموارد</Link><Link href="/exam-material">المادة الامتحانية</Link><Link href="/final-exam">الأسئلة النهائية</Link>
       <Link href="/questions">مراجعة الأسئلة</Link><Link href="/google-forms">مولد Google Forms</Link><Link href="/settings">⚙ الإعدادات</Link></>}
       <Link href="/about">من نحن</Link>
     </nav>

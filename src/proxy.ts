@@ -10,7 +10,7 @@ export async function proxy(request: Request) {
   const pathname = new URL(request.url).pathname;
 
   // handleUpload reads the JSON body; auth(request) consumes the stream first.
-  if (pathname === "/api/documents/upload-url") {
+  if (pathname === "/api/documents/upload-url" || pathname === "/api/resources/upload-url") {
     return undefined;
   }
 
