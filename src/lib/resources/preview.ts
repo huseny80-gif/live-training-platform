@@ -20,6 +20,12 @@ export function officePreview(buffer: Buffer, extension: string): { text: string
   const files = unzipSync(buffer, { filter: file => extension === "docx" ? file.name === "word/document.xml" : /^ppt\/slides\/slide\d+\.xml$/.test(file.name) });
   const keys = Object.keys(files).sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
   if (!keys.length) throw new Error("INVALID_OFFICE_FILE");
-  const text = keys.slice(0, 100).map(key => [...strFromU8(files[key]).matchAll(/<(?:w|a):t(?:\s[^>]*)?>([\s\S]*?)<\/(?:w|a):t>/g)].map(m => decodeXml(m[1])).join("\n")).join("\n\n");
+  const text = keys.slice(0, 100).map(key => {
+    const xml = strFromU8(files[key]);
+    const paragraphs = [...xml.matchAll(/<(w|a):p(?:\s[^>]*)?>([\s\S]*?)<\/\1:p>/g)];
+    if (!paragraphs.length) return [...xml.matchAll(/<(?:w|a):t(?:\s[^>]*)?>([\s\S]*?)<\/(?:w|a):t>/g)].map(m => decodeXml(m[1])).join("\n");
+    // Formatting runs can split a single word; join them without inventing spaces.
+    return paragraphs.map(p => [...p[2].matchAll(/<(?:w|a):t(?:\s[^>]*)?>([\s\S]*?)<\/(?:w|a):t>|<(?:w|a):(tab|br)\s*\/>/g)].map(m => m[2] === "tab" ? "\t" : m[2] === "br" ? "\n" : decodeXml(m[1])).join("")).join("\n");
+  }).join("\n\n");
   return { text: text.slice(0, 50_000), limited: text.length > 50_000 || keys.length > 100 };
 }

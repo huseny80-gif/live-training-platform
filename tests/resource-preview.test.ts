@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import { officePreview } from "../src/lib/resources/preview";
 const doc = Buffer.from(zipSync({ "word/document.xml": strToU8('<w:document><w:p><w:r><w:t>نص المصدر &amp; معلومات</w:t></w:r></w:p><w:p><w:r><w:t>&lt;script&gt; &quot;اقتباس&quot;</w:t></w:r></w:p></w:document>') }));
 assert.equal(officePreview(doc, "docx").text, 'نص المصدر & معلومات\n<script> "اقتباس"');
+const runs = Buffer.from(zipSync({ "word/document.xml": strToU8('<w:p><w:r><w:t>المعلو</w:t></w:r><w:r><w:t>مات</w:t></w:r><w:tab/><w:r><w:t>الجغرافية</w:t></w:r></w:p>') }));
+assert.equal(officePreview(runs, "docx").text, "المعلومات\tالجغرافية");
 const slides = Buffer.from(zipSync({ "ppt/slides/slide2.xml": strToU8('<a:t>الشريحة الثانية</a:t>'), "ppt/slides/slide1.xml": strToU8('<a:t>الشريحة الأولى</a:t>'), "ppt/notesSlides/notesSlide1.xml": strToU8('<a:t>ملاحظة لا تظهر في معاينة الشرائح</a:t>') }));
 assert.equal(officePreview(slides, "pptx").text, "الشريحة الأولى\n\nالشريحة الثانية");
 const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([["متدرب", "نتيجة"], ["اسم الاختبار", 50]]), "النتائج");
