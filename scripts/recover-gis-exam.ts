@@ -1,6 +1,8 @@
 import { writeFile } from "node:fs/promises";
-import { prisma } from "../src/lib/prisma";
-import { runMaterialJob } from "../src/lib/exam-material/service";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 10000, statement_timeout: 15000, query_timeout: 15000, max: 2 }) });
 import { selectFromSource } from "../src/lib/exam-material/source-selection";
 import { buildGroundedCatalog } from "../src/lib/exam-material/catalog";
 import { sha, type SourcePage, type Material } from "../src/lib/exam-material/grounding";
@@ -68,7 +70,10 @@ async function recover() {
           content: JSON.parse(JSON.stringify(extracted.content)), instructorGuide: JSON.parse(JSON.stringify(extracted.instructorGuide)),
           status: "READY", completedAt: new Date(),
         } });
-      } catch { await runMaterialJob(batch.id, count); }
+      } catch {
+        await prisma.examMaterialBatch.updateMany({ where: { id: batch.id, status: "GENERATING" },
+          data: { status: "FAILED", errorCode: "INSUFFICIENT_SOURCE", completedAt: new Date() } });
+      }
       const outcome = await prisma.examMaterialBatch.findUniqueOrThrow({ where: { id: batch.id } });
       if (outcome.status === "READY" && outcome.content) {
         result.status = "READY"; result.questionCount = (outcome.content as unknown as Material).questions.length;
@@ -81,7 +86,11 @@ async function recover() {
     }
   }
 }
-recover().catch(() => { result.status = "RECOVERY_UNAVAILABLE"; }).finally(async () => {
+recover().catch(error => {
+  result.status = "RECOVERY_UNAVAILABLE";
+  const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  result.errorCode = /^(P\d{4}|ECONNRESET|ECONNREFUSED|ETIMEDOUT|57014)$/.test(code) ? code : "RECOVERY_ERROR";
+}).finally(async () => {
   await writeFile("public/exam-material-recovery.json", JSON.stringify(result));
   console.log("[exam-material-recovery]", JSON.stringify(result));
   await prisma.$disconnect();

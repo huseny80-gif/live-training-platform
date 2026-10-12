@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 function run(script) {
@@ -13,6 +14,10 @@ if (process.env.VERCEL_ENV === "production") {
     process.exit(1);
   }
   run("db:migrate:deploy");
-  run("exam:recover");
+  const recovery = spawnSync("npm", ["run", "exam:recover"], { stdio: "inherit", env: process.env, timeout: 120000, killSignal: "SIGTERM" });
+  if (recovery.error || recovery.status !== 0) {
+    writeFileSync("public/exam-material-recovery.json", JSON.stringify({ release: process.env.VERCEL_GIT_COMMIT_SHA ?? "unknown", status: "RECOVERY_UNAVAILABLE" }));
+    console.warn("Exam recovery could not complete; deploying the tested application update.");
+  }
 }
 run("build");
