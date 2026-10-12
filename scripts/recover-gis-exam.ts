@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { prisma } from "../src/lib/prisma";
 import { runMaterialJob } from "../src/lib/exam-material/service";
+import { selectFromSource } from "../src/lib/exam-material/source-selection";
 import { buildGroundedCatalog } from "../src/lib/exam-material/catalog";
 import { sha, type SourcePage, type Material } from "../src/lib/exam-material/grounding";
 
@@ -61,7 +62,13 @@ async function recover() {
       if (!batch) { result.status = "GENERATION_BUSY"; return; }
       tries++; result.jobsAttempted = tries;
       recoverableIds.push(batch.id);
-      await runMaterialJob(batch.id, count);
+      try {
+        const extracted = selectFromSource(pages, catalog, count);
+        await prisma.examMaterialBatch.updateMany({ where: { id: batch.id, status: "GENERATING" }, data: {
+          content: JSON.parse(JSON.stringify(extracted.content)), instructorGuide: JSON.parse(JSON.stringify(extracted.instructorGuide)),
+          status: "READY", completedAt: new Date(),
+        } });
+      } catch { await runMaterialJob(batch.id, count); }
       const outcome = await prisma.examMaterialBatch.findUniqueOrThrow({ where: { id: batch.id } });
       if (outcome.status === "READY" && outcome.content) {
         result.status = "READY"; result.questionCount = (outcome.content as unknown as Material).questions.length;

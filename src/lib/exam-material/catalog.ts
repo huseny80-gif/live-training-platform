@@ -25,18 +25,20 @@ export function buildGroundedCatalog(pages: SourcePage[]) {
   const phrasesBySpan = new Map(spans.map(span => [span.id, phrases(span.text)]));
   const candidates = spans.flatMap(span => (phrasesBySpan.get(span.id) ?? []).slice(0, 5).map(p => ({ spanId: span.id, text: p.text })));
   const pool = [...new Map(candidates.map(p => [p.text.toLowerCase(), p])).values()];
+  const answerUsage = new Map<string, number>();
   const questions: { id: string; sourceId: string; documentId: string; span: Span; answer: string; secondary: string; distractors: { spanId: string; text: string }[] }[] = [];
   for (const source of sources) {
     const choices = phrasesBySpan.get(source.span.id) ?? [];
-    const unique = choices.filter(p => source.span.text.indexOf(p.text) === source.span.text.lastIndexOf(p.text));
+    const unique = choices.filter(p => source.span.text.indexOf(p.text) === source.span.text.lastIndexOf(p.text)).sort((a, b) => (answerUsage.get(a.text.toLowerCase()) ?? 0) - (answerUsage.get(b.text.toLowerCase()) ?? 0));
     for (const phrase of unique.slice(0, 8)) {
-      const distractors = pool.filter(p => p.spanId !== source.span.id && !source.span.text.includes(p.text));
+      const distractors = pool.filter(p => p.spanId !== source.span.id && !source.span.text.toLocaleLowerCase().includes(p.text.toLocaleLowerCase()) && p.text.toLocaleLowerCase() !== phrase.text.toLocaleLowerCase());
       // Matching phrase lengths reduces answer cues; do not pad with invented options.
       distractors.sort((a, b) => Math.abs(a.text.length - phrase.text.length) - Math.abs(b.text.length - phrase.text.length));
       const selected = distractors.slice(0, 3);
       const secondary = choices.find(p => p.text !== phrase.text && !p.text.includes(phrase.text) && !phrase.text.includes(p.text));
       if (selected.length !== 3 || !secondary) continue;
       questions.push({ id: `Q${questions.length + 1}`, sourceId: source.id, documentId: source.documentId, span: source.span, answer: phrase.text, secondary: secondary.text, distractors: selected });
+      answerUsage.set(phrase.text.toLowerCase(), (answerUsage.get(phrase.text.toLowerCase()) ?? 0) + 1);
       break;
     }
   }
