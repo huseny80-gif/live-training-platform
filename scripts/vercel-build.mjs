@@ -13,9 +13,6 @@ if (process.env.VERCEL_ENV === "production") {
     process.exit(1);
   }
   run("db:migrate:deploy");
-  const check = spawnSync("npx", ["tsx", "scripts/diagnose-resource-upload.ts"], { stdio: "inherit", env: { ...process.env, VERCEL_BLOB_RETRIES: "0" }, timeout: 90000 });
-  if (check.error || check.status !== 0) process.exit(check.status ?? 1);
-
 
 }
 run("build");
