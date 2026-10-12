@@ -4,3 +4,12 @@
 body:has(.em-page) .platform-bar{background:rgba(9,17,31,.92);color:#ecf2ff;border-bottom-color:rgba(169,194,231,.22);backdrop-filter:blur(18px)}body:has(.em-page) .platform-bar nav a,body:has(.em-page) .platform-identity strong{color:#ecf2ff}body:has(.em-page) .platform-identity small{color:#a8b8d2}
 
 .em-source-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.em-transcript{font-family:inherit;resize:vertical;white-space:pre-wrap}.em-page input[type=file]{display:block;margin-top:8px;max-width:100%}@media(max-width:700px){.em-source-grid{grid-template-columns:1fr}}
+
+/* Full-width source groups with a grid of selectable cards in each group. */
+.em-page .em-source-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+.em-source-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:12px}
+.em-source-cards>.em-lecture{min-width:0;align-items:flex-start;height:100%}
+.em-source-cards>.em-lecture input{margin-top:6px}
+.em-source-cards>.em-lecture:has(input:checked){border-color:var(--em-accent);background:rgba(130,232,206,.1)}
+@media(min-width:600px){.em-source-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1000px){.em-source-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}

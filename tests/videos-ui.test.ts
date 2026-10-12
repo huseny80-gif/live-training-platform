@@ -6,7 +6,7 @@ import { chromium } from "@playwright/test";
 async function run() {
   const transcript = "1\n00:04:20,000 --> 00:04:40,000\nنص المقطع الأصلي.";
   const video = { id: "video", title: "فيديو المراجعة", mediaUrl: "https://youtu.be/abcdefghijk", archived: false, cues: 1, duration: "04:40", transcript };
-  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import VideoControls from'./src/app/exam-material/VideoControls';import{GenerationControls}from'./src/app/exam-material/AdminControls';const video=${JSON.stringify(video)};createRoot(document.getElementById('app')).render(<main className="em-page"><div className="em-container em-stack"><GenerationControls programId="program" generating={false} lectures={[]} videos={[video]}/><VideoControls programId="program" libraryVideos={[{id:"10000000-0000-4000-8000-000000000003",title:"GIS Library"}]} videos={[{...video,archived:location.pathname==='/trash'}]}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "router", setup(builder) { builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); builder.onLoad({ filter: /.*/, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){window.__refreshed=(window.__refreshed||0)+1},push(url){window.__nav=url}}}`, loader: "js" })); } }] });
+  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import VideoControls from'./src/app/exam-material/VideoControls';import{GenerationControls}from'./src/app/exam-material/AdminControls';const video=${JSON.stringify(video)};createRoot(document.getElementById('app')).render(<main className="em-page"><div className="em-container em-stack"><GenerationControls programId="program" generating={false} lectures={Array.from({length:6},(_,i)=>({id:"lecture"+i,fileName:"GIS-Part"+i+".pdf",pages:24,eligible:i!==5}))} videos={[video]}/><VideoControls programId="program" libraryVideos={[{id:"10000000-0000-4000-8000-000000000003",title:"GIS Library"}]} videos={[{...video,archived:location.pathname==='/trash'}]}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "router", setup(builder) { builder.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); builder.onLoad({ filter: /.*/, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){window.__refreshed=(window.__refreshed||0)+1},push(url){window.__nav=url}}}`, loader: "js" })); } }] });
   const calls: Record<string, unknown>[] = [], css = await fs.readFile("src/app/exam-material/exam-material.css", "utf8");
   const server = http.createServer(async (req, res) => {
     if (req.url === "/bundle.js") { res.setHeader("Content-Type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
@@ -19,6 +19,13 @@ async function run() {
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); const errors: string[] = [];
     page.on("pageerror", e => errors.push(e.message)); await page.goto(`http://127.0.0.1:${addr.port}`);
+    for (const [width, columns] of [[390, 1], [882, 2], [1280, 3]]) {
+      await page.setViewportSize({width,height:900});
+      const grid = page.locator(".em-source-cards").first();
+      const measured = await grid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length);
+      assert.equal(measured, columns); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    }
+    await page.setViewportSize({width:390,height:844});
     await page.getByRole("checkbox", { name: /فيديو المراجعة/ }).check();
     await page.getByRole("spinbutton").fill("25"); await page.getByRole("button", { name: "توليد المحتوى الامتحاني" }).click();
     await page.waitForFunction(() => Boolean((window as unknown as { __nav: string }).__nav));

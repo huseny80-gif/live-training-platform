@@ -30,12 +30,12 @@ export function GenerationControls({ programId, lectures, videos = [], generatin
     <div className="em-source-grid">
     <fieldset disabled={busy || generating} className="em-lectures"><legend>المحاضرات</legend>
       {lectures.length === 0 && <p>ارفع المحاضرات إلى البرنامج واستخرج نصها أولاً.</p>}
-      {lectures.map(l => <label key={l.id} className={`em-lecture ${!l.eligible ? "em-disabled" : ""}`}>
+      <div className="em-source-cards">{lectures.map(l => <label key={l.id} className={`em-lecture ${!l.eligible ? "em-disabled" : ""}`}>
         <input type="checkbox" checked={selected.includes(l.id)} disabled={!l.eligible} onChange={e => setSelected(old => e.target.checked ? [...old, l.id] : old.filter(id => id !== l.id))}/>
         <span><strong>{l.fileName}</strong><small>{l.pages} صفحة · {l.eligible ? "جاهزة للتوليد الحرفي" : "تحتاج إلى استخراج نص أصلي مكتمل"}</small></span>
-      </label>)}
+      </label>)}</div>
     </fieldset>
-    <fieldset disabled={busy || generating} className="em-lectures"><legend>مقاطع الفيديو التدريبية</legend>{!videos.length && <p className="em-muted">أضف تفريغ فيديو معتمدًا من قسم إدارة الفيديوهات أدناه.</p>}{videos.map(v => <label className="em-lecture" key={v.id}><input type="checkbox" checked={selectedVideos.includes(v.id)} onChange={e => setSelectedVideos(old => e.target.checked ? [...old, v.id] : old.filter(id => id !== v.id))}/><span><strong>{v.title}</strong><small>{v.cues} مقطعًا · {v.duration} · تفريغ معتمد</small></span></label>)}</fieldset>
+    <fieldset disabled={busy || generating} className="em-lectures"><legend>مقاطع الفيديو التدريبية</legend>{!videos.length && <p className="em-muted">أضف تفريغ فيديو معتمدًا من قسم إدارة الفيديوهات أدناه.</p>}<div className="em-source-cards">{videos.map(v => <label className="em-lecture" key={v.id}><input type="checkbox" checked={selectedVideos.includes(v.id)} onChange={e => setSelectedVideos(old => e.target.checked ? [...old, v.id] : old.filter(id => id !== v.id))}/><span><strong>{v.title}</strong><small>{v.cues} مقطعًا · {v.duration} · تفريغ معتمد</small></span></label>)}</div></fieldset>
     </div>
     <label className="em-count">عدد الأسئلة <input type="number" min={Math.max(1, total)} max={50} step={1} value={countText} inputMode="numeric" aria-label="عدد الأسئلة" disabled={busy || generating} onChange={e => setCountText(e.target.value)}/></label>
     <p className="em-muted">يمكنك اختيار ١–٥٠ سؤالًا ومن مصدر واحد إلى ١٠ مصادر. العدد الأدنى يساوي عدد المصادر المختارة، والتوليد يتطلب نصًا مناسبًا كافيًا.</p>
