@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { unzipSync, strFromU8 } from "fflate";
+import { writeFileSync } from "node:fs";
+import { buildFinalExamWord } from "../src/lib/word/final-exam";
+const q = { questionText: 'ما المقصود بـ GIS؟ <نص> & "مصدر"\nالسطر الثاني', questionType: "MULTIPLE_CHOICE", status: "DRAFT", explanation: "تفسير من المحاضرة", correctOptionId: "yes", options: [{ id: "no", optionText: "خيار غير صحيح" }, { id: "yes", optionText: "نظم المعلومات الجغرافية" }] };
+const bytes = buildFinalExamWord("اختبار GIS", [q, { ...q, questionType: "TRUE_FALSE", status: "APPROVED", explanation: null, correctOptionId: "true", options: [{ id: "true", optionText: "صح" }, { id: "false", optionText: "خطأ" }] }]);
+const entries = unzipSync(bytes); const xml = strFromU8(entries['word/document.xml']);
+assert.ok(entries['[Content_Types].xml'] && entries['_rels/.rels']);
+assert.ok(xml.includes('الإجابة الصحيحة: نظم المعلومات الجغرافية'));
+assert.ok(xml.includes('الإجابة الصحيحة: صح'));
+assert.ok(xml.includes('مسودة') && xml.includes('معتمد'));
+assert.ok(xml.includes('&lt;نص&gt; &amp; &quot;مصدر&quot;'));
+assert.ok(xml.includes('<w:bidi/>') && xml.includes('<w:br/>'));
+assert.throws(() => buildFinalExamWord('test', []), /NO_QUESTIONS/);
+assert.throws(() => buildFinalExamWord('test', [{ ...q, correctOptionId: 'missing' }]), /INVALID_ANSWER/);
+writeFileSync('/tmp/final-word-check.docx', bytes);
+console.log('PASS: DOCX Arabic, options, correct answers, saved explanations, draft status, XML escaping, missing-answer rejection.');

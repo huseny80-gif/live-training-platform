@@ -5,6 +5,7 @@ import { getProgram, deleteProgram } from "@/app/actions/programs";
 import Link from "next/link";
 import DocumentProcessing from "./DocumentProcessing";
 import DocumentUpload from "./DocumentUpload";
+import "./documents.css";
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: "tp-bg-yellow-100 tp-text-yellow-800",
@@ -108,9 +109,10 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
         {program.documents && program.documents.length > 0 && (
           <div className="tp-bg-white tp-rounded-xl tp-border tp-p-4 tp-space-y-2">
             <h2 className="tp-text-base tp-font-semibold">المستندات التدريبية</h2>
+            <div className="training-document-grid">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {program.documents.map((doc: any) => (
-              <div key={doc.id} data-document-id={doc.id} className="tp-text-sm tp-border tp-rounded-lg tp-px-3 tp-py-2 tp-space-y-2">
+              <div key={doc.id} data-document-id={doc.id} className="training-document-card brand-card tp-text-sm tp-p-4 tp-space-y-2">
                 <div>
                   <Link href={`/programs/${id}/lectures?documentId=${doc.id}`} className="tp-font-medium" style={{ overflowWrap: "anywhere" }}>{doc.fileName} — عرض وإدارة المحاضرة</Link>
                   {doc.pageCount != null && (
@@ -120,6 +122,7 @@ export default async function ProgramPage({ params }: { params: Promise<{ id: st
                 <DocumentProcessing documentId={doc.id} programId={id} status={doc.extractionStatus} notes={doc.extractionNotes} hasContent={totalQuestions > 0 || program._count.sessions > 0} />
               </div>
             ))}
+            </div>
           </div>
         )}
 
