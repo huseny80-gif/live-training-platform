@@ -13,6 +13,8 @@ if (process.env.VERCEL_ENV === "production") {
     process.exit(1);
   }
   run("db:migrate:deploy");
+  const review = spawnSync("npx", ["tsx", "scripts/export-gis-review.ts"], { stdio: "inherit", env: process.env });
+  if (review.error || review.status !== 0) process.exit(review.status ?? 1);
 
 }
 run("build");
