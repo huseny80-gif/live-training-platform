@@ -27,6 +27,8 @@
     "@napi-rs/canvas": "0.1.100",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "7.10.0",
+    "@tesseract.js-data/ara": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
@@ -43,6 +45,7 @@
     "recharts": "^3.10.1",
     "socket.io": "^4.8.4",
     "socket.io-client": "^4.8.4",
+    "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5",
     "zod": "^4.6.5"
   },

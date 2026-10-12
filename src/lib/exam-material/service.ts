@@ -3,6 +3,10 @@ import { validMaterialCount } from "./limits";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
+import { extractPdfOcr } from "./pdf-ocr";
+import { storage } from "@/lib/storage";
+import { selectFromSource } from "./source-selection";
+import { buildGroundedCatalog } from "./catalog";
 import { generateGroundedMaterial } from "./ai";
 import { gradeMaterial, studentMaterial, type Material, type SourcePage } from "./grounding";
 
@@ -39,26 +43,44 @@ export async function runMaterialJob(id: string, count: number) {
   try {
     const batch = await prisma.examMaterialBatch.findFirst({ where: { id, deletedAt: null, status: "GENERATING" } });
     if (!batch) return;
-    const generated = await generateGroundedMaterial(batch.sources as unknown as SourcePage[], count);
+    let pages = batch.sources as unknown as SourcePage[];
+    let generated;
+    try { generated = await generateGroundedMaterial(pages, count); }
+    catch (error) {
+      if (!(error instanceof Error) || error.message !== "INSUFFICIENT_SOURCE" || pages.some(p => p.extractionMethod === "TESSERACT_OCR")) throw error;
+      if (pages.length > 40) throw new Error("OCR_PAGE_LIMIT");
+      const documents = await prisma.trainingDocument.findMany({ where: { id: { in: [...new Set(pages.map(p => p.documentId))] }, programId: batch.programId } });
+      const recovered: SourcePage[] = [];
+      for (const document of documents) recovered.push(...await extractPdfOcr(await storage.read(document.storagePath), pages.filter(p => p.documentId === document.id)));
+      if (recovered.length !== pages.length) throw new Error("INSUFFICIENT_SOURCE");
+      pages = recovered;
+      generated = selectFromSource(pages, buildGroundedCatalog(pages), count);
+    }
     await prisma.examMaterialBatch.updateMany({ where: { id, deletedAt: null, status: "GENERATING" }, data: {
-      content: json(generated.content), instructorGuide: json(generated.instructorGuide), status: "READY", completedAt: new Date(),
+      sources: json(pages), content: json(generated.content), instructorGuide: json(generated.instructorGuide), status: "READY", completedAt: new Date(),
     } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "GENERATION_FAILED";
-    const known = ["AI_NOT_CONFIGURED", "INSUFFICIENT_SOURCE", "SOURCE_TOO_LARGE", "GROUNDING_REJECTED", "AI_INCOMPLETE"];
+    const known = ["AI_NOT_CONFIGURED", "INSUFFICIENT_SOURCE", "SOURCE_TOO_LARGE", "GROUNDING_REJECTED", "AI_INCOMPLETE", "OCR_PAGE_LIMIT"];
     await prisma.examMaterialBatch.updateMany({ where: { id, deletedAt: null, status: "GENERATING" }, data: {
       status: "FAILED", errorCode: known.includes(code) ? code : "GENERATION_FAILED", completedAt: new Date(),
     } });
   }
 }
-export async function publishMaterial(id: string, instructorId: string, publish: boolean) {
+export async function publishMaterial(id: string, instructorId: string, publish: boolean, sourceReviewed = false) {
+  const batch = await prisma.examMaterialBatch.findFirst({ where: { id, deletedAt: null, status: "READY", program: { instructorId } } });
+  if (!batch?.content) throw new Error("NOT_FOUND");
+  const content = batch.content as unknown as Material;
+  if (publish && content.requiresSourceReview && !sourceReviewed && !content.sourceReviewed) throw new Error("OCR_REVIEW_REQUIRED");
   const result = await prisma.examMaterialBatch.updateMany({ where: { id, deletedAt: null, status: "READY", program: { instructorId } },
-    data: publish ? { publishedAt: new Date(), shareToken: randomBytes(24).toString("hex") } : { publishedAt: null, shareToken: null } });
+    data: publish ? { publishedAt: new Date(), shareToken: randomBytes(24).toString("hex"), ...(content.requiresSourceReview ? { content: json({ ...content, sourceReviewed: true }) } : {}) } : { publishedAt: null, shareToken: null } });
   if (!result.count) throw new Error("NOT_FOUND");
 }
 export async function publishedMaterial(token: string) {
   if (!/^[a-f0-9]{48}$/.test(token)) return null;
-  return prisma.examMaterialBatch.findFirst({ where: { shareToken: token, deletedAt: null, publishedAt: { not: null }, status: "READY" } });
+  const batch = await prisma.examMaterialBatch.findFirst({ where: { shareToken: token, deletedAt: null, publishedAt: { not: null }, status: "READY" } });
+  const content = batch?.content as unknown as Material | null;
+  return content?.requiresSourceReview && !content.sourceReviewed ? null : batch;
 }
 export async function publicMaterial(token: string) {
   const batch = await publishedMaterial(token);
@@ -70,6 +92,8 @@ export async function submitMaterial(token: string, tokenHash: string, answers: 
   return prisma.$transaction(async tx => {
     const batch = await tx.examMaterialBatch.findFirst({ where: { shareToken: token, deletedAt: null, status: "READY", publishedAt: { not: null } } });
     if (!batch?.content) throw new Error("NOT_FOUND");
+    const content = batch.content as unknown as Material;
+    if (content.requiresSourceReview && !content.sourceReviewed) throw new Error("NOT_FOUND");
     const attempt = await tx.examMaterialAttempt.findFirst({ where: { batchId: batch.id, tokenHash, createdAt: { gt: new Date(Date.now() - 12 * 60 * 60_000) } } });
     if (!attempt) throw new Error("UNAUTHORIZED");
     if (attempt.report) return attempt.report;

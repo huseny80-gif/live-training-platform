@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
-export type SourcePage = { id: string; documentId: string; fileName: string; pageNumber: number; text: string };
+export type SourcePage = { id: string; documentId: string; fileName: string; pageNumber: number; text: string; extractionMethod?: string; documentHash?: string };
 export type Span = { id: string; pageId: string; text: string; start: number; end: number; lineStart: number; lineEnd: number };
-export type Citation = Span & { fileName: string; pageNumber: number; documentId: string; pageHash: string };
+export type Citation = Span & { fileName: string; pageNumber: number; documentId: string; pageHash: string; extractionMethod?: string; documentHash?: string };
 const string = z.string().min(2).max(180);
 const planSchema = z.object({
   summary: z.array(z.string()).min(3).max(18),
@@ -13,7 +13,7 @@ const planSchema = z.object({
   debrief: z.array(z.object({ spanId: z.string(), focus: string, kind: z.enum(["EXPLAIN", "COMPARE", "APPLY"]) }).strict()).min(2).max(8),
 }).strict();
 export type SelectionPlan = z.infer<typeof planSchema>;
-export const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+export const sha = (text: string | Uint8Array) => createHash("sha256").update(text).digest("hex");
 
 /** Offsets index the untouched extracted page text; lines are extracted-text lines, not PDF visual rows. */
 export function sourceSpans(pages: SourcePage[]): Span[] {
@@ -77,7 +77,7 @@ export function compileGroundedMaterial(raw: unknown, pages: SourcePage[], count
     if (!span) throw new Error("GROUNDING_UNKNOWN_SOURCE");
     const page = source.get(span.pageId)!;
     if (page.text.slice(span.start, span.end) !== span.text) throw new Error("GROUNDING_CHANGED_SOURCE");
-    return { ...span, fileName: page.fileName, documentId: page.documentId, pageNumber: page.pageNumber, pageHash: sha(page.text) };
+    return { ...span, fileName: page.fileName, documentId: page.documentId, pageNumber: page.pageNumber, pageHash: sha(page.text), ...(page.extractionMethod ? { extractionMethod: page.extractionMethod } : {}), ...(page.documentHash ? { documentHash: page.documentHash } : {}) };
   }
   function literal(id: string, value: string) {
     const citation = cite(id);
@@ -114,7 +114,7 @@ export function compileGroundedMaterial(raw: unknown, pages: SourcePage[], count
     if (!summary.some(c => c.documentId === documentId) || !questions.some(q => q.citation.documentId === documentId)) throw new Error("GROUNDING_MISSING_LECTURE");
   }
   const instructorGuide = plan.debrief.map(d => ({ focus: d.focus, kind: d.kind, citation: literal(d.spanId, d.focus) }));
-  return { content: { version: 1, selectionMethod, summary, concepts, links, questions }, instructorGuide };
+  return { content: { version: 1, selectionMethod, requiresSourceReview: pages.some(p => p.extractionMethod === "TESSERACT_OCR"), sourceReviewed: false, summary, concepts, links, questions }, instructorGuide };
 }
 export type Material = ReturnType<typeof compileGroundedMaterial>["content"];
 export type Guide = ReturnType<typeof compileGroundedMaterial>["instructorGuide"];

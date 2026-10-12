@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Citation, StudentMaterial } from "@/lib/exam-material/grounding";
 
 export function CitationView({ citation, token }: { citation: Citation; token?: string | null }) {
-  const label = `${citation.fileName} · صفحة ${citation.pageNumber} · أسطر النص ${citation.lineStart}–${citation.lineEnd}`;
+  const label = `${citation.extractionMethod === "TESSERACT_OCR" ? "نص OCR · " : ""}${citation.fileName} · صفحة ${citation.pageNumber} · أسطر النص ${citation.lineStart}–${citation.lineEnd}`;
   return <details className="em-citation"><summary>{label}</summary>
     <blockquote>{citation.text}</blockquote>
     {token && <Link href={`/study/${token}/source/${citation.pageId}?citation=${encodeURIComponent(citation.id)}#L${citation.lineStart}`}>مراجعة الفقرة في المحاضرة ←</Link>}

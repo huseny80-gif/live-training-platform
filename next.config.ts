@@ -7,9 +7,12 @@ const pdfRuntimeFiles = [
   "./node_modules/@napi-rs/canvas-*/**/*",
 ];
 
+const ocrRuntimeFiles = [...pdfRuntimeFiles, "./node_modules/tesseract.js/**/*", "./node_modules/tesseract.js-core/**/*",
+  "./node_modules/@tesseract.js-data/eng/4.0.0_best_int/**/*", "./node_modules/@tesseract.js-data/ara/4.0.0_best_int/**/*"];
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas"],
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas", "tesseract.js", "tesseract.js-core", "@tesseract.js-data/eng", "@tesseract.js-data/ara"],
   outputFileTracingIncludes: {
+    "/api/exam-material": ocrRuntimeFiles,
     "/api/documents/process": pdfRuntimeFiles,
     "/programs/*": pdfRuntimeFiles,
   },

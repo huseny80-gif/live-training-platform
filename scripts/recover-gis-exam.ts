@@ -1,6 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { extractPdfOcr } from "../src/lib/exam-material/pdf-ocr";
+import { storage } from "../src/lib/storage";
 import { selectFromSource } from "../src/lib/exam-material/source-selection";
 import { buildGroundedCatalog } from "../src/lib/exam-material/catalog";
 import { sha, type SourcePage, type Material } from "../src/lib/exam-material/grounding";
@@ -23,19 +25,37 @@ async function recover() {
   if (!document.pages.length || document.pages.some(p => p.extractionMethod !== "NATIVE_TEXT" || p.extractionStatus !== "COMPLETED")) {
     result.status = "NATIVE_TEXT_REQUIRED"; return;
   }
-  const pages: SourcePage[] = document.pages.filter(p => p.extractedText?.trim()).map(p => ({ id: p.id, documentId: document.id,
+  let pages: SourcePage[] = document.pages.filter(p => p.extractedText?.trim()).map(p => ({ id: p.id, documentId: document.id,
     fileName: document.fileName, pageNumber: p.pageNumber, text: p.extractedText! }));
   const candidates = await prisma.examMaterialBatch.findMany({ where: { programId: document.programId, deletedAt: null }, orderBy: { createdAt: "desc" }, take: 50 });
   const related = candidates.filter(b => (b.sources as unknown as SourcePage[]).every(p => p.documentId === document.id));
   const requested = related.find(b => b.status === "FAILED" && b.errorCode !== "RECOVERED")?.questionCount ?? 10;
   result.requestedCount = requested; result.extractedPages = pages.length;
-  const sourceHash = fingerprint(pages);
+  let sourceHash = fingerprint(pages);
   const existing = related.find(b => b.status === "READY" && b.questionCount === requested && fingerprint(b.sources as unknown as SourcePage[]) === sourceHash);
   if (existing?.content) {
     result.status = "READY"; result.questionCount = (existing.content as unknown as Material).questions.length;
     result.selectionMethod = (existing.content as unknown as Material).selectionMethod ?? "AI_CURATED"; return;
   }
-  const catalog = buildGroundedCatalog(pages);
+  let catalog = buildGroundedCatalog(pages);
+  if (catalog.questions.length < requested) {
+    result.ocrAttempted = true; result.stage = "READ_ORIGINAL_PDF";
+    result.storageBackend = process.env.BLOB_READ_WRITE_TOKEN ? "BLOB" : "LOCAL";
+    const bytes = await storage.read(document.storagePath);
+    const previousOcr = related.find(b => b.status === "READY" && b.questionCount === requested &&
+      (b.sources as unknown as SourcePage[]).some(p => p.extractionMethod === "TESSERACT_OCR") &&
+      (b.sources as unknown as SourcePage[]).every(p => p.documentHash === sha(bytes)));
+    if (previousOcr?.content) {
+      result.status = "READY"; result.questionCount = (previousOcr.content as unknown as Material).questions.length;
+      result.selectionMethod = (previousOcr.content as unknown as Material).selectionMethod;
+      result.requiresSourceReview = (previousOcr.content as unknown as Material).requiresSourceReview; return;
+    }
+    result.stage = "OCR";
+    const ocr = await extractPdfOcr(bytes, pages);
+    result.stage = "VALIDATE_SOURCE";
+    if (ocr.length > 0) { pages = ocr; catalog = buildGroundedCatalog(pages); sourceHash = fingerprint(pages); }
+    result.ocrPages = ocr.filter(p => p.extractionMethod === "TESSERACT_OCR").length;
+  }
   result.availableCandidates = catalog.questions.length;
   const available = Math.min(new Set(catalog.questions.map(q => q.answer.toLowerCase())).size, new Set(catalog.questions.map(q => q.span.id)).size);
   const counts = [requested];
@@ -54,7 +74,7 @@ async function recover() {
       } });
     }, { isolationLevel: "Serializable" });
     if (!batch) { result.status = "GENERATION_BUSY"; return; }
-    result.status = "READY"; result.questionCount = extracted.content.questions.length; result.selectionMethod = extracted.content.selectionMethod;
+    result.stage = "COMPLETE"; result.status = "READY"; result.questionCount = extracted.content.questions.length; result.selectionMethod = extracted.content.selectionMethod; result.requiresSourceReview = extracted.content.requiresSourceReview;
     const failedIds = related.filter(b => b.status === "FAILED").map(b => b.id);
     if (failedIds.length) await prisma.examMaterialBatch.updateMany({ where: { id: { in: failedIds }, programId: document.programId, status: "FAILED", deletedAt: null }, data: { errorCode: "RECOVERED" } });
     return;

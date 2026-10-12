@@ -7,13 +7,13 @@ import { materialError } from "@/lib/exam-material/messages";
 import { sameOrigin, smallJson } from "@/lib/exam-material/http";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 300;
 const input = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("generate"), programId: z.string().uuid(), documentIds: z.array(z.string().uuid()).min(1).max(10), count: z.number().int().min(1).max(50) }).strict(),
   z.object({ mode: z.literal("regenerate"), id: z.string().uuid(), count: z.number().int().min(1).max(50) }).strict(),
   z.object({ mode: z.literal("purge"), id: z.string().uuid(), confirmed: z.literal(true) }).strict(),
   z.object({ mode: z.literal("archive"), id: z.string().uuid(), action: z.enum(["delete", "restore", "rename"]), title: z.string().max(120).optional() }).strict(),
-  z.object({ mode: z.literal("publish"), id: z.string().uuid(), publish: z.boolean() }).strict(),
+  z.object({ mode: z.literal("publish"), id: z.string().uuid(), publish: z.boolean(), sourceReviewed: z.boolean().optional() }).strict(),
 ]);
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: "طلب غير مسموح." }, { status: 403 });
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   try {
     const data = input.parse(await smallJson(request));
     if (data.mode === "publish") {
-      await publishMaterial(data.id, user.user.id, data.publish);
+      await publishMaterial(data.id, user.user.id, data.publish, data.sourceReviewed);
       return NextResponse.json({ ok: true });
     }
     if (data.mode === "purge") {

@@ -37,18 +37,20 @@ export function GenerationControls({ programId, lectures, generating }: { progra
     {error && <p className="em-error" role="alert">{error}</p>}
   </section>;
 }
-export function PublishControls({ id, token }: { id: string; token: string | null }) {
+export function PublishControls({ id, token, requiresSourceReview = false, sourceReviewed = false }: { id: string; token: string | null; requiresSourceReview?: boolean; sourceReviewed?: boolean }) {
   const router = useRouter();
+  const [reviewed, setReviewed] = useState(sourceReviewed);
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [copied, setCopied] = useState(false);
   async function publish() {
     setBusy(true); setError("");
-    try { const response = await fetch("/api/exam-material", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "publish", id, publish: !token }) });
+    try { const response = await fetch("/api/exam-material", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "publish", id, publish: !token, sourceReviewed: reviewed }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error); router.refresh();
     } catch(e) { setError(e instanceof Error ? e.message : "تعذّر تغيير النشر."); } finally { setBusy(false); }
   }
   return <section className="em-glass em-pad em-stack"><h2>مراجعة المحتوى واعتماده</h2>
     <p>{token ? "المادة منشورة للمتدربين عبر الرابط. دليل المناقشة خاص بالمدير." : "راجع المقاطع والأسئلة قبل الاعتماد. لن يصبح المحتوى متاحًا للمتدربين إلا بعد نشره."}</p>
-    <div className="em-actions"><button disabled={busy} className="em-button" onClick={publish}>{busy ? "جاري الحفظ…" : token ? "إلغاء النشر وإيقاف الرابط" : "اعتماد المحتوى ونشره للمتدربين"}</button>
+    {requiresSourceReview && !token && <label><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)}/> راجعت النص والأسئلة المستخرجة من صور PDF مقابل المحاضرة الأصلية وأعتمد صحتها.</label>}
+    <div className="em-actions"><button disabled={busy || (!token && requiresSourceReview && !reviewed)} className="em-button" onClick={publish}>{busy ? "جاري الحفظ…" : token ? "إلغاء النشر وإيقاف الرابط" : "اعتماد المحتوى ونشره للمتدربين"}</button>
       {token && <><a className="em-button em-secondary" href={`/study/${token}`} target="_blank" rel="noreferrer">فتح نسخة المتدرب</a><button className="em-button em-secondary" onClick={async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/study/${token}`); setCopied(true); } catch { setError("انسخ الرابط من حقل الرابط أدناه."); } }}>{copied ? "تم نسخ الرابط" : "نسخ رابط المتدرب"}</button></>}
     </div>{token && <input className="em-share" aria-label="رابط المتدرب" readOnly value={`/study/${token}`} onFocus={e => e.target.select()} dir="ltr"/>}
     {error && <p role="alert" className="em-error">{error}</p>}

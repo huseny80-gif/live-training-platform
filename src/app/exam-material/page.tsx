@@ -45,9 +45,10 @@ export default async function ExamMaterialPage({ searchParams }: { searchParams:
     {batch?.status === "GENERATING" && <p className="em-glass em-pad" role="status">جارٍ اختيار المقاطع والتحقق الحرفي منها… يمكنك مغادرة الصفحة والعودة إلى الأرشيف.</p>}
     {batch?.status === "FAILED" && <p className="em-error em-glass em-pad" role="alert">{materialError[batch.errorCode ?? ""] ?? materialError.GENERATION_FAILED}</p>}
     {batch?.status === "READY" && content && <>
+      {content.requiresSourceReview && <section className="em-glass em-pad em-stack"><p>استُخرجت نصوص من صور صفحات PDF باستخدام OCR. راجع الاقتباسات والإجابات مقابل الملف الأصلي قبل تأكيد النشر.</p><div className="em-actions">{[...new Map((batch.sources as unknown as SourcePage[]).map(p => [p.documentId, p.fileName])).entries()].map(([id, name]) => <a key={id} className="em-button em-secondary" href={`/api/documents/${id}/file`} target="_blank" rel="noreferrer">عرض PDF الأصلي — {name}</a>)}</div></section>}
       {content.selectionMethod === "SOURCE_ONLY" && <p className="em-glass em-pad">تم استخراج محتوى حرفي من المحاضرات بعد تعذّر اختيار الذكاء الاصطناعي. راجع جودة الأسئلة وخريطة المفاهيم قبل الاعتماد. دليل المدرّب هنا مستخرج آليًا من النص وليس تحليلًا من نموذج ذكاء اصطناعي.</p>}
       <p className="em-muted">المحاضرات المحددة: {[...new Set((batch.sources as unknown as SourcePage[]).map(p => p.fileName))].join(" · ")}</p>
-      {!batch.deletedAt && <PublishControls id={batch.id} token={batch.shareToken}/>}
+      {!batch.deletedAt && <PublishControls key={batch.id} id={batch.id} token={batch.shareToken} requiresSourceReview={content.requiresSourceReview} sourceReviewed={content.sourceReviewed}/>}
       <nav className="em-tabs" aria-label="أقسام المادة">{tabs.map(([key, label]) => <Link aria-current={key === tab ? "page" : undefined} className={key === tab ? "active" : ""} key={key} href={url(batch.id, key)}>{label}</Link>)}</nav>
       {tab === "summary" && <SummaryView content={studentMaterial(content)} token={batch.shareToken}/>}
       {tab === "map" && <ConceptView content={studentMaterial(content)} token={batch.shareToken}/>}
