@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { type Category, type ResourceItem, formatSize, resourceMimeTypes } from "@/lib/resources/types";
+import { type Category, type ResourceItem, formatSize, resourceMimeTypes, maxResourceSize } from "@/lib/resources/types";
 
 async function mutate(body: unknown): Promise<Record<string, string>> {
   const response = await fetch("/api/resources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -13,20 +13,32 @@ export default function ResourceLibrary({ programId, programTitle, categories, i
   const [modal, setModal] = useState<"resource" | "category" | null>(null); const [title, setTitle] = useState(""); const [category, setCategory] = useState("exams"); const [file, setFile] = useState<File | null>(null);
   const [targetProgram, setTargetProgram] = useState(programId ?? programs[0]?.id ?? "");
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [progress, setProgress] = useState(0);
+  const [uploaded, setUploaded] = useState<{ id: string; url: string } | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null); const openerRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => { if (modal && !dialogRef.current?.open) dialogRef.current?.showModal(); }, [modal]);
-  function open(type: "resource" | "category", button: HTMLButtonElement) { openerRef.current = button; setTitle(""); setFile(null); setTargetProgram(categories.find(c => c.key === active)?.programId ?? programId ?? programs[0]?.id ?? ""); setCategory(active === "all" ? "exams" : active); setError(""); setModal(type); }
+  function open(type: "resource" | "category", button: HTMLButtonElement) { openerRef.current = button; setTitle(""); setFile(null); setUploaded(null); setTargetProgram(categories.find(c => c.key === active)?.programId ?? programId ?? programs[0]?.id ?? ""); setCategory(active === "all" ? "exams" : active); setError(""); setModal(type); }
   function close() { dialogRef.current?.close(); setModal(null); openerRef.current?.focus(); }
   async function save(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setError(""); setNotice(""); setProgress(0);
+    let stage = "حفظ المورد";
     try {
       if (modal === "category") await mutate({ mode: "category", programId: targetProgram, name: title });
+      else if (uploaded) { stage = "تثبيت الملف المرفوع في المكتبة"; await mutate({ mode: "complete", id: uploaded.id, url: uploaded.url }); }
       else {
         if (!file) throw new Error("اختر الملف الأصلي لإضافته إلى المكتبة.");
+        const extension = file.name.split(".").at(-1)?.toLowerCase() ?? "";
+        const limit = ["mp4", "webm"].includes(extension) ? maxResourceSize : 30 * 1024 * 1024;
+        if (!resourceMimeTypes[extension]) throw new Error("اختر PDF أو DOCX أو PPTX أو XLSX أو TXT أو MP4 أو WebM.");
+        if (!file.size) throw new Error("الملف فارغ.");
+        if (file.size > limit) throw new Error(`حجم الملف ${formatSize(file.size)} يتجاوز الحد: ${["mp4", "webm"].includes(extension) ? "٥ GB" : "٣٠ MB"}.`);
+        stage = "تسجيل المورد قبل الرفع";
         const reserved = await mutate({ mode: "reserve", input: { programId: targetProgram, categoryKey: category, title, fileName: file.name, sizeBytes: file.size } });
         if (reserved.mode === "blob") {
+          stage = "رفع الملف إلى التخزين";
           const { upload } = await import("@vercel/blob/client");
           const result = await upload(reserved.pathname, file, { access: "private", contentType: reserved.mimeType, handleUploadUrl: "/api/resources/upload-url", clientPayload: JSON.stringify({ id: reserved.id }), multipart: file.size > 5 * 1024 * 1024, onUploadProgress: event => setProgress(Math.round(event.percentage)) });
+          setUploaded({ id: reserved.id, url: result.url });
+          stage = "تثبيت الملف المرفوع في المكتبة";
           await mutate({ mode: "complete", id: reserved.id, url: result.url });
         } else {
           const form = new FormData(); form.set("id", reserved.id); form.set("file", file);
@@ -34,7 +46,7 @@ export default function ResourceLibrary({ programId, programTitle, categories, i
         }
       }
       setNotice(modal === "category" ? "تم حفظ القسم الجديد." : "تم رفع المورد وحفظه في المكتبة."); close(); router.refresh();
-    } catch(e) { setError(e instanceof Error ? e.message : "تعذّر الحفظ."); } finally { setBusy(false); }
+    } catch(e) { setError(`${stage}: ${e instanceof Error ? e.message : "تعذّر الحفظ."}`); } finally { setBusy(false); }
   }
   async function manage(item: ResourceItem, action: "delete" | "restore" | "rename") {
     let newTitle: string | null = null;
@@ -59,10 +71,10 @@ export default function ResourceLibrary({ programId, programTitle, categories, i
         {item.kind === "file" && (item.archived ? <button className="em-button em-secondary" disabled={busy} onClick={() => manage(item, "restore")}>استعادة</button> : <><button className="em-button em-secondary" disabled={busy} onClick={() => manage(item, "rename")}>تعديل العنوان</button><button className="em-button em-secondary" disabled={busy} onClick={() => manage(item, "delete")}>حذف</button></>)}
       </div></article>)}</div>{!filtered.length && <p className="rl-empty">لا توجد موارد مطابقة في هذا القسم.{trash ? " تظهر هنا الملفات التي حُذفت من المكتبة ويمكن استعادتها." : " أضف ملفًا أو جهّز المحتوى في البرنامج."}</p>}<p className="em-muted">المحاضرات والامتحانات والفيديوهات والنتائج مرتبطة بأقسامها الأصلية؛ يمكنك إدارة محتواها من زر الاستعراض.</p></section>
     </div>
-    {modal && <dialog ref={dialogRef} className="rl-dialog em-glass em-pad" aria-labelledby="resource-dialog-title" onCancel={e => { e.preventDefault(); if (!busy) close(); }}><h2 id="resource-dialog-title">{modal === "category" ? "إضافة قسم جديد" : "إضافة مورد جديد للمكتبة"}</h2><form onSubmit={save} className="em-stack"><label>العنوان<input autoFocus className="em-share" required minLength={3} maxLength={160} value={title} onChange={e => setTitle(e.target.value)} disabled={busy}/></label>
-      {!programId && <label>البرنامج المستهدف<select className="em-share" value={targetProgram} required disabled={busy} onChange={e => { setTargetProgram(e.target.value); setCategory("exams"); }}>{programs.map(p => <option value={p.id} key={p.id}>{p.title}</option>)}</select></label>}
-      {modal === "resource" && <><label>القسم المستهدف<select className="em-share" value={category} onChange={e => setCategory(e.target.value)} disabled={busy}>{categories.filter(c => !c.programId || c.programId === targetProgram).map(c => <option key={c.key} value={c.key}>{c.name}</option>)}</select></label><label>الملف الأصلي<input type="file" required accept={Object.keys(resourceMimeTypes).map(k => `.${k}`).join(",")} disabled={busy} onChange={e => setFile(e.target.files?.[0] ?? null)}/></label><p className="em-muted">PDF، Word، PowerPoint، Excel، TXT حتى ٣٠ MB؛ MP4 وWebM حتى ٥١٢ MB. إضافة ملف هنا لا تُدخل محتواه تلقائيًا في توليد الأسئلة.</p></>}
-      {busy && <p role="status">{progress ? `رفع الملف: ${progress}٪` : "جارٍ الحفظ…"}</p>}{error && <p role="alert" className="em-error">{error}</p>}<div className="em-actions"><button className="em-button" disabled={busy}>{busy ? "جارٍ الحفظ…" : "حفظ وإضافة"}</button><button type="button" className="em-button em-secondary" disabled={busy} onClick={close}>إلغاء</button></div>
+    {modal && <dialog ref={dialogRef} className="rl-dialog em-glass em-pad" aria-labelledby="resource-dialog-title" onCancel={e => { e.preventDefault(); if (!busy) close(); }}><h2 id="resource-dialog-title">{modal === "category" ? "إضافة قسم جديد" : "إضافة مورد جديد للمكتبة"}</h2><form onSubmit={save} className="em-stack"><label>العنوان<input autoFocus className="em-share" required minLength={3} maxLength={160} value={title} onChange={e => setTitle(e.target.value)} disabled={busy || Boolean(uploaded)}/></label>
+      {!programId && <label>البرنامج المستهدف<select className="em-share" value={targetProgram} required disabled={busy || Boolean(uploaded)} onChange={e => { setTargetProgram(e.target.value); setCategory("exams"); }}>{programs.map(p => <option value={p.id} key={p.id}>{p.title}</option>)}</select></label>}
+      {modal === "resource" && <><label>القسم المستهدف<select className="em-share" value={category} onChange={e => setCategory(e.target.value)} disabled={busy || Boolean(uploaded)}>{categories.filter(c => !c.programId || c.programId === targetProgram).map(c => <option key={c.key} value={c.key}>{c.name}</option>)}</select></label><label>الملف الأصلي<input type="file" required accept={Object.keys(resourceMimeTypes).map(k => `.${k}`).join(",")} disabled={busy || Boolean(uploaded)} onChange={e => setFile(e.target.files?.[0] ?? null)}/></label>{file && <p className="em-muted">حجم الملف: {formatSize(file.size)}</p>}<p className="em-muted">PDF، Word، PowerPoint، Excel، TXT حتى ٣٠ MB؛ MP4 وWebM حتى ٥ GB. إضافة ملف هنا لا تُدخل محتواه تلقائيًا في توليد الأسئلة.</p></>}
+      {busy && <p role="status">{progress ? `رفع الملف: ${progress}٪` : "جارٍ الحفظ…"}</p>}{error && <p role="alert" className="em-error">{error}</p>}{uploaded && !busy && <p>اكتمل رفع الملف. يمكنك إعادة حفظه في المكتبة دون إعادة رفعه.</p>}<div className="em-actions"><button className="em-button" disabled={busy}>{busy ? "جارٍ الحفظ…" : uploaded ? "إعادة حفظ الملف المرفوع" : "حفظ وإضافة"}</button><button type="button" className="em-button em-secondary" disabled={busy} onClick={close}>إلغاء</button></div>
     </form></dialog>}
   </div>;
 }

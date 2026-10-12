@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const form = await request.formData(); const id = form.get("id"); const bytes = form.get("file");
     if (typeof id !== "string" || !(bytes instanceof File)) throw new Error("INVALID_FILE");
     const resource = await resourceForOwner(id, user.user.id);
-    if (resource.status !== "PENDING" || resource.archivedAt || bytes.size !== resource.sizeBytes || resource.createdAt.getTime() < Date.now() - 60 * 60_000) throw new Error("INVALID_FILE");
+    if (resource.status !== "PENDING" || resource.archivedAt || bytes.size !== Number(resource.sizeBytes) || resource.createdAt.getTime() < Date.now() - 60 * 60_000) throw new Error("INVALID_FILE");
     await storage.save(resource.blobPath, Buffer.from(await bytes.arrayBuffer()), resource.mimeType);
     await prisma.resourceFile.updateMany({ where: { id, status: "PENDING", program: { instructorId: user.user.id } }, data: { status: "READY", storagePath: resource.blobPath } });
     return NextResponse.json({ ok: true });

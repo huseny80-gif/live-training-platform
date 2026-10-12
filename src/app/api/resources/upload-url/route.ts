@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         const { id } = JSON.parse(payload ?? "{}");
         const file = await resourceForOwner(id, user.user.id);
         if (file.blobPath !== pathname || file.status !== "PENDING" || file.archivedAt || file.createdAt.getTime() < Date.now() - 60 * 60_000) throw new Error("INVALID_UPLOAD");
-        return { allowedContentTypes: [file.mimeType], maximumSizeInBytes: file.sizeBytes, addRandomSuffix: false, allowOverwrite: false, validUntil: Date.now() + 60 * 60_000, tokenPayload: JSON.stringify({ id, owner: user.user.id }) };
+        return { allowedContentTypes: [file.mimeType], maximumSizeInBytes: Number(file.sizeBytes), addRandomSuffix: false, allowOverwrite: false, validUntil: Date.now() + 60 * 60_000, tokenPayload: JSON.stringify({ id, owner: user.user.id }) };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => { const { id, owner } = JSON.parse(tokenPayload ?? "{}"); await completeResource(id, owner, blob.url); },
     });

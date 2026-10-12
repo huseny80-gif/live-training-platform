@@ -12,12 +12,13 @@ async function run() {
   ];
   items.forEach(i => Object.assign(i, { programId: "program" }));
   items.push({ id: "task", categoryKey: "assignments", title: "المهمة الثانية", kind: "file", date: "2026-10-12T10:00:00Z", previewUrl: "/resources/task", ...{ programId: "second" } });
-  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import ResourceLibrary from'./src/app/resources/ResourceLibrary';createRoot(document.getElementById('app')).render(<main className="em-page"><div className="rl-container"><ResourceLibrary programId={location.pathname==='/all'?null:'program'} programTitle="نظم المعلومات الجغرافية" programs={[{id:'program',title:'نظم المعلومات الجغرافية'},{id:'second',title:'دورة ثانية'}]} categories={${JSON.stringify([...defaultCategories,{key:"maps-second",name:"خرائط تطبيقية",icon:"📁",programId:"second"}])}} items={${JSON.stringify(items)}}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "mock", setup(b) { b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); b.onLoad({ filter: /./, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){window.__refresh=(window.__refresh||0)+1}}}`, loader: "js" })); } }] });
+  const bundle = await build({ stdin: { contents: `import React from 'react';import{createRoot}from'react-dom/client';import ResourceLibrary from'./src/app/resources/ResourceLibrary';createRoot(document.getElementById('app')).render(<main className="em-page"><div className="rl-container"><ResourceLibrary programId={location.pathname==='/all'?null:'program'} programTitle="نظم المعلومات الجغرافية" programs={[{id:'program',title:'نظم المعلومات الجغرافية'},{id:'second',title:'دورة ثانية'}]} categories={${JSON.stringify([...defaultCategories,{key:"maps-second",name:"خرائط تطبيقية",icon:"📁",programId:"second"}])}} items={${JSON.stringify(items)}}/></div></main>);`, resolveDir: process.cwd(), loader: "tsx" }, bundle: true, write: false, platform: "browser", jsx: "automatic", define: { "process.env.NODE_ENV": '"production"', "process.env": "{}" }, plugins: [{ name: "mock", setup(b) { b.onResolve({ filter: /^@vercel\/blob\/client$/ }, () => ({path:"blob",namespace:"blob-mock"})); b.onLoad({filter:/./,namespace:"blob-mock"},()=>({loader:"js",contents:`export async function upload(path,file,options){window.__blobUploads=(window.__blobUploads||0)+1;options.onUploadProgress({percentage:100});return{url:'https://fixture.private.blob.vercel-storage.com/resources/program/new.mp4'}}`})); b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: "router", namespace: "mock" })); b.onLoad({ filter: /./, namespace: "mock" }, () => ({ contents: `export function useRouter(){return{refresh(){window.__refresh=(window.__refresh||0)+1}}}`, loader: "js" })); } }] });
   const css = (await fs.readFile("src/app/exam-material/exam-material.css", "utf8")) + (await fs.readFile("src/app/resources/resources.css", "utf8"));
   const calls: Record<string, unknown>[] = [], uploads: { name: string; size: number }[] = [];
+  let completeAttempts = 0;
   const server = http.createServer(async (req, res) => {
     if (req.url === "/bundle.js") { res.setHeader("Content-Type", "text/javascript"); res.end(bundle.outputFiles[0].text); return; }
-    if (req.url === "/api/resources") { let body = ""; for await (const part of req) body += part; const data = JSON.parse(body); calls.push(data); res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify(data.mode === "reserve" ? { id: "new", mode: "direct" } : { ok: true })); return; }
+    if (req.url === "/api/resources") { let body = ""; for await (const part of req) body += part; const data = JSON.parse(body); calls.push(data); res.setHeader("Content-Type", "application/json"); if (data.mode === "complete" && ++completeAttempts === 1) { res.statusCode=503; res.end(JSON.stringify({error:"استغرق حفظ المورد وقتًا طويلًا.",code:"RESOURCE_DB_TIMEOUT"})); return; } res.end(JSON.stringify(data.mode === "reserve" ? { id: "new", mode: (data.input.fileName.endsWith(".mp4") ? "blob" : "direct"), pathname:"resources/program/new.mp4", mimeType:"video/mp4" } : { ok: true })); return; }
     if (req.url === "/api/resources/upload") { const parts: Buffer[] = []; for await (const p of req) parts.push(p); const body = Buffer.concat(parts); const form = await new Request("http://localhost/upload", { method: "POST", headers: { "content-type": req.headers["content-type"]! }, body }).formData(); const file = form.get("file") as File; uploads.push({ name: file.name, size: file.size }); res.setHeader("Content-Type", "application/json"); res.end('{"ok":true}'); return; }
     res.setHeader("Content-Type", "text/html; charset=utf-8"); res.end(`<!doctype html><html lang="ar" dir="rtl"><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}${css}</style></head><body><div id="app"></div><script src="/bundle.js"></script></body></html>`);
   });
@@ -61,6 +62,21 @@ async function run() {
     await page.getByLabel("الملف الأصلي",{exact:true}).setInputFiles({name:"task.txt",mimeType:"text/plain",buffer:Buffer.from("source")});
     await page.getByRole("button",{name:"حفظ وإضافة"}).click(); await page.getByRole("dialog").waitFor({state:"detached"});
     assert.equal((calls.at(-1)!.input as any).programId,"second"); assert.equal((calls.at(-1)!.input as any).categoryKey,"maps-second");
+    await page.goto(`http://127.0.0.1:${address.port}/blob`);
+    await page.getByRole("button",{name:"+ إضافة مورد جديد للمكتبة",exact:true}).click();
+    await page.getByLabel("العنوان",{exact:true}).fill("GIS-Part1");
+    await page.getByLabel("القسم المستهدف").selectOption("videos");
+    await page.getByLabel("الملف الأصلي",{exact:true}).setInputFiles({name:"GIS.mp4",mimeType:"video/mp4",buffer:Buffer.from("video-fixture")});
+    const reservesBefore=calls.filter(c=>c.mode==="reserve").length;
+    await page.getByRole("button",{name:"حفظ وإضافة"}).click();
+    await page.getByRole("button",{name:"إعادة حفظ الملف المرفوع"}).waitFor();
+    assert.ok((await page.getByRole("alert").textContent())?.includes("تثبيت الملف المرفوع"));
+    assert.equal(await page.getByLabel("العنوان",{exact:true}).isDisabled(),true);
+    await page.getByRole("button",{name:"إعادة حفظ الملف المرفوع"}).click();
+    await page.getByRole("dialog").waitFor({state:"detached"});
+    assert.equal(await page.evaluate(()=>(window as any).__blobUploads),1);
+    assert.equal(calls.filter(c=>c.mode==="reserve").length,reservesBefore+1);
+    assert.equal(completeAttempts,2);
     assert.deepEqual(errors, []); console.log("PASS: real library components on mobile/desktop; cross-category search, exact download link, rename/trash/cancel/restore; persisted category request and original file bytes/name/size upload; dialog Escape/focus and no overflow (fixture API).");
   } finally { await browser.close(); await new Promise<void>(resolve => server.close(() => resolve())); }
 }
