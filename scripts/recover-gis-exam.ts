@@ -18,15 +18,18 @@ async function recover() {
   const program = await prisma.trainingProgram.findUnique({ where: { id: PROGRAM_ID }, select: { id: true, instructorId: true } });
   if (!program) { result.status = "NO_MATCHING_PROGRAM"; return; }
   const documents = await prisma.trainingDocument.findMany({ where: {
-    program: { instructorId: program.instructorId }, archivedAt: null, extractionStatus: "COMPLETED",
+    archivedAt: null, extractionStatus: "COMPLETED",
     fileName: { contains: "GIS-Part6b", mode: "insensitive" },
-  }, select: { id: true, programId: true } });
+  }, select: { id: true, programId: true, program: { select: { instructorId: true } } } });
   const courses = [...new Set(documents.map(d => d.programId))];
+  result.matchingDocuments = documents.length; result.matchingCourses = courses.length;
   if (courses.length > 1) { result.status = "AMBIGUOUS_TARGET"; return; }
   if (courses.length === 1) programId = courses[0];
   documents.forEach(d => targetDocuments.add(d.id));
   const candidates = await prisma.examMaterialBatch.findMany({ where: { programId, deletedAt: null }, orderBy: { createdAt: "desc" }, take: 50 });
+  result.failedJobsInScope = candidates.filter(b => b.status === "FAILED").length;
   const failed = candidates.find(b => b.status === "FAILED" && b.errorCode !== "RECOVERED" && matchesLecture(b.sources as unknown as SourcePage[]));
+  result.matchingFailedJobs = candidates.filter(b => b.status === "FAILED" && matchesLecture(b.sources as unknown as SourcePage[])).length;
   if (!failed) {
     const ready = candidates.find(b => b.status === "READY" && b.questionCount === 10 && matchesLecture(b.sources as unknown as SourcePage[]));
     if (ready?.content) {
