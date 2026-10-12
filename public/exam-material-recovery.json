@@ -1,18 +1,1 @@
-{
-  "release": "cd93f03df8da9a1d710dc0a5a86c8c924773a509",
-  "status": "READY",
-  "jobsAttempted": 1,
-  "matchingDocuments": 1,
-  "matchingCourses": 1,
-  "requestedCount": 10,
-  "extractedPages": 24,
-  "ocrAttempted": true,
-  "stage": "COMPLETE",
-  "storageBackend": "BLOB",
-  "ocrPages": 24,
-  "availableCandidates": 548,
-  "questionCount": 10,
-  "selectionMethod": "SOURCE_ONLY",
-  "requiresSourceReview": true,
-  "reportType": "COMPLETED_OPERATION_RECEIPT"
-}
+{"reportType":"COMPLETED_OPERATION_RECEIPT","release":"5040091b8da3f329795daa7a649f424c91a9e372","status":"READY","questionCount":10,"visuallyComparedPages":10,"totalDocumentPages":24,"requiresSourceReview":true,"sourceReviewed":false,"selectionMethod":"SOURCE_ONLY","scope":"VERIFIED_EXCERPTS_ONLY"}
