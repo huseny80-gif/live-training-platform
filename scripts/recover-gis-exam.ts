@@ -6,15 +6,32 @@ import { sha, type SourcePage, type Material } from "../src/lib/exam-material/gr
 
 // A scoped recovery requested by the owner in this session. No other course is touched.
 const PROGRAM_ID = "15dda042-1cf0-4143-ba9b-122eeecbbdc4";
-const matchesLecture = (pages: SourcePage[]) => pages.length > 0 && pages.every(p => /gis-part6b\.pdf$/i.test(p.fileName));
+let programId = PROGRAM_ID;
+const targetDocuments = new Set<string>();
+const matchesLecture = (pages: SourcePage[]) => pages.length > 0 && new Set(pages.map(p => p.documentId)).size === 1 && pages.every(p => targetDocuments.size > 0 ? targetDocuments.has(p.documentId) : /gis[-_ ]part6b/i.test(p.fileName));
 const result: Record<string, unknown> = { release: process.env.VERCEL_GIT_COMMIT_SHA ?? "local", status: "PENDING", jobsAttempted: 0 };
 async function recover() {
   if (process.env.VERCEL_ENV !== "production") return;
   const program = await prisma.trainingProgram.findUnique({ where: { id: PROGRAM_ID }, select: { id: true, instructorId: true } });
   if (!program) { result.status = "NO_MATCHING_PROGRAM"; return; }
-  const candidates = await prisma.examMaterialBatch.findMany({ where: { programId: PROGRAM_ID, deletedAt: null }, orderBy: { createdAt: "desc" }, take: 50 });
+  const documents = await prisma.trainingDocument.findMany({ where: {
+    program: { instructorId: program.instructorId }, archivedAt: null, extractionStatus: "COMPLETED",
+    fileName: { contains: "GIS-Part6b", mode: "insensitive" },
+  }, select: { id: true, programId: true } });
+  const courses = [...new Set(documents.map(d => d.programId))];
+  if (courses.length > 1) { result.status = "AMBIGUOUS_TARGET"; return; }
+  if (courses.length === 1) programId = courses[0];
+  documents.forEach(d => targetDocuments.add(d.id));
+  const candidates = await prisma.examMaterialBatch.findMany({ where: { programId, deletedAt: null }, orderBy: { createdAt: "desc" }, take: 50 });
   const failed = candidates.find(b => b.status === "FAILED" && b.errorCode !== "RECOVERED" && matchesLecture(b.sources as unknown as SourcePage[]));
-  if (!failed) { result.status = "NO_MATCHING_FAILED_JOB"; return; }
+  if (!failed) {
+    const ready = candidates.find(b => b.status === "READY" && b.questionCount === 10 && matchesLecture(b.sources as unknown as SourcePage[]));
+    if (ready?.content) {
+      result.status = "READY"; result.questionCount = ready.questionCount;
+      result.selectionMethod = (ready.content as unknown as Material).selectionMethod ?? "AI_CURATED";
+    } else result.status = "NO_MATCHING_FAILED_JOB";
+    return;
+  }
   const pages = failed.sources as unknown as SourcePage[];
   const fingerprint = sha(JSON.stringify(pages));
   const requested = failed.questionCount;
@@ -37,8 +54,8 @@ async function recover() {
   for (const count of counts) {
     for (let attempt = 0; attempt < (count === requested ? 2 : 1); attempt++) {
       const batch = await prisma.$transaction(async tx => {
-        if (await tx.examMaterialBatch.count({ where: { programId: PROGRAM_ID, status: "GENERATING", deletedAt: null } })) return null;
-        return tx.examMaterialBatch.create({ data: { programId: PROGRAM_ID, sources: failed.sources!, questionCount: count,
+        if (await tx.examMaterialBatch.count({ where: { programId, status: "GENERATING", deletedAt: null } })) return null;
+        return tx.examMaterialBatch.create({ data: { programId, sources: failed.sources!, questionCount: count,
           title: count === requested ? "استعادة التوليد — GIS-Part6b" : `استعادة التوليد — ${count} سؤالًا بدل ${requested} وفق كفاية النص` } });
       }, { isolationLevel: "Serializable" });
       if (!batch) { result.status = "GENERATION_BUSY"; return; }
@@ -49,7 +66,7 @@ async function recover() {
       if (outcome.status === "READY" && outcome.content) {
         result.status = "READY"; result.questionCount = (outcome.content as unknown as Material).questions.length;
         result.selectionMethod = (outcome.content as unknown as Material).selectionMethod;
-        await prisma.examMaterialBatch.updateMany({ where: { id: { in: recoverableIds }, programId: PROGRAM_ID, status: "FAILED", deletedAt: null }, data: { errorCode: "RECOVERED" } });
+        await prisma.examMaterialBatch.updateMany({ where: { id: { in: recoverableIds }, programId, status: "FAILED", deletedAt: null }, data: { errorCode: "RECOVERED" } });
         return;
       }
       result.status = "FAILED"; result.errorCode = outcome.errorCode;
